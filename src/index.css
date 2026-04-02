@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Manrope", sans-serif;
+
+  --color-primary: #526600;
+  --color-primary-container: #8ca33e;
+  --color-primary-fixed: #d4ed7f;
+  --color-primary-fixed-dim: #b8d166;
+  
+  --color-secondary: #5c614d;
+  --color-secondary-container: #dee2c9;
+  
+  --color-tertiary: #84468e;
+  --color-tertiary-container: #c581ce;
+  --color-tertiary-fixed: #fed6ff;
+  --color-tertiary-fixed-dim: #f6adfe;
+
+  --color-surface: #fafaee;
+  --color-surface-bright: #fafaee;
+  --color-surface-dim: #dadbcf;
+  --color-surface-container: #eeefe3;
+  --color-surface-container-low: #f4f4e9;
+  --color-surface-container-high: #e8e9dd;
+  --color-surface-container-highest: #e3e3d8;
+  --color-surface-container-lowest: #ffffff;
+
+  --color-on-surface: #1a1c15;
+  --color-on-surface-variant: #454839;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #2a3600;
+  --color-on-secondary-container: #606551;
+  
+  --color-outline: #767967;
+  --color-outline-variant: #c6c8b4;
+  
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline tracking-tight;
+  }
+}
+
+.sidebar-glass {
+  @apply bg-surface-container/80 backdrop-blur-xl;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
