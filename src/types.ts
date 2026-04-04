@@ -1,4 +1,4 @@
-export type NavItem = 'dashboard' | 'tenantProfile' | 'expenses' | 'vehicles' | 'suppliers' | 'companies' | 'contracts' | 'freights' | 'reports' | 'settings' | 'support';
+export type NavItem = 'dashboard' | 'platformTenants' | 'tenantProfile' | 'expenses' | 'vehicles' | 'suppliers' | 'companies' | 'contracts' | 'freights' | 'reports' | 'settings' | 'support';
 
 export interface Vehicle {
   id: string;
@@ -101,6 +101,22 @@ export interface TenantProfile {
   state: string;
   plan: string;
   status: 'active' | 'inactive' | 'suspended';
+}
+
+export interface PlatformTenant {
+  id: string;
+  name: string;
+  tradeName: string;
+  slug: string;
+  cnpj: string;
+  city: string;
+  state: string;
+  plan: string;
+  status: 'active' | 'inactive' | 'suspended';
+  ownerName: string;
+  ownerEmail: string;
+  ownerLinked: boolean;
+  createdAt: string;
 }
 
 export interface Contract {

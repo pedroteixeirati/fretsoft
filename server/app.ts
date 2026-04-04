@@ -3,7 +3,7 @@ import express from 'express';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { pool } from './db';
 import { adminAuth } from './firebaseAdmin';
-import { canPerform, type AppRole, tenantProfileRoles, userManagementRoles } from './permissions';
+import { canPerform, type AppRole, platformTenantRoles, tenantProfileRoles, userManagementRoles } from './permissions';
 import { resources } from './resources';
 
 type AuthenticatedRequest = express.Request & {
@@ -59,6 +59,22 @@ type TenantProfileRow = {
   status: 'active' | 'inactive' | 'suspended';
 };
 
+type PlatformTenantRow = {
+  id: string;
+  name: string;
+  trade_name: string | null;
+  slug: string;
+  cnpj: string | null;
+  city: string | null;
+  state: string | null;
+  plan: string;
+  status: 'active' | 'inactive' | 'suspended';
+  created_at: string;
+  owner_name: string | null;
+  owner_email: string | null;
+  owner_linked: boolean;
+};
+
 const app = express();
 
 app.use(cors());
@@ -76,6 +92,10 @@ function canManageTenantUsers(role?: AppRole) {
 
 function canManageTenantProfile(role?: AppRole) {
   return !!role && tenantProfileRoles.includes(role);
+}
+
+function canManagePlatformTenants(role?: AppRole) {
+  return !!role && platformTenantRoles.includes(role);
 }
 
 function ensureAllowed(res: express.Response, allowed: boolean, message: string) {
@@ -144,6 +164,24 @@ function mapTenantProfile(row: TenantProfileRow) {
     state: row.state || '',
     plan: row.plan,
     status: row.status,
+  };
+}
+
+function mapPlatformTenant(row: PlatformTenantRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    tradeName: row.trade_name || '',
+    slug: row.slug,
+    cnpj: row.cnpj || '',
+    city: row.city || '',
+    state: row.state || '',
+    plan: row.plan,
+    status: row.status,
+    ownerName: row.owner_name || '',
+    ownerEmail: row.owner_email || '',
+    ownerLinked: row.owner_linked,
+    createdAt: row.created_at,
   };
 }
 
@@ -452,6 +490,159 @@ app.put('/api/tenant-profile', loadAuthContext, async (req: AuthenticatedRequest
     res.json(mapTenantProfile(result.rows[0]));
   } catch (error) {
     next(error);
+  }
+});
+
+app.get('/api/platform/tenants', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canManagePlatformTenants(req.auth?.role), 'Sem permissao para visualizar transportadoras da plataforma.')) {
+      return;
+    }
+
+    const result = await pool.query<PlatformTenantRow>(
+      `select t.id,
+              t.name,
+              t.trade_name,
+              t.slug,
+              t.cnpj,
+              t.city,
+              t.state,
+              t.plan,
+              t.status,
+              t.created_at,
+              coalesce(u.name, '') as owner_name,
+              coalesce(u.email, '') as owner_email,
+              (u.id is not null) as owner_linked
+       from tenants t
+       left join lateral (
+         select tu.user_id
+         from tenant_users tu
+         where tu.tenant_id = t.id
+           and tu.role = 'owner'
+         order by tu.created_at asc
+         limit 1
+       ) tenant_owner on true
+       left join users u on u.id = tenant_owner.user_id
+       order by t.created_at desc`
+    );
+
+    res.json(result.rows.map(mapPlatformTenant));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/platform/tenants', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  const client = await pool.connect();
+
+  try {
+    if (!ensureAllowed(res, canManagePlatformTenants(req.auth?.role), 'Sem permissao para criar transportadoras.')) {
+      return;
+    }
+
+    const {
+      name,
+      tradeName,
+      slug,
+      cnpj,
+      city,
+      state,
+      plan,
+      status,
+      ownerUid,
+      ownerEmail,
+      ownerName,
+    } = req.body as {
+      name: string;
+      tradeName?: string;
+      slug?: string;
+      cnpj?: string;
+      city?: string;
+      state?: string;
+      plan?: string;
+      status?: 'active' | 'inactive' | 'suspended';
+      ownerUid: string;
+      ownerEmail: string;
+      ownerName?: string;
+    };
+
+    if (!name?.trim() || !ownerUid?.trim() || !ownerEmail?.trim()) {
+      res.status(400).json({ error: 'Nome da transportadora e dados do usuario owner sao obrigatorios.' });
+      return;
+    }
+
+    const normalizedSlug = slugify(slug || tradeName || name) || `tenant-${Date.now()}`;
+
+    await client.query('begin');
+
+    const tenantResult = await client.query<{ id: string }>(
+      `insert into tenants (name, trade_name, slug, cnpj, city, state, plan, status)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
+       returning id`,
+      [
+        name.trim(),
+        tradeName?.trim() || null,
+        normalizedSlug,
+        cnpj?.trim() || null,
+        city?.trim() || null,
+        state?.trim() || null,
+        plan?.trim() || 'starter',
+        status || 'active',
+      ]
+    );
+
+    const userResult = await client.query<AppUserRow>(
+      `insert into users (firebase_uid, email, role, name, status)
+       values ($1, $2, 'owner', $3, 'active')
+       on conflict (firebase_uid) do update set
+         email = excluded.email,
+         role = 'owner',
+         name = excluded.name,
+         status = 'active',
+         updated_at = now()
+       returning id, firebase_uid, email, name, status, created_at`,
+      [ownerUid.trim(), ownerEmail.trim(), ownerName?.trim() || null]
+    );
+
+    await client.query(
+      `insert into tenant_users (tenant_id, user_id, role, status)
+       values ($1, $2, 'owner', 'active')
+       on conflict (tenant_id, user_id) do update set
+         role = 'owner',
+         status = 'active',
+         updated_at = now()`,
+      [tenantResult.rows[0].id, userResult.rows[0].id]
+    );
+
+    const created = await client.query<PlatformTenantRow>(
+      `select t.id,
+              t.name,
+              t.trade_name,
+              t.slug,
+              t.cnpj,
+              t.city,
+              t.state,
+              t.plan,
+              t.status,
+              t.created_at,
+              coalesce(u.name, '') as owner_name,
+              coalesce(u.email, '') as owner_email,
+              true as owner_linked
+       from tenants t
+       left join users u on u.id = $2
+       where t.id = $1
+       limit 1`,
+      [tenantResult.rows[0].id, userResult.rows[0].id]
+    );
+
+    await client.query('commit');
+
+    res.status(201).json(mapPlatformTenant(created.rows[0]));
+  } catch (error) {
+    await client.query('rollback');
+    next(error);
+  } finally {
+    client.release();
   }
 });
 

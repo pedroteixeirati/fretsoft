@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard,
+  ShieldCheck,
   CreditCard,
   Truck,
   Users,
@@ -9,9 +10,7 @@ import {
   Route,
   BarChart3,
   Settings,
-  HelpCircle,
   LogOut,
-  User,
 } from 'lucide-react';
 import { NavItem } from '../types';
 import { cn } from '../lib/utils';
@@ -24,24 +23,12 @@ interface SidebarProps {
   onNavigate: (item: NavItem) => void;
 }
 
-function roleLabel(role?: string) {
-  if (!role) return 'Perfil nao carregado';
-  switch (role) {
-    case 'dev': return 'Desenvolvedor';
-    case 'owner': return 'Proprietario';
-    case 'admin': return 'Administrador';
-    case 'financial': return 'Financeiro';
-    case 'operational': return 'Operacional';
-    case 'driver': return 'Motorista';
-    default: return 'Visualizador';
-  }
-}
-
 export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
-  const { user, userProfile } = useFirebase();
+  const { userProfile } = useFirebase();
 
   const menuItems = [
     { id: 'dashboard', label: 'Painel', icon: LayoutDashboard, allowed: true },
+    { id: 'platformTenants', label: 'Transportadoras', icon: ShieldCheck, allowed: canAccess(userProfile, 'platformTenants', 'read') },
     { id: 'tenantProfile', label: 'Transportadora', icon: Building2, allowed: canAccess(userProfile, 'tenantProfile', 'read') },
     { id: 'expenses', label: 'Despesas', icon: CreditCard, allowed: canAccess(userProfile, 'expenses', 'read') },
     { id: 'vehicles', label: 'Veiculos', icon: Truck, allowed: canAccess(userProfile, 'vehicles', 'read') },
@@ -54,7 +41,6 @@ export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
 
   const bottomItems = [
     { id: 'settings', label: 'Configuracoes', icon: Settings, allowed: canAccess(userProfile, 'settings', 'read') },
-    { id: 'support', label: 'Suporte', icon: HelpCircle, allowed: true },
   ].filter((item) => item.allowed);
 
   const handleLogout = async () => {
@@ -117,29 +103,6 @@ export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
             <LogOut className="w-5 h-5 shrink-0" />
             <span className="font-headline text-sm leading-none whitespace-nowrap">Sair</span>
           </button>
-
-          <div className="px-4 mt-6 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary-container overflow-hidden flex items-center justify-center shrink-0">
-              {user?.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName || 'Usuario'}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <User className="w-4 h-4 text-primary" />
-              )}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold truncate">
-                {userProfile?.name ||
-                 (user?.email?.endsWith('@novalog.test') ? user.email.split('@')[0] : user?.displayName) ||
-                 'Usuario'}
-              </p>
-              <p className="text-[10px] text-on-surface-variant truncate">{roleLabel(userProfile?.role)}</p>
-            </div>
-          </div>
         </div>
       </div>
     </aside>

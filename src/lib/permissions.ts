@@ -1,10 +1,16 @@
 import { UserProfile } from '../types';
 
 type Role = UserProfile['role'];
-type Section = 'tenantProfile' | 'vehicles' | 'providers' | 'companies' | 'contracts' | 'freights' | 'expenses' | 'reports' | 'settings' | 'users';
+type Section = 'platformTenants' | 'tenantProfile' | 'vehicles' | 'providers' | 'companies' | 'contracts' | 'freights' | 'expenses' | 'reports' | 'settings' | 'users';
 type Action = 'read' | 'create' | 'update' | 'delete';
 
 const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
+  platformTenants: {
+    read: ['dev'],
+    create: ['dev'],
+    update: ['dev'],
+    delete: [],
+  },
   tenantProfile: {
     read: ['dev', 'owner', 'admin'],
     create: [],

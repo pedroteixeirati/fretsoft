@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { deleteApp, getApp, getApps, initializeApp } from 'firebase/app';
 import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -6,14 +6,16 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 export const createUserByAdmin = async (email: string, pass: string) => {
-  const secondaryApp = initializeApp(firebaseConfig, 'SecondaryApp');
+  const secondaryApp = getApps().some((appInstance) => appInstance.name === 'SecondaryApp')
+    ? getApp('SecondaryApp')
+    : initializeApp(firebaseConfig, 'SecondaryApp');
   const secondaryAuth = getAuth(secondaryApp);
   try {
     const result = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
     await signOut(secondaryAuth);
     return result;
   } finally {
-    // deleteApp(secondaryApp); // Opcional se importar deleteApp
+    await deleteApp(secondaryApp).catch(() => undefined);
   }
 };
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
 import Dashboard from './pages/Dashboard';
+import PlatformTenants from './pages/PlatformTenants';
 import TenantProfile from './pages/TenantProfile';
 import Expenses from './pages/Expenses';
 import Vehicles from './pages/Vehicles';
@@ -126,6 +127,8 @@ function AppContent() {
         return <Expenses onNavigate={setActiveTab} />;
       case 'tenantProfile':
         return <TenantProfile />;
+      case 'platformTenants':
+        return <PlatformTenants />;
       case 'vehicles':
         return <Vehicles />;
       case 'suppliers':

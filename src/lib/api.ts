@@ -1,5 +1,5 @@
 import { auth, OperationType, handleDataError } from '../firebase';
-import { Company, Contract, Expense, Freight, Provider, TenantProfile, UserProfile, Vehicle } from '../types';
+import { Company, Contract, Expense, Freight, PlatformTenant, Provider, TenantProfile, UserProfile, Vehicle } from '../types';
 
 type ResourceInput<T> = Omit<T, 'id'>;
 
@@ -77,6 +77,23 @@ export const tenantProfileApi = {
   get: () => apiRequest<TenantProfile>('/api/tenant-profile', {}, OperationType.GET),
   update: (payload: Omit<TenantProfile, 'id'>) =>
     apiRequest<TenantProfile>('/api/tenant-profile', { method: 'PUT', body: JSON.stringify(payload) }, OperationType.UPDATE),
+};
+
+export const platformTenantsApi = {
+  list: () => apiRequest<PlatformTenant[]>('/api/platform/tenants', {}, OperationType.LIST),
+  create: (payload: {
+    name: string;
+    tradeName: string;
+    slug: string;
+    cnpj: string;
+    city: string;
+    state: string;
+    plan: string;
+    status: 'active' | 'inactive' | 'suspended';
+    ownerUid: string;
+    ownerEmail: string;
+    ownerName: string;
+  }) => apiRequest<PlatformTenant>('/api/platform/tenants', { method: 'POST', body: JSON.stringify(payload) }, OperationType.CREATE),
 };
 
 export const vehiclesApi = createCrudApi<Vehicle>('/api/vehicles');
