@@ -4,13 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "dev:api": "tsx server/index.ts",
-    "build": "vite build",
-    "preview": "vite preview",
+    "start": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
+    "dev": "concurrently \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "vite --config front-end/vite.config.ts --port=3000 --host=0.0.0.0",
+    "dev:api": "tsx back-end/index.ts",
+    "build": "vite build --config front-end/vite.config.ts",
+    "preview": "vite preview --config front-end/vite.config.ts",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test --test-concurrency=1 --test-isolation=none server/__tests__/**/*.test.ts"
+    "test": "node --experimental-strip-types --experimental-specifier-resolution=node --test --test-concurrency=1 --test-isolation=none back-end/__tests__/**/*.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.48.0",
@@ -24,6 +26,7 @@
     "firebase-admin": "^13.7.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "node-cron": "^4.2.1",
     "pg": "^8.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -38,6 +41,7 @@
     "@types/node": "^22.14.0",
     "@types/pg": "^8.20.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
