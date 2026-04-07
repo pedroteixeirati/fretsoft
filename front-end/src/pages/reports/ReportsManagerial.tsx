@@ -1,0 +1,83 @@
+import React from 'react';
+import { Building2, CheckCircle, FileText, Wallet } from 'lucide-react';
+import { useReportsData } from './useReportsData';
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-surface-container-lowest rounded-3xl border border-outline-variant p-6">
+      <h3 className="mb-5 text-xl font-bold text-on-surface">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function MetricBox({ label, value, icon: Icon, highlight }: { label: string; value: string; icon: React.ElementType; highlight?: boolean }) {
+  return (
+    <div className={`rounded-3xl border p-6 shadow-sm ${highlight ? 'border-primary/20 bg-primary-container/20' : 'border-outline-variant bg-surface-container-lowest'}`}>
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-medium text-on-surface-variant">{label}</p>
+        <Icon className={`h-5 w-5 ${highlight ? 'text-primary' : 'text-on-surface-variant'}`} />
+      </div>
+      <p className="text-3xl font-black text-on-surface">{value}</p>
+    </div>
+  );
+}
+
+function ExecutiveRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-outline-variant/30 pb-3 last:border-b-0 last:pb-0">
+      <span className="text-on-surface-variant">{label}</span>
+      <span className="text-right font-bold text-on-surface">{value}</span>
+    </div>
+  );
+}
+
+function EmptyText({ text }: { text: string }) {
+  return <p className="text-sm text-on-surface-variant">{text}</p>;
+}
+
+type ReportsManagerialProps = {
+  data: ReturnType<typeof useReportsData>;
+};
+
+export default function ReportsManagerial({ data }: ReportsManagerialProps) {
+  return (
+    <div className="space-y-8">
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <MetricBox label="Empresas ativas" value={data.activeCompanies.toString()} icon={Building2} />
+        <MetricBox label="Contratos ativos" value={data.activeContracts.toString()} icon={FileText} />
+        <MetricBox label="Carteira recorrente mensal" value={`R$ ${data.contracts.filter((item) => item.status === 'active').reduce((sum, item) => sum + Number(item.monthlyValue || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} />
+        <MetricBox label="Contas vencidas" value={`R$ ${data.overduePayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={CheckCircle} highlight={data.overduePayables === 0} />
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Panel title="Empresas com maior receita contratada">
+          <div className="space-y-4">
+            {data.companyPerformance.length === 0 ? (
+              <EmptyText text="Nenhuma empresa com contrato no intervalo atual." />
+            ) : data.companyPerformance.slice(0, 5).map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-4 border-b border-outline-variant/30 pb-3 last:border-b-0 last:pb-0">
+                <div>
+                  <p className="font-bold text-on-surface">{item.name}</p>
+                  <p className="text-xs text-on-surface-variant">{item.contracts} contrato(s)</p>
+                </div>
+                <p className="font-black text-primary">R$ {item.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Resumo executivo">
+          <div className="space-y-4 text-sm">
+            <ExecutiveRow label="Fretes avulsos no periodo" value={`${data.filteredFreights.length} viagem(ns)`} />
+            <ExecutiveRow label="Custos operacionais registrados" value={`${data.filteredExpenses.length} lancamento(s)`} />
+            <ExecutiveRow label="Contas a pagar em aberto" value={`${data.activePayables.filter((item) => item.status === 'open').length} titulo(s)`} />
+            <ExecutiveRow label="Contas pagas no periodo" value={`R$ ${data.paidPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+            <ExecutiveRow label="Contas a receber em aberto" value={`R$ ${data.openRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+            <ExecutiveRow label="Veiculo com melhor margem" value={data.vehiclePerformance[0]?.label || '-'} />
+            <ExecutiveRow label="Empresa com maior receita" value={data.companyPerformance[0]?.name || '-'} />
+          </div>
+        </Panel>
+      </section>
+    </div>
+  );
+}
