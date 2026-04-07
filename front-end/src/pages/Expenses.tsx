@@ -213,7 +213,7 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     if (!apiKey) {
-      setAiSummary('Os gastos ja podem ser analisados pelos relatorios. Se quiser um resumo automatico por IA, configure a chave do Gemini no ambiente.');
+      setAiSummary('Os custos operacionais ja podem ser analisados pelos relatorios. Se quiser um resumo automatico por IA, configure a chave do Gemini no ambiente.');
       return;
     }
 
@@ -232,13 +232,13 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Resuma em no maximo 2 frases os gastos da frota. Total: R$ ${formatter.format(total)}. Lancamentos: ${expenses.length}. Categorias: ${categorySummary}. Tom profissional e direto, em portugues do Brasil.`,
+        contents: `Resuma em no maximo 2 frases os custos operacionais da frota. Total: R$ ${formatter.format(total)}. Lancamentos: ${expenses.length}. Categorias: ${categorySummary}. Tom profissional e direto, em portugues do Brasil.`,
       });
 
       setAiSummary(response.text || 'Analise indisponivel no momento.');
     } catch (error) {
       console.error('Erro ao gerar resumo de IA:', error);
-      setAiSummary('Os gastos da frota ja estao organizados por categoria e veiculo. Use os relatorios para comparar custo operacional, recorrencia e impacto por caminhao.');
+      setAiSummary('Os custos operacionais ja estao organizados por categoria e veiculo. Use os relatorios para comparar recorrencia e impacto por caminhao.');
     } finally {
       setAiLoading(false);
     }
@@ -337,7 +337,7 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
     <div className="space-y-8">
       <div className="mb-8">
         <div className="flex items-center gap-2 text-on-surface-variant text-sm mb-2">
-          <span>Gestao de Frota</span>
+          <span>Operacao</span>
           <ChevronRight className="w-3 h-3" />
           <span className="text-primary font-medium">Custos operacionais</span>
         </div>
@@ -565,7 +565,7 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
         <div className="bg-primary-container p-8 rounded-3xl text-on-primary-container flex flex-col justify-center items-center text-center shadow-lg">
           <Sparkles className="w-12 h-12 mb-4" />
           <h4 className="text-xl font-bold mb-2">Padrao de Lancamentos</h4>
-          <p className="text-sm opacity-90 mb-6 leading-relaxed">Centralize os custos por veiculo para comparar combustivel, manutencao e recorrencia de gastos com muito mais clareza.</p>
+          <p className="text-sm opacity-90 mb-6 leading-relaxed">Centralize os custos por veiculo para comparar combustivel, manutencao e recorrencia operacional com muito mais clareza.</p>
           <button onClick={() => onNavigate('reports')} className="bg-on-primary-container text-primary-container w-full py-3 rounded-full font-bold hover:scale-[1.02] transition-transform">
             Abrir Relatorios
           </button>

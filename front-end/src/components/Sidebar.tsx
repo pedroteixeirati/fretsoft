@@ -58,6 +58,7 @@ export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
       items: [
         { id: 'freights', label: 'Fretes', icon: Route, allowed: canAccess(userProfile, 'freights', 'read') },
         { id: 'contracts', label: 'Contratos', icon: FileText, allowed: canAccess(userProfile, 'contracts', 'read') },
+        { id: 'expenses', label: 'Custos operacionais', icon: CreditCard, allowed: canAccess(userProfile, 'expenses', 'read') },
       ],
     },
     {
@@ -65,8 +66,8 @@ export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
       label: 'Gestao',
       icon: WalletCards,
       items: [
-        { id: 'revenues', label: 'Receitas', icon: WalletCards, allowed: canAccess(userProfile, 'revenues', 'read') },
-        { id: 'expenses', label: 'Custos operacionais', icon: CreditCard, allowed: canAccess(userProfile, 'expenses', 'read') },
+        { id: 'revenues', label: 'Contas a receber', icon: WalletCards, allowed: canAccess(userProfile, 'revenues', 'read') },
+        { id: 'payables', label: 'Contas a pagar', icon: CreditCard, allowed: canAccess(userProfile, 'payables', 'read') },
         { id: 'reports', label: 'Relatorios', icon: BarChart3, allowed: canAccess(userProfile, 'reports', 'read') },
       ],
     },
