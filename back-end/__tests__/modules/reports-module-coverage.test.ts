@@ -51,6 +51,7 @@ test('hook compartilhado de relatorios centraliza filtros estados e agregacoes',
   assert.match(reportsDataSource, /const vehiclePerformance = useMemo/);
   assert.match(reportsDataSource, /const companyPerformance = useMemo/);
   assert.match(reportsDataSource, /const resetFilters = \(\) =>/);
+  assert.match(reportsDataSource, /filteredExpenses, filteredFreights, filteredContracts, totalOperationalCosts/);
   assert.match(reportsDataSource, /setVehicleFilter\('all'\)/);
   assert.match(reportsDataSource, /setCompanyFilter\('all'\)/);
 });

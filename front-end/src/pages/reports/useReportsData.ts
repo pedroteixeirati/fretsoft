@@ -202,7 +202,7 @@ export function useReportsData() {
   return {
     activeTab, setActiveTab, startDate, setStartDate, endDate, setEndDate, vehicleFilter, setVehicleFilter, companyFilter, setCompanyFilter,
     loading, refreshing, loadError, loadReports, resetFilters, vehicles, companies, contracts,
-    filteredExpenses, filteredFreights, totalOperationalCosts, activePayables, paidPayables, openPayables, overduePayables,
+    filteredExpenses, filteredFreights, filteredContracts, totalOperationalCosts, activePayables, paidPayables, openPayables, overduePayables,
     contractRevenue, freightRevenue, receivedRevenue, openRevenue, projectedRevenue, netResult, activeVehicles, maintenanceAlerts,
     activeContracts, activeCompanies, routeRanking, vehiclePerformance, companyPerformance,
   };
