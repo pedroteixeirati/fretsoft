@@ -1,5 +1,5 @@
 import { auth, OperationType, handleDataError } from '../firebase';
-import { Company, Contract, Expense, Freight, PlatformTenant, Provider, Revenue, TenantProfile, UserProfile, Vehicle } from '../types';
+import { Company, Contract, Expense, Freight, Payable, PlatformTenant, Provider, Revenue, TenantProfile, UserProfile, Vehicle } from '../types';
 
 type ResourceInput<T> = Omit<T, 'id'>;
 
@@ -104,6 +104,15 @@ export const revenuesApi = {
   generateCharge: (id: string) => apiRequest<Revenue>(`/api/revenues/${id}/charge`, { method: 'POST' }, OperationType.UPDATE),
   markReceived: (id: string) => apiRequest<Revenue>(`/api/revenues/${id}/receive`, { method: 'POST' }, OperationType.UPDATE),
   markOverdue: (id: string) => apiRequest<Revenue>(`/api/revenues/${id}/overdue`, { method: 'POST' }, OperationType.UPDATE),
+};
+
+export const payablesApi = {
+  list: () => apiRequest<Payable[]>('/api/payables', {}, OperationType.LIST),
+  create: (payload: Omit<Payable, 'id'>) => apiRequest<Payable>('/api/payables', { method: 'POST', body: JSON.stringify(payload) }, OperationType.CREATE),
+  update: (id: string, payload: Partial<Omit<Payable, 'id'>>) => apiRequest<Payable>(`/api/payables/${id}`, { method: 'PUT', body: JSON.stringify(payload) }, OperationType.UPDATE),
+  remove: (id: string) => apiRequest<void>(`/api/payables/${id}`, { method: 'DELETE' }, OperationType.DELETE),
+  markPaid: (id: string) => apiRequest<Payable>(`/api/payables/${id}/pay`, { method: 'POST' }, OperationType.UPDATE),
+  markOverdue: (id: string) => apiRequest<Payable>(`/api/payables/${id}/overdue`, { method: 'POST' }, OperationType.UPDATE),
 };
 
 export const vehiclesApi = createCrudApi<Vehicle>('/api/vehicles');

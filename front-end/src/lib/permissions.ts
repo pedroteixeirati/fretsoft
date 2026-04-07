@@ -1,7 +1,7 @@
 import { UserProfile } from '../types';
 
 type Role = UserProfile['role'];
-type Section = 'platformTenants' | 'tenantProfile' | 'revenues' | 'vehicles' | 'providers' | 'companies' | 'contracts' | 'freights' | 'expenses' | 'reports' | 'settings' | 'users';
+type Section = 'platformTenants' | 'tenantProfile' | 'revenues' | 'payables' | 'vehicles' | 'providers' | 'companies' | 'contracts' | 'freights' | 'expenses' | 'reports' | 'settings' | 'users';
 type Action = 'read' | 'create' | 'update' | 'delete';
 
 const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
@@ -22,6 +22,12 @@ const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
     create: ['dev', 'owner', 'admin', 'financial'],
     update: [],
     delete: [],
+  },
+  payables: {
+    read: ['dev', 'owner', 'admin', 'financial'],
+    create: ['dev', 'owner', 'admin', 'financial'],
+    update: ['dev', 'owner', 'admin', 'financial'],
+    delete: ['dev', 'owner', 'admin', 'financial'],
   },
   vehicles: {
     read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],
@@ -55,9 +61,9 @@ const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
   },
   expenses: {
     read: ['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'],
-    create: ['dev', 'owner', 'admin', 'financial'],
-    update: ['dev', 'owner', 'admin', 'financial'],
-    delete: ['dev', 'owner', 'admin', 'financial'],
+    create: ['dev', 'owner', 'admin', 'operational'],
+    update: ['dev', 'owner', 'admin', 'operational'],
+    delete: ['dev', 'owner', 'admin', 'operational'],
   },
   reports: {
     read: ['dev', 'owner', 'admin', 'financial'],

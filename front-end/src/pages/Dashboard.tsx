@@ -75,7 +75,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-12">
       <header>
         <h2 className="text-3xl font-extrabold text-on-surface tracking-tight mb-2">Desempenho da Frota</h2>
-        <p className="text-on-surface-variant">Resumo financeiro operacional em tempo real.</p>
+        <p className="text-on-surface-variant">Visao consolidada da operacao e dos custos da frota em tempo real.</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -107,7 +107,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <section className="bg-surface-container-low p-8 rounded-xl">
           <div className="flex justify-between items-end mb-10">
             <div>
-              <h4 className="text-xl font-bold">Custos por Servico</h4>
+              <h4 className="text-xl font-bold">Custos operacionais por categoria</h4>
               <p className="text-sm text-on-surface-variant mt-1">Detalhamento dos custos operacionais por categoria</p>
             </div>
             {canReadReports && (
@@ -134,7 +134,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
         <section className="bg-surface-container p-8 rounded-xl flex flex-col">
           <div className="mb-10">
-            <h4 className="text-xl font-bold">Maiores Gastos da Frota</h4>
+            <h4 className="text-xl font-bold">Maiores custos da frota</h4>
             <p className="text-sm text-on-surface-variant mt-1">Analise de alocacao de recursos por unidade especifica</p>
           </div>
 
@@ -159,7 +159,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             <PulseCard
               onClick={() => onNavigate('expenses')}
               icon={AlertTriangle}
-              title="Alertas Criticos"
+              title="Pendencias operacionais"
               description={`${expenses.filter((expense) => expense.status === 'pending').length} custos operacionais pendentes de aprovacao.`}
               tone="error"
             />

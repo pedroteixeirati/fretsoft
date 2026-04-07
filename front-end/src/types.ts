@@ -1,4 +1,4 @@
-export type NavItem = 'dashboard' | 'platformTenants' | 'tenantProfile' | 'revenues' | 'expenses' | 'vehicles' | 'suppliers' | 'companies' | 'contracts' | 'freights' | 'reports' | 'settings' | 'support';
+export type NavItem = 'dashboard' | 'platformTenants' | 'tenantProfile' | 'revenues' | 'payables' | 'expenses' | 'vehicles' | 'suppliers' | 'companies' | 'contracts' | 'freights' | 'reports' | 'settings' | 'support';
 
 export interface Vehicle {
   id: string;
@@ -22,6 +22,7 @@ export interface Expense {
   displayId?: number;
   date: string;
   time: string;
+  costDate?: string;
   vehicleId: string;
   vehicleName: string;
   provider: string;
@@ -30,6 +31,14 @@ export interface Expense {
   amount: number;
   odometer: string;
   status: 'approved' | 'review' | 'pending';
+  paymentRequired?: boolean;
+  financialStatus?: 'none' | 'open' | 'paid' | 'overdue' | 'canceled';
+  dueDate?: string;
+  paidAt?: string;
+  linkedPayableId?: string | null;
+  contractId?: string | null;
+  freightId?: string | null;
+  receiptUrl?: string;
   observations: string;
 }
 
@@ -155,6 +164,25 @@ export interface Revenue {
   chargeGeneratedAt?: string;
   receivedAt?: string;
   createdAt: string;
+}
+
+export interface Payable {
+  id: string;
+  displayId?: number;
+  sourceType: 'expense' | 'manual';
+  sourceId?: string | null;
+  description: string;
+  providerName: string;
+  vehicleId?: string | null;
+  vehicleName?: string;
+  contractId?: string | null;
+  amount: number;
+  dueDate: string;
+  status: 'open' | 'paid' | 'overdue' | 'canceled';
+  paidAt?: string;
+  paymentMethod?: string;
+  proofUrl?: string;
+  notes?: string;
 }
 
 export interface Contract {

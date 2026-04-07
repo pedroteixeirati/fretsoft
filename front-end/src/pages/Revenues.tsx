@@ -75,7 +75,7 @@ export default function Revenues() {
     try {
       setRevenues(await revenuesApi.list());
     } catch {
-      setLoadError('Nao foi possivel carregar as receitas agora. Tente atualizar novamente.');
+      setLoadError('Nao foi possivel carregar as contas a receber agora. Tente atualizar novamente.');
     } finally {
       setLoading(false);
     }
@@ -162,9 +162,9 @@ export default function Revenues() {
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-extrabold text-on-surface tracking-tight">Gestao de Receitas</h1>
+          <h1 className="text-4xl font-extrabold text-on-surface tracking-tight">Contas a receber</h1>
           <p className="text-on-secondary-container mt-2">
-            Acompanhe as receitas geradas por contratos e fretes avulsos no mesmo fluxo financeiro.
+            Acompanhe cobrancas, recebimentos e atrasos das entradas financeiras geradas por contratos e fretes.
           </p>
         </div>
       </div>
@@ -176,7 +176,7 @@ export default function Revenues() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Receitas filtradas" value={currency(totalFiltered)} icon={FileText} variant="primary" />
+        <StatCard label="Titulos filtrados" value={currency(totalFiltered)} icon={FileText} variant="primary" />
         <StatCard label="Recebidas" value={currency(totalReceived)} icon={RefreshCw} variant="secondary" />
         <StatCard label="Em aberto" value={currency(totalOpen)} icon={Building2} variant="tertiary" />
         <StatCard label="Em atraso" value={currency(totalOverdue)} icon={MoreVertical} variant="error" />
@@ -189,7 +189,7 @@ export default function Revenues() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
               <input
                 type="text"
-                placeholder="Buscar receita..."
+                placeholder="Buscar conta a receber..."
                 className="pl-10 pr-4 py-2 bg-surface rounded-full border-none text-sm font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20 min-w-[240px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -212,7 +212,7 @@ export default function Revenues() {
             </div>
           </div>
           <div className="text-sm font-semibold text-on-surface-variant">
-            Mostrando <span className="text-primary">{filteredRevenues.length}</span> de {revenues.length} receitas
+            Mostrando <span className="text-primary">{filteredRevenues.length}</span> de {revenues.length} contas
           </div>
         </div>
 
@@ -221,7 +221,7 @@ export default function Revenues() {
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant/10">
                 <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">Vencimento</th>
-                <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">Receita</th>
+                <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">Conta</th>
                 <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">Empresa</th>
                 <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">Tipo</th>
                 <th className="px-6 py-4 text-[10px] uppercase tracking-wider font-bold text-on-surface-variant text-right">Valor</th>
@@ -235,14 +235,14 @@ export default function Revenues() {
                   <td colSpan={7} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center gap-4">
                       <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                      <p className="text-on-surface-variant font-medium">Carregando receitas...</p>
+                      <p className="text-on-surface-variant font-medium">Carregando contas a receber...</p>
                     </div>
                   </td>
                 </tr>
               ) : filteredRevenues.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-20 text-center text-on-surface-variant">
-                    Nenhuma receita encontrada.
+                    Nenhuma conta a receber encontrada.
                   </td>
                 </tr>
               ) : (
@@ -264,7 +264,7 @@ export default function Revenues() {
                         <div>
                           <div className="text-sm font-medium text-on-surface">{revenue.contractName}</div>
                           <div className="text-xs text-on-surface-variant">
-                            {revenue.sourceType === 'freight' ? 'Receita de frete' : 'Receita mensal'}
+                            {revenue.sourceType === 'freight' ? 'Cobranca de frete' : 'Cobranca mensal'}
                           </div>
                         </div>
                       </div>

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import PlatformTenants from './pages/PlatformTenants';
 import TenantProfile from './pages/TenantProfile';
 import Revenues from './pages/Revenues';
+import Payables from './pages/Payables';
 import Expenses from './pages/Expenses';
 import Vehicles from './pages/Vehicles';
 import Reports from './pages/Reports';
@@ -20,13 +21,14 @@ import { canAccess } from './lib/permissions';
 
 function getFirstAllowedTab(profile: UserProfile): NavItem {
   if (canAccess(profile, 'platformTenants', 'read')) return 'platformTenants';
-  if (canAccess(profile, 'revenues', 'read')) return 'revenues';
-  if (canAccess(profile, 'expenses', 'read')) return 'expenses';
   if (canAccess(profile, 'vehicles', 'read')) return 'vehicles';
   if (canAccess(profile, 'providers', 'read')) return 'suppliers';
   if (canAccess(profile, 'companies', 'read')) return 'companies';
-  if (canAccess(profile, 'contracts', 'read')) return 'contracts';
   if (canAccess(profile, 'freights', 'read')) return 'freights';
+  if (canAccess(profile, 'contracts', 'read')) return 'contracts';
+  if (canAccess(profile, 'expenses', 'read')) return 'expenses';
+  if (canAccess(profile, 'revenues', 'read')) return 'revenues';
+  if (canAccess(profile, 'payables', 'read')) return 'payables';
   if (canAccess(profile, 'reports', 'read')) return 'reports';
   if (canAccess(profile, 'tenantProfile', 'read')) return 'tenantProfile';
   if (canAccess(profile, 'settings', 'read')) return 'settings';
@@ -41,6 +43,8 @@ function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): NavItem {
       return canAccess(profile, 'tenantProfile', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'revenues':
       return canAccess(profile, 'revenues', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'payables':
+      return canAccess(profile, 'payables', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'expenses':
       return canAccess(profile, 'expenses', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'vehicles':
@@ -195,6 +199,8 @@ function AppContent() {
         return <Expenses onNavigate={setActiveTab} />;
       case 'revenues':
         return <Revenues />;
+      case 'payables':
+        return <Payables />;
       case 'tenantProfile':
         return <TenantProfile />;
       case 'platformTenants':

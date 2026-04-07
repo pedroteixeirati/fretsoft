@@ -1,8 +1,8 @@
 import React, { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { Building2, Calendar, CheckCircle, FileText, Filter, Loader2, RefreshCw, Route, Truck, Wallet } from 'lucide-react';
-import { companiesApi, contractsApi, expensesApi, freightsApi, revenuesApi, vehiclesApi } from '../lib/api';
+import { companiesApi, contractsApi, expensesApi, freightsApi, payablesApi, revenuesApi, vehiclesApi } from '../lib/api';
 import { cn } from '../lib/utils';
-import { Company, Contract, Expense, Freight, Revenue, Vehicle } from '../types';
+import { Company, Contract, Expense, Freight, Payable, Revenue, Vehicle } from '../types';
 
 type ReportTab = 'financial' | 'operational' | 'managerial';
 
@@ -216,6 +216,7 @@ function MapMarkerIcon(props: React.ComponentProps<'svg'>) {
 
 export default function Reports() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payables, setPayables] = useState<Payable[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [freights, setFreights] = useState<Freight[]>([]);
@@ -247,6 +248,7 @@ export default function Reports() {
     try {
       const results = await Promise.allSettled([
         expensesApi.list(),
+        payablesApi.list(),
         vehiclesApi.list(),
         contractsApi.list(),
         freightsApi.list(),
@@ -254,10 +256,13 @@ export default function Reports() {
         companiesApi.list(),
       ]);
 
-      const [expenseResult, vehicleResult, contractResult, freightResult, revenueResult, companyResult] = results;
+      const [expenseResult, payableResult, vehicleResult, contractResult, freightResult, revenueResult, companyResult] = results;
       let hasFailure = false;
 
       if (expenseResult.status === 'fulfilled') setExpenses(expenseResult.value ?? []);
+      else hasFailure = true;
+
+      if (payableResult.status === 'fulfilled') setPayables(payableResult.value ?? []);
       else hasFailure = true;
 
       if (vehicleResult.status === 'fulfilled') setVehicles(vehicleResult.value ?? []);
@@ -321,11 +326,19 @@ export default function Reports() {
 
   const filteredExpenses = useMemo(() => (
     expenses.filter((expense) => {
-      if (!isWithinDateRange(expense.date)) return false;
+      if (!isWithinDateRange(expense.costDate || expense.date)) return false;
       if (vehicleFilter !== 'all' && expense.vehicleId !== vehicleFilter) return false;
       return true;
     })
   ), [expenses, startDate, endDate, vehicleFilter]);
+
+  const filteredPayables = useMemo(() => (
+    payables.filter((payable) => {
+      if (!isWithinDateRange(payable.dueDate)) return false;
+      if (vehicleFilter !== 'all' && payable.vehicleId !== vehicleFilter) return false;
+      return true;
+    })
+  ), [payables, startDate, endDate, vehicleFilter]);
 
   const filteredFreights = useMemo(() => (
     freights.filter((freight) => {
@@ -361,7 +374,17 @@ export default function Reports() {
     })
   ), [revenues, startDate, endDate, companyFilter, vehicleFilter, freights, contracts]);
 
-  const totalExpenses = filteredExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const totalOperationalCosts = filteredExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const activePayables = filteredPayables.filter((item) => item.status !== 'canceled');
+  const paidPayables = activePayables
+    .filter((item) => item.status === 'paid')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const openPayables = activePayables
+    .filter((item) => ['open', 'overdue'].includes(item.status))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const overduePayables = activePayables
+    .filter((item) => item.status === 'overdue')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const activeFinancialRevenues = filteredRevenues.filter((item) => item.status !== 'canceled');
   const contractRevenue = activeFinancialRevenues
     .filter((item) => item.sourceType === 'contract')
@@ -379,7 +402,7 @@ export default function Reports() {
     .filter((item) => item.status === 'overdue')
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const projectedRevenue = contractRevenue + freightRevenue;
-  const netResult = receivedRevenue - totalExpenses;
+  const netResult = receivedRevenue - paidPayables;
   const activeVehicles = vehicles.filter((vehicle) => vehicle.status === 'active').length;
   const maintenanceAlerts = vehicles.filter((vehicle) => vehicle.nextMaintenance && new Date(vehicle.nextMaintenance) < new Date()).length;
   const activeContracts = contracts.filter((contract) => contract.status === 'active').length;
@@ -430,7 +453,7 @@ export default function Reports() {
   ), [companies, filteredContracts]);
 
   const tabs: { id: ReportTab; label: string; description: string }[] = [
-    { id: 'financial', label: 'Relatorio Financeiro', description: 'Receitas, custos operacionais, saldo e rentabilidade.' },
+    { id: 'financial', label: 'Relatorio Financeiro', description: 'Contas a receber, custos operacionais, contas a pagar e saldo realizado.' },
     { id: 'operational', label: 'Relatorio Operacional', description: 'Viagens, rotas, uso da frota e manutencao.' },
     { id: 'managerial', label: 'Relatorio Gerencial', description: 'Visao consolidada de empresas, contratos e desempenho.' },
   ];
@@ -525,7 +548,7 @@ export default function Reports() {
           <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             <MetricBox label="Fretes faturados" value={`R$ ${freightRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Route} />
             <MetricBox label="Contratos faturados" value={`R$ ${contractRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={FileText} />
-            <MetricBox label="Recebido no periodo" value={`R$ ${receivedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={CheckCircle} />
+            <MetricBox label="Contas pagas no periodo" value={`R$ ${paidPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} />
             <MetricBox label="Saldo realizado" value={`R$ ${netResult.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} highlight={netResult >= 0} />
           </section>
 
@@ -535,9 +558,22 @@ export default function Reports() {
                 <ProgressRow label="Fretes avulsos" value={freightRevenue} total={Math.max(projectedRevenue, 1)} />
                 <ProgressRow label="Contratos recorrentes faturados" value={contractRevenue} total={Math.max(projectedRevenue, 1)} />
                 <ProgressRow label="Carteira em aberto" value={openRevenue} total={Math.max(projectedRevenue, 1)} />
-                <ProgressRow label="Custos operacionais" value={totalExpenses} total={Math.max(projectedRevenue, 1)} tone="danger" />
+                <ProgressRow label="Custos operacionais registrados" value={totalOperationalCosts} total={Math.max(projectedRevenue, 1)} tone="danger" />
+                <ProgressRow label="Contas a pagar em aberto" value={openPayables} total={Math.max(projectedRevenue, 1)} tone="danger" />
               </div>
             </Panel>
+            <Panel title="Indicadores de saida">
+              <div className="space-y-4 text-sm">
+                <ExecutiveRow label="Recebido no periodo" value={`R$ ${receivedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                <ExecutiveRow label="Custos operacionais registrados" value={`R$ ${totalOperationalCosts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                <ExecutiveRow label="Contas pagas no periodo" value={`R$ ${paidPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                <ExecutiveRow label="Contas a pagar em aberto" value={`R$ ${openPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                <ExecutiveRow label="Contas vencidas" value={`R$ ${overduePayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+              </div>
+            </Panel>
+          </section>
+
+          <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <Panel title="Rentabilidade por veiculo">
               <div className="space-y-4">
                 {vehiclePerformance.length === 0 ? (
@@ -546,7 +582,7 @@ export default function Reports() {
                   <div key={item.id} className="flex items-center justify-between gap-4 border-b border-outline-variant/30 pb-3 last:border-b-0 last:pb-0">
                     <div>
                       <p className="font-bold text-on-surface">{item.label}</p>
-                      <p className="text-xs text-on-surface-variant">{item.trips} frete(s) e custo R$ {item.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-xs text-on-surface-variant">{item.trips} frete(s) e custo operacional R$ {item.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                     </div>
                     <p className={cn('font-black', item.margin >= 0 ? 'text-primary' : 'text-error')}>
                       R$ {item.margin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -610,8 +646,8 @@ export default function Reports() {
           <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             <MetricBox label="Empresas ativas" value={activeCompanies.toString()} icon={Building2} />
             <MetricBox label="Contratos ativos" value={activeContracts.toString()} icon={FileText} />
-            <MetricBox label="Receita recorrente mensal" value={`R$ ${contracts.filter((item) => item.status === 'active').reduce((sum, item) => sum + Number(item.monthlyValue || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} />
-            <MetricBox label="Carteira em atraso" value={`R$ ${overdueRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={CheckCircle} highlight={overdueRevenue === 0} />
+            <MetricBox label="Carteira recorrente mensal" value={`R$ ${contracts.filter((item) => item.status === 'active').reduce((sum, item) => sum + Number(item.monthlyValue || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} />
+            <MetricBox label="Contas vencidas" value={`R$ ${overduePayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={CheckCircle} highlight={overduePayables === 0} />
           </section>
 
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -634,7 +670,9 @@ export default function Reports() {
               <div className="space-y-4 text-sm">
                 <ExecutiveRow label="Fretes avulsos no periodo" value={`${filteredFreights.length} viagem(ns)`} />
                 <ExecutiveRow label="Custos operacionais registrados" value={`${filteredExpenses.length} lancamento(s)`} />
-                <ExecutiveRow label="Receitas em aberto" value={`R$ ${openRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                <ExecutiveRow label="Contas a pagar em aberto" value={`${activePayables.filter((item) => item.status === 'open').length} titulo(s)`} />
+                <ExecutiveRow label="Contas pagas no periodo" value={`R$ ${paidPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                <ExecutiveRow label="Contas a receber em aberto" value={`R$ ${openRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
                 <ExecutiveRow label="Veiculo com melhor margem" value={vehiclePerformance[0]?.label || '-'} />
                 <ExecutiveRow label="Empresa com maior receita" value={companyPerformance[0]?.name || '-'} />
               </div>
