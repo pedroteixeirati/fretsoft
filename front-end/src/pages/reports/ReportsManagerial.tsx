@@ -1,40 +1,7 @@
 import React from 'react';
 import { Building2, CheckCircle, FileText, Wallet } from 'lucide-react';
 import { useReportsData } from './useReportsData';
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-surface-container-lowest rounded-3xl border border-outline-variant p-6">
-      <h3 className="mb-5 text-xl font-bold text-on-surface">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function MetricBox({ label, value, icon: Icon, highlight }: { label: string; value: string; icon: React.ElementType; highlight?: boolean }) {
-  return (
-    <div className={`rounded-3xl border p-6 shadow-sm ${highlight ? 'border-primary/20 bg-primary-container/20' : 'border-outline-variant bg-surface-container-lowest'}`}>
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-on-surface-variant">{label}</p>
-        <Icon className={`h-5 w-5 ${highlight ? 'text-primary' : 'text-on-surface-variant'}`} />
-      </div>
-      <p className="text-3xl font-black text-on-surface">{value}</p>
-    </div>
-  );
-}
-
-function ExecutiveRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-outline-variant/30 pb-3 last:border-b-0 last:pb-0">
-      <span className="text-on-surface-variant">{label}</span>
-      <span className="text-right font-bold text-on-surface">{value}</span>
-    </div>
-  );
-}
-
-function EmptyText({ text }: { text: string }) {
-  return <p className="text-sm text-on-surface-variant">{text}</p>;
-}
+import { EmptyText, ExecutiveRow, MetricBox, Panel } from './ReportsSharedComponents';
 
 type ReportsManagerialProps = {
   data: ReturnType<typeof useReportsData>;
