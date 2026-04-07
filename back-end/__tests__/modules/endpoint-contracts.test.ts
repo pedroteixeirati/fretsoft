@@ -11,6 +11,7 @@ const authControllerSource = readModule('back-end/modules/auth/controllers/auth.
 const contractsControllerSource = readModule('back-end/modules/contracts/controllers/contracts.controller.ts');
 const expensesControllerSource = readModule('back-end/modules/expenses/controllers/expenses.controller.ts');
 const freightsControllerSource = readModule('back-end/modules/freights/controllers/freights.controller.ts');
+const payablesControllerSource = readModule('back-end/modules/payables/controllers/payables.controller.ts');
 const resourcesControllerSource = readModule('back-end/modules/resources/controllers/resources.controller.ts');
 const revenuesControllerSource = readModule('back-end/modules/revenues/controllers/revenues.controller.ts');
 const tenantsControllerSource = readModule('back-end/modules/tenants/controllers/tenants.controller.ts');
@@ -24,6 +25,7 @@ test('app HTTP registra todos os routers principais da API', () => {
   assert.match(appSource, /app\.use\('\/api', contractsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', freightsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', expensesRouter\)/);
+  assert.match(appSource, /app\.use\('\/api', payablesRouter\)/);
   assert.match(appSource, /app\.use\('\/api\/revenues', revenuesRouter\)/);
   assert.match(appSource, /app\.use\('\/api', resourcesRouter\)/);
 });
@@ -68,6 +70,22 @@ test('expenses expoe CRUD completo com serializer e not found consistente', () =
   assert.match(expensesControllerSource, /serializeExpenses\(await listResourcesByConfig\(expensesResource, req\.auth\)\)/);
   assert.match(expensesControllerSource, /serializeExpense\(await createResourceByConfig\('expenses'/);
   assert.match(expensesControllerSource, /res\.status\(404\)\.json\(\{ error: 'Registro nao encontrado\.' \}\)/);
+});
+
+test('payables expoe CRUD e acoes financeiras minimas com guardas consistentes', () => {
+  assert.match(payablesControllerSource, /router\.get\('\/payables'/);
+  assert.match(payablesControllerSource, /router\.post\('\/payables'/);
+  assert.match(payablesControllerSource, /router\.put\('\/payables\/:id'/);
+  assert.match(payablesControllerSource, /router\.delete\('\/payables\/:id'/);
+  assert.match(payablesControllerSource, /router\.post\('\/payables\/:id\/pay'/);
+  assert.match(payablesControllerSource, /router\.post\('\/payables\/:id\/overdue'/);
+  assert.match(payablesControllerSource, /Sem permissao para visualizar contas a pagar\./);
+  assert.match(payablesControllerSource, /Sem permissao para criar contas a pagar\./);
+  assert.match(payablesControllerSource, /Sem permissao para editar contas a pagar\./);
+  assert.match(payablesControllerSource, /Sem permissao para excluir contas a pagar\./);
+  assert.match(payablesControllerSource, /Sem permissao para registrar pagamento\./);
+  assert.match(payablesControllerSource, /Sem permissao para marcar atraso\./);
+  assert.match(payablesControllerSource, /Conta a pagar nao encontrada\./);
 });
 
 test('resources genericos cobrem vehicles providers e companies com CRUD seguro', () => {
