@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useEffectEvent, useState }
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, logout, signInWithEmail } from '../firebase';
 import { usersApi } from '../lib/api';
-import { UserProfile } from '../types';
+import { UserProfile } from '../shared/types/common.types';
 
 interface FirebaseContextType {
   user: User | null;
