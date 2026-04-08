@@ -1,6 +1,6 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import KpiCard from './KpiCard';
+import { KpiCard } from '../shared/ui';
 
 interface MetricCardProps {
   label: string;
