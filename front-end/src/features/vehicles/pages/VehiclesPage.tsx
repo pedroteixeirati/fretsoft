@@ -1,0 +1,150 @@
+import React, { useMemo, useState } from 'react';
+import { canAccess } from '../../../lib/permissions';
+import { getErrorMessage } from '../../../lib/errors';
+import { useFirebase } from '../../../context/FirebaseContext';
+import { useVehiclesQuery } from '../hooks/useVehiclesQuery';
+import { useVehicleMutations } from '../hooks/useVehicleMutations';
+import { useVehicleForm } from '../hooks/useVehicleForm';
+import VehiclesHeader from '../components/VehiclesHeader';
+import VehiclesFilters from '../components/VehiclesFilters';
+import VehiclesList from '../components/VehiclesList';
+import VehicleFormModal from '../components/VehicleFormModal';
+
+export default function VehiclesPage() {
+  const { userProfile } = useFirebase();
+  const canCreate = canAccess(userProfile, 'vehicles', 'create');
+  const canUpdate = canAccess(userProfile, 'vehicles', 'update');
+  const canDelete = canAccess(userProfile, 'vehicles', 'delete');
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const { vehicles, isLoading: loading, error: loadQueryError } = useVehiclesQuery({
+    enabled: Boolean(userProfile),
+  });
+  const { createVehicle, updateVehicle, deleteVehicle, isSubmitting } = useVehicleMutations();
+  const {
+    isModalOpen,
+    editingVehicle,
+    formData,
+    setFormData,
+    submitError,
+    setSubmitError,
+    submitSuccess,
+    setSubmitSuccess,
+    openCreate,
+    openEdit,
+    closeModal,
+  } = useVehicleForm();
+
+  const loadError = loadQueryError
+    ? getErrorMessage(loadQueryError, 'Nao foi possivel carregar os veiculos.')
+    : '';
+
+  const filteredVehicles = useMemo(
+    () =>
+      vehicles.filter(
+        (vehicle) =>
+          (vehicle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            vehicle.driver.toLowerCase().includes(searchTerm.toLowerCase())) &&
+          (typeFilter === 'all' || vehicle.type === typeFilter) &&
+          (statusFilter === 'all' || vehicle.status === statusFilter),
+      ),
+    [vehicles, searchTerm, typeFilter, statusFilter],
+  );
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitError('');
+    setSubmitSuccess('');
+
+    const payload = {
+      ...formData,
+      name: formData.name.trim(),
+      plate: formData.plate.toUpperCase().trim(),
+      driver: formData.driver.trim(),
+    };
+
+    try {
+      if (editingVehicle) {
+        await updateVehicle.mutateAsync({ id: editingVehicle.id, payload });
+      } else {
+        await createVehicle.mutateAsync(payload);
+      }
+
+      setSubmitSuccess(editingVehicle ? 'Veiculo atualizado com sucesso.' : 'Veiculo cadastrado com sucesso.');
+      closeModal();
+    } catch (error) {
+      setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar o veiculo.'));
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este veiculo?')) return;
+
+    setSubmitError('');
+    setSubmitSuccess('');
+    try {
+      await deleteVehicle.mutateAsync(id);
+      setSubmitSuccess('Veiculo excluido com sucesso.');
+    } catch (error) {
+      setSubmitError(getErrorMessage(error, 'Nao foi possivel excluir o veiculo.'));
+    }
+  };
+
+  const feedbackMessage = submitError || loadError || submitSuccess;
+  const feedbackIsError = Boolean(submitError || loadError);
+
+  return (
+    <div className="space-y-10">
+      <VehiclesHeader canCreate={canCreate} onCreate={openCreate} />
+
+      {feedbackMessage ? (
+        <div
+          className={`rounded-2xl border px-5 py-4 text-sm font-medium ${
+            feedbackIsError
+              ? 'border-error/20 bg-error/5 text-error'
+              : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {feedbackMessage}
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-12">
+          <VehiclesFilters
+            searchTerm={searchTerm}
+            typeFilter={typeFilter}
+            statusFilter={statusFilter}
+            onSearchChange={setSearchTerm}
+            onTypeChange={setTypeFilter}
+            onStatusChange={setStatusFilter}
+          />
+        </div>
+
+        <VehiclesList
+          vehicles={filteredVehicles}
+          loading={loading}
+          canUpdate={canUpdate}
+          canDelete={canDelete}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+        />
+      </div>
+
+      <VehicleFormModal
+        isOpen={isModalOpen}
+        editing={Boolean(editingVehicle)}
+        submitError={submitError}
+        isSubmitting={isSubmitting}
+        formData={formData}
+        onClose={closeModal}
+        onSubmit={handleSubmit}
+        onChange={setFormData}
+      />
+    </div>
+  );
+}
