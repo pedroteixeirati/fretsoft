@@ -1,8 +1,8 @@
-import { UserProfile } from '../types';
+import { UserProfile } from '../shared/types/common.types';
 
-type Role = UserProfile['role'];
-type Section = 'platformTenants' | 'tenantProfile' | 'revenues' | 'payables' | 'vehicles' | 'providers' | 'companies' | 'contracts' | 'freights' | 'expenses' | 'reports' | 'settings' | 'users';
-type Action = 'read' | 'create' | 'update' | 'delete';
+export type Role = UserProfile['role'];
+export type Section = 'platformTenants' | 'tenantProfile' | 'revenues' | 'payables' | 'vehicles' | 'providers' | 'companies' | 'contracts' | 'freights' | 'expenses' | 'reports' | 'settings' | 'users';
+export type Action = 'read' | 'create' | 'update' | 'delete';
 
 const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
   platformTenants: {
