@@ -32,5 +32,12 @@ export default defineConfig(({ mode }) => {
       outDir: path.resolve(workspaceRoot, 'dist'),
       emptyOutDir: true,
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: [path.resolve(__dirname, 'src/test/setup.ts')],
+      include: ['src/**/*.test.{ts,tsx}'],
+      css: true,
+    },
   };
 });
