@@ -107,3 +107,5 @@ export default function CustomSelect({
     </div>
   );
 }
+
+export type { CustomSelectProps };
