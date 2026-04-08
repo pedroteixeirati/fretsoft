@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { NavItem, UserProfile } from '../../../shared/types/common.types';
 import { canAccess } from '../../../lib/permissions';
-import { usePermission } from '../../auth/hooks/usePermission';
+import { useAuth } from '../../auth/hooks/useAuth';
 
 export interface NavigationItem {
   id: NavItem;
@@ -99,66 +99,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
 }
 
 export function useNavigationSections(): NavigationSection[] {
-  const { check } = usePermission();
+  const { userProfile } = useAuth();
 
-  return useMemo(
-    () =>
-      [
-        {
-          id: 'overview',
-          label: 'Visao geral',
-          icon: LayoutDashboard,
-          items: [navItem('dashboard', 'Painel', LayoutDashboard)],
-        },
-        {
-          id: 'platform',
-          label: 'Plataforma',
-          icon: ShieldCheck,
-          items: check('platformTenants', 'read')
-            ? [navItem('platformTenants', 'Transportadoras', ShieldCheck)]
-            : [],
-        },
-        {
-          id: 'registry',
-          label: 'Cadastros',
-          icon: FolderKanban,
-          items: compactItems([
-            check('vehicles', 'read') ? navItem('vehicles', 'Veiculos', Truck) : null,
-            check('providers', 'read') ? navItem('suppliers', 'Fornecedores', Users) : null,
-            check('companies', 'read') ? navItem('companies', 'Empresas', Building2) : null,
-          ]),
-        },
-        {
-          id: 'operations',
-          label: 'Operacao',
-          icon: BriefcaseBusiness,
-          items: compactItems([
-            check('freights', 'read') ? navItem('freights', 'Fretes', Route) : null,
-            check('contracts', 'read') ? navItem('contracts', 'Contratos', FileText) : null,
-            check('expenses', 'read') ? navItem('expenses', 'Custos operacionais', CreditCard) : null,
-          ]),
-        },
-        {
-          id: 'management',
-          label: 'Gestao',
-          icon: WalletCards,
-          items: compactItems([
-            check('revenues', 'read') ? navItem('revenues', 'Contas a receber', WalletCards) : null,
-            check('payables', 'read') ? navItem('payables', 'Contas a pagar', CreditCard) : null,
-            check('reports', 'read') ? navItem('reports', 'Relatorios', BarChart3) : null,
-          ]),
-        },
-        {
-          id: 'admin',
-          label: 'Administracao',
-          icon: Settings,
-          items: compactItems([
-            check('tenantProfile', 'read') ? navItem('tenantProfile', 'Transportadora', Building2) : null,
-            check('settings', 'read') ? navItem('settings', 'Configuracoes', Settings) : null,
-            navItem('support', 'Suporte', ShieldCheck),
-          ]),
-        },
-      ].filter((section) => section.items.length > 0),
-    [check],
-  );
+  return useMemo(() => buildNavigationSections(userProfile), [userProfile]);
 }

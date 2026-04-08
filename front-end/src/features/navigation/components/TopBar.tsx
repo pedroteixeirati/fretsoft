@@ -2,15 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Bell, ChevronDown, LogOut, Search, Settings, User as UserIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../../firebase';
-import Can from '../../auth/components/Can';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { getPathFromNavItem } from '../../../app/router/navigation';
+import { canAccess } from '../../../lib/permissions';
 
 export default function TopBar() {
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const canOpenSettings = canAccess(userProfile, 'settings', 'read');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -141,7 +142,7 @@ export default function TopBar() {
                 </div>
 
                 <div className="mt-2 space-y-1">
-                  <Can section="settings" action="read">
+                  {canOpenSettings ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -153,7 +154,7 @@ export default function TopBar() {
                       <Settings className="h-4 w-4 text-on-surface-variant" />
                       Configuracoes
                     </button>
-                  </Can>
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleLogout}
