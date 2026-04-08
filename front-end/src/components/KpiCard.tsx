@@ -218,3 +218,5 @@ export default function KpiCard({
     </article>
   );
 }
+
+export type { KpiCardProps };
