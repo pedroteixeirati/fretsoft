@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Building2, ImagePlus, Loader2, MapPin, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 import { useFirebase } from '../context/FirebaseContext';
 import { tenantProfileApi } from '../lib/api';
 import { canAccess } from '../lib/permissions';
@@ -338,16 +339,16 @@ export default function TenantProfilePage() {
               <Field label="Plano" value={draft.plan} onChange={(value) => handleChange('plan', value)} disabled={!canUpdate || !canManageBilling} />
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Status da conta</label>
-                <select
+                <CustomSelect
                   value={draft.status}
-                  onChange={(event) => handleChange('status', event.target.value)}
+                  onChange={(value) => handleChange('status', value)}
                   disabled={!canUpdate || !canManageBilling}
-                  className="w-full rounded-xl border border-outline-variant bg-surface-container px-4 py-3 outline-none transition-all focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="active">Ativa</option>
-                  <option value="inactive">Inativa</option>
-                  <option value="suspended">Suspensa</option>
-                </select>
+                  options={[
+                    { value: 'active', label: 'Ativa' },
+                    { value: 'inactive', label: 'Inativa' },
+                    { value: 'suspended', label: 'Suspensa' },
+                  ]}
+                />
               </div>
               <div className="rounded-2xl bg-surface-container p-4 md:col-span-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Auditoria</p>

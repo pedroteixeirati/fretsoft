@@ -49,8 +49,8 @@ export default function ReportsManagerial({ data }: ReportsManagerialProps) {
             <ExecutiveRow label="Contas a pagar em aberto" value={`${data.activePayables.filter((item) => item.status === 'open').length} titulo(s)`} />
             <ExecutiveRow label="Contas pagas no periodo" value={`R$ ${data.paidPayables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
             <ExecutiveRow label="Contas a receber em aberto" value={`R$ ${data.openRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-            <ExecutiveRow label="Veiculo com melhor margem" value={data.vehiclePerformance[0]?.label || '-'} />
-            <ExecutiveRow label="Empresa com maior receita" value={data.companyPerformance[0]?.name || '-'} />
+            <ExecutiveRow label="Veiculo com melhor margem" value={data.vehiclePerformance[0]?.label || '-' } />
+            <ExecutiveRow label="Empresa com maior receita" value={data.companyPerformance[0]?.name || '-' } />
           </div>
         </Panel>
       </section>

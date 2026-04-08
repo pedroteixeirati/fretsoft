@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Calendar, ChevronLeft, ChevronRight, Clock, Edit2, Filter, Hash, Loader2, MapPin, Plus, Search, Sparkles, Tag, Trash2, Truck, Wallet, Wrench } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
-import { expensesApi, vehiclesApi } from '../lib/api';
+import { expensesApi, providersApi, vehiclesApi } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
 import { cn } from '../lib/utils';
-import { Expense, NavItem, Vehicle } from '../types';
+import { Expense, NavItem, Provider, Vehicle } from '../types';
+import { formatDatePtBr, getCalendarDays, getMonthLabel, parseLocalDate, toDateInputValue } from './reports/reports.shared';
 
 interface ExpensesProps {
   onNavigate: (item: NavItem) => void;
@@ -23,60 +26,12 @@ const defaultFormData = () => ({
   quantity: '',
   amount: 0,
   odometer: '',
-  status: 'pending' as const,
+  status: 'approved' as const,
+  paymentRequired: false,
+  dueDate: '',
+  linkedPayableId: null as string | null,
   observations: '',
 });
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  variant,
-  currency = false,
-}: {
-  label: string;
-  value: number | string;
-  icon: React.ElementType;
-  variant: 'primary' | 'secondary' | 'tertiary' | 'error';
-  currency?: boolean;
-}) {
-  const borderClass = {
-    primary: 'border-primary/20',
-    secondary: 'border-secondary/20',
-    tertiary: 'border-tertiary/20',
-    error: 'border-error/20',
-  }[variant];
-
-  const badgeClass = {
-    primary: 'bg-primary/10 text-primary',
-    secondary: 'bg-secondary/10 text-secondary',
-    tertiary: 'bg-tertiary/10 text-tertiary',
-    error: 'bg-error/10 text-error',
-  }[variant];
-
-  return (
-    <div className={cn('bg-surface-container-lowest p-6 rounded-2xl shadow-sm border-b-2', borderClass)}>
-      <div className="flex justify-between items-start mb-4">
-        <span className={cn('p-2 rounded-lg', badgeClass)}>
-          <Icon className="w-5 h-5" />
-        </span>
-      </div>
-      <p className="text-on-surface-variant text-sm font-medium">{label}</p>
-      <div className="flex items-baseline gap-1 mt-1">
-        {currency ? (
-          <>
-            <span className="text-sm font-bold text-on-surface-variant">R$</span>
-            <span className="text-2xl font-black text-on-surface whitespace-nowrap">
-              {Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span>
-          </>
-        ) : (
-          <span className="text-2xl font-black text-on-surface whitespace-nowrap">{value}</span>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function Input({
   label,
@@ -87,6 +42,7 @@ function Input({
   step,
   required = true,
   icon: Icon,
+  lang,
 }: {
   label: string;
   value: string;
@@ -96,6 +52,7 @@ function Input({
   step?: string;
   required?: boolean;
   icon: React.ElementType;
+  lang?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -107,6 +64,7 @@ function Input({
         required={required}
         type={type}
         step={step}
+        lang={lang}
         className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
         placeholder={placeholder}
         value={value}
@@ -116,40 +74,252 @@ function Input({
   );
 }
 
-function Select({
+function DateField({
   label,
   value,
   onChange,
-  options,
-  placeholder,
-  icon: Icon,
+  required = true,
+  min,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-  placeholder?: string;
-  icon: React.ElementType;
+  required?: boolean;
+  min?: string;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [viewDate, setViewDate] = useState(value ? parseLocalDate(value) : new Date());
+  const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !value) return;
+    setViewDate(parseLocalDate(value));
+  }, [isOpen, value]);
+
+  const calendarDays = getCalendarDays(viewDate);
+
   return (
-    <div className="space-y-2">
+    <div ref={rootRef} className="space-y-2">
       <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
-        <Icon className="w-3 h-3" />
+        <Calendar className="w-3 h-3" />
         {label}
       </label>
-      <select
-        required
-        className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+
+      <div className="relative">
+        <button
+          type="button"
+          aria-required={required}
+          onClick={() => setIsOpen((current) => !current)}
+          className="grid w-full grid-cols-[1rem_minmax(0,1fr)_1rem] items-center gap-3 rounded-xl border border-outline-variant bg-surface px-4 py-3 text-left transition-all hover:border-primary/30 focus:ring-2 focus:ring-primary/20"
+        >
+          <Calendar className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium text-on-surface">{formatDatePtBr(value)}</span>
+          <ChevronRight className="h-4 w-4 rotate-90 text-on-surface-variant" />
+        </button>
+
+        {isOpen ? (
+          <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[17rem] rounded-[1.6rem] border border-outline-variant/10 bg-surface-container-lowest p-2 shadow-[0_24px_60px_rgba(26,28,21,0.12)]">
+            <div className="rounded-[1.2rem] border border-primary/15 bg-primary/5 px-3 py-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">{label}</p>
+              <p className="mt-0.5 text-[1rem] font-bold text-on-surface">{formatDatePtBr(value)}</p>
+            </div>
+
+            <div className="mt-2 rounded-[1.3rem] border border-outline-variant/20 bg-surface px-2.5 py-2">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+                  className="rounded-full border border-outline-variant/20 p-1.25 text-on-surface-variant transition hover:border-primary hover:text-primary"
+                  aria-label="Mes anterior"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <p className="text-[0.95rem] font-bold capitalize text-on-surface">{getMonthLabel(viewDate)}</p>
+                <button
+                  type="button"
+                  onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+                  className="rounded-full border border-outline-variant/20 p-1.25 text-on-surface-variant transition hover:border-primary hover:text-primary"
+                  aria-label="Proximo mes"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+                {weekdayLabels.map((day) => <span key={day}>{day}</span>)}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map((day) => {
+                  const isoValue = toDateInputValue(day);
+                  const isCurrentMonth = day.getMonth() === viewDate.getMonth();
+                  const isSelected = isoValue === value;
+                  const isDisabled = Boolean(min && isoValue < min);
+
+                  return (
+                    <button
+                      key={isoValue}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => {
+                        onChange(isoValue);
+                        setIsOpen(false);
+                      }}
+                      className={cn(
+                        'flex h-6.5 items-center justify-center rounded-lg text-[0.95rem] transition',
+                        isSelected
+                          ? 'bg-primary text-on-primary font-bold'
+                          : isDisabled
+                            ? 'cursor-not-allowed text-on-surface-variant/30'
+                            : isCurrentMonth
+                              ? 'text-on-surface hover:bg-primary/10'
+                              : 'text-on-surface-variant/50 hover:bg-surface-container',
+                      )}
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-2 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => onChange('')}
+                  className="text-[0.95rem] font-medium text-on-surface-variant transition hover:text-primary"
+                >
+                  Limpar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = toDateInputValue(new Date());
+                    if (!min || today >= min) {
+                      onChange(today);
+                      setIsOpen(false);
+                    }
+                  }}
+                  className="text-[0.95rem] font-bold text-primary"
+                >
+                  Hoje
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [isOpen]);
+
+  const [selectedHour = '00', selectedMinute = '00'] = value.split(':');
+  const hours = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
+  const minutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
+
+  const updateTime = (nextHour: string, nextMinute: string) => {
+    onChange(`${nextHour}:${nextMinute}`);
+  };
+
+  return (
+    <div ref={rootRef} className="space-y-2">
+      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
+        <Clock className="w-3 h-3" />
+        {label}
+      </label>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+          className="grid w-full grid-cols-[1rem_minmax(0,1fr)_1rem] items-center gap-3 rounded-xl border border-outline-variant bg-surface px-4 py-3 text-left transition-all hover:border-primary/30 focus:ring-2 focus:ring-primary/20"
+        >
+          <Clock className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium text-on-surface">{value || '00:00'}</span>
+          <ChevronRight className="h-4 w-4 rotate-90 text-on-surface-variant" />
+        </button>
+
+        {isOpen ? (
+          <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[16rem] rounded-[1.6rem] border border-outline-variant/10 bg-surface-container-lowest p-2 shadow-[0_24px_60px_rgba(26,28,21,0.12)]">
+            <div className="rounded-[1.2rem] border border-primary/15 bg-primary/5 px-3 py-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">{label}</p>
+              <p className="mt-0.5 text-[1rem] font-bold text-on-surface">{value || '00:00'}</p>
+            </div>
+
+            <div className="mt-2 grid grid-cols-[1fr_auto_1fr] gap-2 rounded-[1.3rem] border border-outline-variant/20 bg-surface p-2">
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Hora</p>
+                <div className="max-h-44 overflow-y-auto rounded-xl bg-surface-container-low/60 p-1">
+                  {hours.map((hour) => (
+                    <button
+                      key={hour}
+                      type="button"
+                      onClick={() => updateTime(hour, selectedMinute)}
+                      className={cn(
+                        'flex w-full items-center justify-center rounded-lg px-2 py-2 text-sm font-medium transition',
+                        hour === selectedHour ? 'bg-primary text-on-primary' : 'text-on-surface hover:bg-primary/10',
+                      )}
+                    >
+                      {hour}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center pt-6 text-lg font-bold text-on-surface-variant">:</div>
+
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Min</p>
+                <div className="max-h-44 overflow-y-auto rounded-xl bg-surface-container-low/60 p-1">
+                  {minutes.map((minute) => (
+                    <button
+                      key={minute}
+                      type="button"
+                      onClick={() => updateTime(selectedHour, minute)}
+                      className={cn(
+                        'flex w-full items-center justify-center rounded-lg px-2 py-2 text-sm font-medium transition',
+                        minute === selectedMinute ? 'bg-primary text-on-primary' : 'text-on-surface hover:bg-primary/10',
+                      )}
+                    >
+                      {minute}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -159,8 +329,10 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
   const canCreate = canAccess(userProfile, 'expenses', 'create');
   const canUpdate = canAccess(userProfile, 'expenses', 'update');
   const canDelete = canAccess(userProfile, 'expenses', 'delete');
+  const canReadProviders = canAccess(userProfile, 'providers', 'read');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -178,9 +350,10 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
     setLoading(true);
     setLoadError('');
     try {
-      const [expenseData, vehicleData] = await Promise.all([
+      const [expenseData, vehicleData, providersData] = await Promise.all([
         expensesApi.list(),
         vehiclesApi.list(),
+        canReadProviders ? providersApi.list() : Promise.resolve([]),
       ]);
 
       setExpenses(
@@ -191,6 +364,7 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
         })
       );
       setVehicles(vehicleData);
+      setProviders(providersData);
     } catch (error) {
       setLoadError(getErrorMessage(error, 'Nao foi possivel carregar os custos operacionais.'));
     } finally {
@@ -261,10 +435,38 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.date) {
+      setSubmitError('Informe a data do custo operacional.');
+      return;
+    }
+    if (!formData.time) {
+      setSubmitError('Informe a hora do custo operacional.');
+      return;
+    }
     const selectedVehicle = vehicles.find((vehicle) => vehicle.id === formData.vehicleId);
     if (!selectedVehicle) {
       setSubmitError('Selecione um veiculo cadastrado para registrar o custo operacional.');
       return;
+    }
+    if (!formData.provider.trim()) {
+      setSubmitError('Selecione um fornecedor para registrar o custo operacional.');
+      return;
+    }
+    if (!formData.category.trim()) {
+      setSubmitError('Selecione uma categoria para o custo operacional.');
+      return;
+    }
+    if (!Number.isFinite(Number(formData.amount)) || Number(formData.amount) <= 0) {
+      setSubmitError('Informe um valor total maior que zero para o custo operacional.');
+      return;
+    }
+    if (formData.paymentRequired && !formData.dueDate) {
+      setSubmitError('Informe a data de vencimento para gerar a conta a pagar.');
+      return;
+    }
+    if (editingExpense?.linkedPayableId && !formData.paymentRequired) {
+      const confirmed = window.confirm('Ao remover a exigencia financeira, a conta a pagar vinculada sera excluida. Deseja continuar?');
+      if (!confirmed) return;
     }
 
     setIsSubmitting(true);
@@ -300,6 +502,9 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
       amount: Number(expense.amount || 0),
       odometer: expense.odometer || '',
       status: expense.status,
+      paymentRequired: Boolean(expense.paymentRequired),
+      dueDate: expense.dueDate || '',
+      linkedPayableId: expense.linkedPayableId || null,
       observations: expense.observations || '',
     });
     setSubmitError('');
@@ -332,6 +537,21 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
   const fuelAmount = filteredExpenses.filter((expense) => expense.category.toLowerCase().includes('combust')).reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
   const maintenanceAmount = filteredExpenses.filter((expense) => expense.category.toLowerCase().includes('manut')).reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
   const pendingCount = filteredExpenses.filter((expense) => expense.status === 'pending').length;
+  const providerOptions = useMemo(() => {
+    const orderedProviders = [...providers]
+      .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
+
+    const options = orderedProviders.map((provider) => ({
+      value: provider.name,
+      label: provider.name,
+    }));
+
+    if (formData.provider && !options.some((option) => option.value === formData.provider)) {
+      options.unshift({ value: formData.provider, label: formData.provider });
+    }
+
+    return options;
+  }, [providers, formData.provider]);
 
   return (
     <div className="space-y-8">
@@ -362,10 +582,10 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <StatCard label="Custos filtrados" value={totalAmount} icon={Wallet} variant="primary" currency />
-        <StatCard label="Combustivel" value={fuelAmount} icon={Truck} variant="secondary" currency />
-        <StatCard label="Manutencao" value={maintenanceAmount} icon={Wrench} variant="tertiary" currency />
-        <StatCard label="Pendentes" value={`${pendingCount} lancamento(s)`} icon={AlertTriangle} variant="error" />
+        <KpiCard label="Custos filtrados" value={`R$ ${totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} tone="primary" />
+        <KpiCard label="Combustivel" value={`R$ ${fuelAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Truck} tone="secondary" />
+        <KpiCard label="Manutencao" value={`R$ ${maintenanceAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wrench} tone="tertiary" />
+        <KpiCard label="Pendentes" value={`${pendingCount} lancamento(s)`} icon={AlertTriangle} tone="danger" />
       </div>
 
       <section className="bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden flex flex-col">
@@ -486,48 +706,119 @@ export default function Expenses({ onNavigate }: ExpensesProps) {
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input label="Data" type="date" value={formData.date} onChange={(value) => setFormData({ ...formData, date: value })} icon={Calendar} />
-            <Input label="Hora" type="time" value={formData.time} onChange={(value) => setFormData({ ...formData, time: value })} icon={Clock} />
-            <Select
-              label="Veiculo"
-              value={formData.vehicleId}
-              onChange={(value) => setFormData({ ...formData, vehicleId: value })}
-              icon={Truck}
-              placeholder="Selecione um veiculo"
-              options={vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.name} (${vehicle.plate})` }))}
+            <DateField label="Data" value={formData.date} onChange={(value) => setFormData({ ...formData, date: value })} />
+            <TimeField
+              label="Hora"
+              value={formData.time}
+              onChange={(value) => setFormData({ ...formData, time: value })}
             />
-            <Input label="Fornecedor" value={formData.provider} onChange={(value) => setFormData({ ...formData, provider: value })} icon={MapPin} placeholder="Ex: Posto Ipiranga" />
-            <Select
-              label="Categoria"
-              value={formData.category}
-              onChange={(value) => setFormData({ ...formData, category: value })}
-              icon={Tag}
-              options={[
-                { value: 'Combustivel', label: 'Combustivel' },
-                { value: 'Manutencao', label: 'Manutencao' },
-                { value: 'Lavagem', label: 'Lavagem' },
-                { value: 'Pneus', label: 'Pneus' },
-                { value: 'Documentacao', label: 'Documentacao' },
-                { value: 'Seguro', label: 'Seguro' },
-                { value: 'Outros', label: 'Outros' },
-              ]}
-            />
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
+                <Truck className="w-3 h-3" />
+                Veiculo
+              </label>
+              <CustomSelect
+                value={formData.vehicleId}
+                onChange={(value) => setFormData({ ...formData, vehicleId: value })}
+                placeholder="Selecione um veiculo"
+                options={vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.name} (${vehicle.plate})` }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
+                <MapPin className="w-3 h-3" />
+                Fornecedor
+              </label>
+              <CustomSelect
+                value={formData.provider}
+                onChange={(value) => setFormData({ ...formData, provider: value })}
+                placeholder={canReadProviders ? 'Selecione um fornecedor' : 'Sem acesso aos fornecedores'}
+                options={providerOptions}
+                disabled={!canReadProviders}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-2">
+                <Tag className="w-3 h-3" />
+                Categoria
+              </label>
+              <CustomSelect
+                value={formData.category}
+                onChange={(value) => setFormData({ ...formData, category: value })}
+                options={[
+                  { value: 'Combustivel', label: 'Combustivel' },
+                  { value: 'Manutencao', label: 'Manutencao' },
+                  { value: 'Lavagem', label: 'Lavagem' },
+                  { value: 'Pneus', label: 'Pneus' },
+                  { value: 'Documentacao', label: 'Documentacao' },
+                  { value: 'Seguro', label: 'Seguro' },
+                  { value: 'Outros', label: 'Outros' },
+                ]}
+              />
+            </div>
             <Input label="Valor Total (R$)" type="number" value={String(formData.amount)} onChange={(value) => setFormData({ ...formData, amount: Number(value) })} icon={Hash} step="0.01" />
             <Input label="Odometro (km)" type="number" value={formData.odometer} onChange={(value) => setFormData({ ...formData, odometer: value })} icon={Hash} />
-            <Select
-              label="Status"
-              value={formData.status}
-              onChange={(value) => setFormData({ ...formData, status: value as Expense['status'] })}
-              icon={AlertTriangle}
-              options={[
-                { value: 'pending', label: 'Pendente' },
-                { value: 'review', label: 'Em revisao' },
-                { value: 'approved', label: 'Aprovado' },
-              ]}
-            />
             <Input label="Quantidade" value={formData.quantity} onChange={(value) => setFormData({ ...formData, quantity: value })} icon={Hash} placeholder="Opcional" required={false} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
             <Input label="Observacoes" value={formData.observations} onChange={(value) => setFormData({ ...formData, observations: value })} icon={Sparkles} placeholder="Opcional" required={false} />
           </div>
+
+          <section className="rounded-2xl border border-outline-variant bg-surface-container-low/40 p-5">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Controle financeiro</p>
+                  <h3 className="mt-1 text-lg font-bold text-on-surface">Gerar conta a pagar</h3>
+                  <p className="mt-1 text-sm text-on-surface-variant">
+                    Ative quando este custo operacional tambem precisar entrar no financeiro.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.paymentRequired}
+                  onClick={() => setFormData((current) => ({
+                    ...current,
+                    paymentRequired: !current.paymentRequired,
+                    dueDate: !current.paymentRequired ? (current.dueDate || current.date) : current.dueDate,
+                  }))}
+                  className={cn(
+                    'relative mt-1 inline-flex h-8 w-14 shrink-0 items-center rounded-full border transition-colors',
+                    formData.paymentRequired ? 'border-primary bg-primary' : 'border-outline-variant bg-surface'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform',
+                      formData.paymentRequired ? 'translate-x-7' : 'translate-x-1'
+                    )}
+                  />
+                </button>
+              </div>
+
+              {editingExpense?.linkedPayableId ? (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+                  Este custo possui uma conta a pagar vinculada.
+                </div>
+              ) : null}
+
+              {formData.paymentRequired ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <DateField
+                    label="Data de vencimento"
+                    value={formData.dueDate}
+                    onChange={(value) => setFormData({ ...formData, dueDate: value })}
+                    min={formData.date}
+                  />
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-4 text-sm text-primary flex items-center">
+                    Este custo sera enviado para Contas a pagar ao salvar.
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
           <div className="pt-6 flex justify-end gap-4">
             <button type="button" onClick={handleCloseModal} className="px-8 py-3 rounded-full font-bold text-on-surface-variant hover:bg-surface-container transition-colors">
               Cancelar

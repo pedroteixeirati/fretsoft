@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BriefcaseBusiness, Building2, Edit2, FileBadge2, Filter, Loader2, Mail, MapPin, Phone, Plus, Search, Trash2 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { companiesApi } from '../lib/api';
@@ -176,10 +178,10 @@ export default function Companies() {
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard label="Empresas cadastradas" value={companies.length.toString()} />
-        <StatCard label="Empresas ativas" value={companies.filter((company) => company.status === 'active').length.toString()} />
-        <StatCard label="Com contato contratual" value={companies.filter((company) => company.contractContact).length.toString()} />
-        <StatCard label="UFs atendidas" value={new Set(companies.map((company) => company.state).filter(Boolean)).size.toString()} />
+        <KpiCard label="Empresas cadastradas" value={companies.length.toString()} />
+        <KpiCard label="Empresas ativas" value={companies.filter((company) => company.status === 'active').length.toString()} />
+        <KpiCard label="Com contato contratual" value={companies.filter((company) => company.contractContact).length.toString()} />
+        <KpiCard label="UFs atendidas" value={new Set(companies.map((company) => company.state).filter(Boolean)).size.toString()} />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -189,11 +191,16 @@ export default function Companies() {
             <input type="text" placeholder="Buscar por razao social, fantasia ou CNPJ..." className="w-full border-none focus:ring-0 bg-transparent text-on-surface text-sm py-2 px-4 placeholder:text-outline/60" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             <div className="h-6 w-px bg-outline/20 mx-2" />
             <div className="flex items-center gap-2 px-2">
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent text-primary text-sm font-semibold appearance-none cursor-pointer focus:outline-none">
-                <option value="all">Todos os Status</option>
-                <option value="active">Ativa</option>
-                <option value="inactive">Inativa</option>
-              </select>
+              <CustomSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os Status' },
+                  { value: 'active', label: 'Ativa' },
+                  { value: 'inactive', label: 'Inativa' },
+                ]}
+              />
               <Filter className="w-4 h-4 text-primary" />
             </div>
           </div>
@@ -291,10 +298,14 @@ export default function Companies() {
             <Field label="CEP" value={formData.zipCode} onChange={(value) => setFormData({ ...formData, zipCode: value })} />
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status</label>
-              <select className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}>
-                <option value="active">Ativa</option>
-                <option value="inactive">Inativa</option>
-              </select>
+              <CustomSelect
+                value={formData.status}
+                onChange={(value) => setFormData({ ...formData, status: value as 'active' | 'inactive' })}
+                options={[
+                  { value: 'active', label: 'Ativa' },
+                  { value: 'inactive', label: 'Inativa' },
+                ]}
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -312,10 +323,6 @@ export default function Companies() {
       </Modal>
     </div>
   );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant shadow-sm"><p className="text-sm font-medium text-on-surface-variant mb-2">{label}</p><p className="text-3xl font-black text-on-surface">{value}</p></div>;
 }
 
 function Field({ label, value, onChange, type = 'text', required = true }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) {

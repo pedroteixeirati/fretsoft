@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Edit2, Filter, Loader2, MapPinned, Plus, Route, Search, Trash2 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { contractsApi, freightsApi, vehiclesApi } from '../lib/api';
@@ -195,10 +197,10 @@ export default function Freights() {
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard label="Fretes lancados" value={freights.length.toString()} />
-        <StatCard label="Receita no frete" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-        <StatCard label="Viagens de contrato recorrente" value={recurringOperationalTrips.toString()} />
-        <StatCard label="Ultimo frete" value={freights[0]?.date ? new Date(freights[0].date).toLocaleDateString('pt-BR') : '-'} />
+        <KpiCard label="Fretes lancados" value={freights.length.toString()} />
+        <KpiCard label="Receita no frete" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+        <KpiCard label="Viagens de contrato recorrente" value={recurringOperationalTrips.toString()} />
+        <KpiCard label="Ultimo frete" value={freights[0]?.date ? new Date(freights[0].date).toLocaleDateString('pt-BR') : '-'} />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -299,11 +301,10 @@ export default function Freights() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo de frete</label>
-              <select
-                className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              <CustomSelect
                 value={formData.freightType}
-                onChange={(e) => {
-                  const nextType = e.target.value as 'standalone' | 'contract';
+                onChange={(value) => {
+                  const nextType = value as 'standalone' | 'contract';
                   setFormData((current) => ({
                     ...current,
                     freightType: nextType,
@@ -313,21 +314,19 @@ export default function Freights() {
                     amount: nextType === 'contract' && selectedContract?.remunerationType === 'recurring' ? '' : current.amount,
                   }));
                 }}
-              >
-                <option value="standalone">Frete avulso</option>
-                <option value="contract">Frete por contrato</option>
-              </select>
+                options={[
+                  { value: 'standalone', label: 'Frete avulso' },
+                  { value: 'contract', label: 'Frete por contrato' },
+                ]}
+              />
             </div>
 
             {formData.freightType === 'contract' && (
               <div className="space-y-2 md:col-span-2">
                 <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Contrato</label>
-                <select
-                  required
-                  className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                <CustomSelect
                   value={formData.contractId}
-                  onChange={(e) => {
-                    const nextContractId = e.target.value;
+                  onChange={(nextContractId) => {
                     const nextContract = contracts.find((contract) => contract.id === nextContractId);
                     const shouldResetVehicle = nextContract && !nextContract.vehicleIds.includes(formData.vehicleId);
                     setFormData((current) => ({
@@ -338,14 +337,12 @@ export default function Freights() {
                       amount: nextContract?.remunerationType === 'recurring' ? '' : current.amount,
                     }));
                   }}
-                >
-                  <option value="">Selecione um contrato</option>
-                  {selectableContracts.map((contract) => (
-                    <option key={contract.id} value={contract.id}>
-                      {contract.contractName} - {contract.companyName}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Selecione um contrato"
+                  options={selectableContracts.map((contract) => ({
+                    value: contract.id,
+                    label: `${contract.contractName} - ${contract.companyName}`,
+                  }))}
+                />
               </div>
             )}
 
@@ -353,13 +350,15 @@ export default function Freights() {
               <>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Placa</label>
-                  <select required className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" value={formData.vehicleId} onChange={(e) => {
-                    const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === e.target.value);
-                    setFormData({ ...formData, vehicleId: e.target.value, plate: selectedVehicle?.plate || '' });
-                  }}>
-                    <option value="">{selectedContract ? 'Selecione um caminhao do contrato' : 'Selecione um caminhao'}</option>
-                    {availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} - {vehicle.name}</option>)}
-                  </select>
+                  <CustomSelect
+                    value={formData.vehicleId}
+                    onChange={(value) => {
+                      const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === value);
+                      setFormData({ ...formData, vehicleId: value, plate: selectedVehicle?.plate || '' });
+                    }}
+                    placeholder={selectedContract ? 'Selecione um caminhao do contrato' : 'Selecione um caminhao'}
+                    options={availableVehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.plate} - ${vehicle.name}` }))}
+                  />
                 </div>
 
                 <Field label="Data" type="date" value={formData.date} onChange={(value) => setFormData({ ...formData, date: value })} />
@@ -432,10 +431,6 @@ function billingTypeTone(billingType?: Freight['billingType']) {
     default:
       return 'bg-tertiary-container text-on-tertiary-container';
   }
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant shadow-sm"><p className="text-sm font-medium text-on-surface-variant mb-2">{label}</p><p className="text-3xl font-black text-on-surface">{value}</p></div>;
 }
 
 function Field({ label, value, onChange, type = 'text', required = true, disabled = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; disabled?: boolean }) {

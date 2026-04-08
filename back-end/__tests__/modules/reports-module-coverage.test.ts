@@ -29,15 +29,15 @@ test('relatorios orquestra visoes por dominio a partir do shell compartilhado', 
 });
 
 test('layout dos relatorios concentra shell analitico filtros e navegacao interna', () => {
-  assert.match(reportsLayoutSource, /Espaco de Trabalho Analitico/);
-  assert.match(reportsLayoutSource, /Relatorios da Transportadora/);
+  assert.match(reportsLayoutSource, /Relatorios Avancados/);
+  assert.match(reportsLayoutSource, /Leitura operacional, financeira e gerencial com foco nas decisoes da transportadora\./);
   assert.match(reportsLayoutSource, /REPORT_TABS\.map/);
   assert.match(reportsLayoutSource, /activeTabMeta\?\.label/);
   assert.match(reportsLayoutSource, /onResetFilters/);
   assert.match(reportsLayoutSource, /Limpar filtros/);
-  assert.match(reportsLayoutSource, /Atualizar dados/);
-  assert.match(reportsLayoutSource, /Veiculo/);
-  assert.match(reportsLayoutSource, /Empresa/);
+  assert.match(reportsLayoutSource, /Visao atual/);
+  assert.match(reportsLayoutSource, /Todos os veiculos/);
+  assert.match(reportsLayoutSource, /Todas as empresas/);
 });
 
 test('hook compartilhado de relatorios centraliza filtros estados e agregacoes', () => {

@@ -14,9 +14,7 @@ export async function validateProviderPayload(body: Record<string, unknown>) {
   if (name.length < 3) throw new Error('Informe um nome valido para o fornecedor.');
   if (type.length < 2) throw new Error('Informe o tipo do fornecedor.');
   if (status.length < 2) throw new Error('Informe o status do fornecedor.');
-  if (contact.length < 3) throw new Error('Informe um contato valido para o fornecedor.');
-  if (!isValidEmail(email)) throw new Error('Informe um e-mail valido para o fornecedor.');
-  if (address.length < 5) throw new Error('Informe um endereco valido para o fornecedor.');
+  if (email && !isValidEmail(email)) throw new Error('Informe um e-mail valido para o fornecedor.');
 
   return { name, type, status, contact, email, address };
 }

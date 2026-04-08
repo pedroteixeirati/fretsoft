@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Bell, ChevronRight, Globe, Info, Loader2, Moon, Shield, UserPlus, Wallet } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 import { useFirebase } from '../context/FirebaseContext';
 import { canAccess } from '../lib/permissions';
 import { logout } from '../firebase';
@@ -100,18 +101,17 @@ export default function Settings() {
                     />
                   </Field>
                   <Field label="Nivel de Acesso">
-                    <select
-                      required
-                      className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none"
+                    <CustomSelect
                       value={newUserRole}
-                      onChange={(e) => setNewUserRole(e.target.value as typeof newUserRole)}
-                    >
-                      <option value="admin">Administrador</option>
-                      <option value="financial">Financeiro</option>
-                      <option value="operational">Operacional</option>
-                      <option value="driver">Motorista</option>
-                      <option value="viewer">Visualizador</option>
-                    </select>
+                      onChange={(value) => setNewUserRole(value as typeof newUserRole)}
+                      options={[
+                        { value: 'admin', label: 'Administrador' },
+                        { value: 'financial', label: 'Financeiro' },
+                        { value: 'operational', label: 'Operacional' },
+                        { value: 'driver', label: 'Motorista' },
+                        { value: 'viewer', label: 'Visualizador' },
+                      ]}
+                    />
                   </Field>
                 </div>
                 {createError && <p className="text-error text-xs font-bold">{createError}</p>}

@@ -126,9 +126,9 @@ create table if not exists providers (
   name text not null,
   type text not null,
   status text not null,
-  contact text not null,
-  email text not null,
-  address text not null,
+  contact text,
+  email text,
+  address text,
   created_by_user_id uuid references users(id) on delete set null,
   updated_by_user_id uuid references users(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -309,6 +309,9 @@ alter table if exists providers add column if not exists tenant_id uuid referenc
 alter table if exists providers add column if not exists display_id bigint;
 alter table if exists providers add column if not exists created_by_user_id uuid references users(id) on delete set null;
 alter table if exists providers add column if not exists updated_by_user_id uuid references users(id) on delete set null;
+alter table if exists providers alter column contact drop not null;
+alter table if exists providers alter column email drop not null;
+alter table if exists providers alter column address drop not null;
 alter table if exists providers drop column if exists rating;
 alter table if exists providers drop column if exists owner_uid;
 alter table if exists companies add column if not exists tenant_id uuid references tenants(id) on delete cascade;

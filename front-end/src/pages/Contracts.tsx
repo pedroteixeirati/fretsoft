@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, CalendarRange, Edit2, FileText, Filter, Loader2, Plus, Search, Trash2, Truck, Wallet } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { companiesApi, contractsApi, vehiclesApi } from '../lib/api';
@@ -201,10 +203,10 @@ export default function Contracts() {
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <Metric label="Contratos ativos" value={contracts.filter((contract) => contract.status === 'active').length.toString()} icon={FileText} />
-        <Metric label="Receita anual contratada" value={`R$ ${totalAnnualValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} />
-        <Metric label="Repasse mensal previsto" value={`R$ ${totalMonthlyValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={CalendarRange} />
-        <Metric label="Caminhoes alocados" value={allocatedVehicleIds.size.toString()} icon={Truck} />
+        <KpiCard label="Contratos ativos" value={contracts.filter((contract) => contract.status === 'active').length.toString()} icon={FileText} />
+        <KpiCard label="Receita anual contratada" value={`R$ ${totalAnnualValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={Wallet} />
+        <KpiCard label="Repasse mensal previsto" value={`R$ ${totalMonthlyValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} icon={CalendarRange} />
+        <KpiCard label="Caminhoes alocados" value={allocatedVehicleIds.size.toString()} icon={Truck} />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -220,16 +222,17 @@ export default function Contracts() {
             />
             <div className="h-6 w-px bg-outline/20 mx-2" />
             <div className="flex items-center gap-2 px-2">
-              <select
+              <CustomSelect
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent text-primary text-sm font-semibold appearance-none cursor-pointer focus:outline-none"
-              >
-                <option value="all">Todos os Status</option>
-                <option value="active">Ativo</option>
-                <option value="renewal">Renovacao</option>
-                <option value="closed">Encerrado</option>
-              </select>
+                onChange={setStatusFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os Status' },
+                  { value: 'active', label: 'Ativo' },
+                  { value: 'renewal', label: 'Renovacao' },
+                  { value: 'closed', label: 'Encerrado' },
+                ]}
+              />
               <Filter className="w-4 h-4 text-primary" />
             </div>
           </div>
@@ -335,30 +338,27 @@ export default function Contracts() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Empresa contratante</label>
-              <select
-                required
-                className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              <CustomSelect
                 value={formData.companyId}
-                onChange={(e) => {
-                  const selectedCompany = companies.find((company) => company.id === e.target.value);
-                  setFormData({ ...formData, companyId: e.target.value, companyName: selectedCompany?.corporateName || '' });
+                onChange={(value) => {
+                  const selectedCompany = companies.find((company) => company.id === value);
+                  setFormData({ ...formData, companyId: value, companyName: selectedCompany?.corporateName || '' });
                 }}
-              >
-                <option value="">Selecione uma empresa cadastrada</option>
-                {companies.map((company) => <option key={company.id} value={company.id}>{company.corporateName} ({company.cnpj})</option>)}
-              </select>
+                placeholder="Selecione uma empresa cadastrada"
+                options={companies.map((company) => ({ value: company.id, label: `${company.corporateName} (${company.cnpj})` }))}
+              />
             </div>
             <Field label="Nome do contrato" value={formData.contractName} onChange={(value) => setFormData({ ...formData, contractName: value })} />
             <div className="space-y-2">
               <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo de remuneracao</label>
-              <select
-                className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              <CustomSelect
                 value={formData.remunerationType}
-                onChange={(e) => setFormData({ ...formData, remunerationType: e.target.value as 'recurring' | 'per_trip' })}
-              >
-                <option value="recurring">Receita recorrente</option>
-                <option value="per_trip">Receita por viagem</option>
-              </select>
+                onChange={(value) => setFormData({ ...formData, remunerationType: value as 'recurring' | 'per_trip' })}
+                options={[
+                  { value: 'recurring', label: 'Receita recorrente' },
+                  { value: 'per_trip', label: 'Receita por viagem' },
+                ]}
+              />
             </div>
             {formData.remunerationType === 'recurring' && (
               <>
@@ -377,15 +377,15 @@ export default function Contracts() {
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status do contrato</label>
-            <select
-              className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+            <CustomSelect
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'renewal' | 'closed' })}
-            >
-              <option value="active">Ativo</option>
-              <option value="renewal">Em renovacao</option>
-              <option value="closed">Encerrado</option>
-            </select>
+              onChange={(value) => setFormData({ ...formData, status: value as 'active' | 'renewal' | 'closed' })}
+              options={[
+                { value: 'active', label: 'Ativo' },
+                { value: 'renewal', label: 'Em renovacao' },
+                { value: 'closed', label: 'Encerrado' },
+              ]}
+            />
           </div>
 
           <div className="space-y-3">
@@ -435,18 +435,6 @@ export default function Contracts() {
           </div>
         </form>
       </Modal>
-    </div>
-  );
-}
-
-function Metric({ label, value, icon: Icon }: { label: string; value: string; icon: React.ElementType }) {
-  return (
-    <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-medium text-on-surface-variant">{label}</p>
-        <Icon className="w-5 h-5 text-primary" />
-      </div>
-      <p className="text-3xl font-black text-on-surface">{value}</p>
     </div>
   );
 }

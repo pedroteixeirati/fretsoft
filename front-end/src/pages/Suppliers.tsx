@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Edit2, Filter, Loader2, Mail, MapPin, Phone, Plus, Search, Trash2, Users } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { providersApi } from '../lib/api';
@@ -115,10 +117,10 @@ export default function Suppliers() {
       </div>
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard label="Total de fornecedores" value={providers.length.toString()} />
-        <StatCard label="Ativos" value={providers.filter((provider) => provider.status === 'Ativo').length.toString()} />
-        <StatCard label="Oficinas" value={providers.filter((provider) => provider.type === 'Oficina').length.toString()} />
-        <StatCard label="Com e-mail" value={providers.filter((provider) => provider.email.trim().length > 0).length.toString()} />
+        <KpiCard label="Total de fornecedores" value={providers.length.toString()} />
+        <KpiCard label="Ativos" value={providers.filter((provider) => provider.status === 'Ativo').length.toString()} />
+        <KpiCard label="Oficinas" value={providers.filter((provider) => provider.type === 'Oficina').length.toString()} />
+        <KpiCard label="Com e-mail" value={providers.filter((provider) => provider.email.trim().length > 0).length.toString()} />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -128,14 +130,19 @@ export default function Suppliers() {
             <input type="text" placeholder="Buscar por nome, tipo ou contato..." className="w-full border-none focus:ring-0 bg-transparent text-on-surface text-sm py-2 px-4 placeholder:text-outline/60" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             <div className="h-6 w-px bg-outline/20 mx-2" />
             <div className="flex items-center gap-2 px-2">
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="bg-transparent text-primary text-sm font-semibold appearance-none cursor-pointer focus:outline-none">
-                <option value="all">Todos os Tipos</option>
-                <option value="Oficina">Oficina</option>
-                <option value="Posto de Combustivel">Posto de Combustivel</option>
-                <option value="Seguradora">Seguradora</option>
-                <option value="Concessionaria">Concessionaria</option>
-                <option value="Outros">Outros</option>
-              </select>
+              <CustomSelect
+                value={typeFilter}
+                onChange={setTypeFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os Tipos' },
+                  { value: 'Oficina', label: 'Oficina' },
+                  { value: 'Posto de Combustivel', label: 'Posto de Combustivel' },
+                  { value: 'Seguradora', label: 'Seguradora' },
+                  { value: 'Concessionaria', label: 'Concessionaria' },
+                  { value: 'Outros', label: 'Outros' },
+                ]}
+              />
               <Filter className="w-4 h-4 text-primary" />
             </div>
           </div>
@@ -212,9 +219,9 @@ export default function Suppliers() {
               <SelectInput label="Tipo" value={formData.type} onChange={(value) => setFormData({ ...formData, type: value })} options={['Oficina', 'Posto de Combustivel', 'Seguradora', 'Concessionaria', 'Outros']} />
               <SelectInput label="Status" value={formData.status} onChange={(value) => setFormData({ ...formData, status: value })} options={['Ativo', 'Inativo']} />
             </div>
-            <TextInput label="E-mail" type="email" value={formData.email} onChange={(value) => setFormData({ ...formData, email: value })} placeholder="exemplo@email.com" />
-            <TextInput label="Endereco" value={formData.address} onChange={(value) => setFormData({ ...formData, address: value })} placeholder="Rua, Numero, Bairro, Cidade - UF" />
-            <TextInput label="Contato (Telefone)" value={formData.contact} onChange={(value) => setFormData({ ...formData, contact: value })} placeholder="(11) 99999-9999" />
+            <TextInput label="E-mail" type="email" required={false} value={formData.email} onChange={(value) => setFormData({ ...formData, email: value })} placeholder="exemplo@email.com" />
+            <TextInput label="Endereco" required={false} value={formData.address} onChange={(value) => setFormData({ ...formData, address: value })} placeholder="Rua, Numero, Bairro, Cidade - UF" />
+            <TextInput label="Contato (Telefone)" required={false} value={formData.contact} onChange={(value) => setFormData({ ...formData, contact: value })} placeholder="(11) 99999-9999" />
           </div>
           <div className="pt-6 flex justify-end gap-4">
             <button type="button" onClick={handleCloseModal} className="px-8 py-3 rounded-full font-bold text-on-surface-variant hover:bg-surface-container transition-colors">Cancelar</button>
@@ -229,15 +236,11 @@ export default function Suppliers() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return <div className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant shadow-sm"><p className="text-sm font-medium text-on-surface-variant mb-2">{label}</p><p className="text-3xl font-black text-on-surface">{value}</p></div>;
-}
-
-function TextInput({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string }) {
+function TextInput({ label, value, onChange, placeholder, type = 'text', required = true }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; required?: boolean }) {
   return (
     <div className="space-y-2">
       <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <input required type={type} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input required={required} type={type} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -246,9 +249,11 @@ function SelectInput({ label, value, onChange, options }: { label: string; value
   return (
     <div className="space-y-2">
       <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <select className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((option) => <option key={option}>{option}</option>)}
-      </select>
+      <CustomSelect
+        value={value}
+        onChange={onChange}
+        options={options.map((option) => ({ value: option, label: option }))}
+      />
     </div>
   );
 }

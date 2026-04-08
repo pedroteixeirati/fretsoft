@@ -1,19 +1,27 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Calendar, Loader2, RefreshCw } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Building2, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Loader2, Truck } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 import { cn } from '../../lib/utils';
 import { Company, Vehicle } from '../../types';
 import { formatDatePtBr, getCalendarDays, getMonthLabel, parseLocalDate, REPORT_TABS, ReportTab, toDateInputValue } from './reports.shared';
 
-function DateFilterInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function DateRangePill({
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange,
+}: {
+  startDate: string;
+  endDate: string;
+  onStartDateChange: (value: string) => void;
+  onEndDateChange: (value: string) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const selectedDate = value ? parseLocalDate(value) : new Date();
-  const [viewDate, setViewDate] = useState(selectedDate);
+  const [activeField, setActiveField] = useState<'start' | 'end'>('start');
+  const selectedDate = activeField === 'start' ? startDate : endDate;
+  const [viewDate, setViewDate] = useState(selectedDate ? parseLocalDate(selectedDate) : new Date());
   const weekdayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-
-  useEffect(() => {
-    setViewDate(selectedDate);
-  }, [value]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -24,71 +32,160 @@ function DateFilterInput({ value, onChange }: { value: string; onChange: (value:
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const nextSelectedDate = activeField === 'start' ? startDate : endDate;
+    if (nextSelectedDate) setViewDate(parseLocalDate(nextSelectedDate));
+  }, [activeField, startDate, endDate, isOpen]);
+
   const calendarDays = getCalendarDays(viewDate);
 
   return (
-    <div ref={rootRef} className="relative flex-1 min-w-0">
+    <div ref={rootRef} className="relative min-w-0">
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="relative w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 pr-9 text-left text-on-surface font-medium text-sm"
+        className="grid w-full min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_1rem] items-center gap-3 whitespace-nowrap rounded-2xl border border-outline-variant/10 bg-surface-container-lowest px-4 py-3 shadow-sm transition hover:border-primary/20"
       >
-        <span className="block truncate">{formatDatePtBr(value)}</span>
-        <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none opacity-60" />
+        <CalendarDays className="h-5 w-5 text-primary" />
+        <span className="min-w-0 truncate text-center text-sm font-medium text-on-surface">
+          {formatDatePtBr(startDate)} - {formatDatePtBr(endDate)}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-stone-400" />
       </button>
 
-      {isOpen && (
-        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-30 w-[18rem] rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-xl">
-          <div className="mb-4 flex items-center justify-between gap-3">
+      {isOpen ? (
+        <div className="absolute left-0 top-[calc(100%+0.5rem)] z-40 w-[17rem] rounded-[1.6rem] border border-outline-variant/10 bg-surface-container-lowest p-2 shadow-[0_24px_60px_rgba(26,28,21,0.12)]">
+          <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
-              onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
-              className="rounded-full border border-outline-variant p-2 text-on-surface-variant transition hover:border-primary hover:text-primary"
-              aria-label="Mes anterior"
+              onClick={() => setActiveField('start')}
+              className={cn(
+                'rounded-[1.2rem] border px-3 py-1.5 text-left transition',
+                activeField === 'start' ? 'border-primary bg-primary/5' : 'border-outline-variant/20 bg-surface',
+              )}
             >
-              <Calendar className="h-4 w-4 rotate-90" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Data inicial</p>
+              <p className="mt-0.5 text-[1rem] font-bold text-on-surface">{formatDatePtBr(startDate)}</p>
             </button>
-            <p className="text-sm font-bold capitalize text-on-surface">{getMonthLabel(viewDate)}</p>
             <button
               type="button"
-              onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
-              className="rounded-full border border-outline-variant p-2 text-on-surface-variant transition hover:border-primary hover:text-primary"
-              aria-label="Proximo mes"
+              onClick={() => setActiveField('end')}
+              className={cn(
+                'rounded-[1.2rem] border px-3 py-1.5 text-left transition',
+                activeField === 'end' ? 'border-primary bg-primary/5' : 'border-outline-variant/20 bg-surface',
+              )}
             >
-              <Calendar className="h-4 w-4 -rotate-90" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Data final</p>
+              <p className="mt-0.5 text-[1rem] font-bold text-on-surface">{formatDatePtBr(endDate)}</p>
             </button>
           </div>
 
-          <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">
-            {weekdayLabels.map((day) => <span key={day}>{day}</span>)}
-          </div>
+          <div className="mt-2 rounded-[1.3rem] border border-outline-variant/20 bg-surface px-2.5 py-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+                className="rounded-full border border-outline-variant/20 p-1.25 text-on-surface-variant transition hover:border-primary hover:text-primary"
+                aria-label="Mes anterior"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <p className="text-[0.95rem] font-bold capitalize text-on-surface">{getMonthLabel(viewDate)}</p>
+              <button
+                type="button"
+                onClick={() => setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+                className="rounded-full border border-outline-variant/20 p-1.25 text-on-surface-variant transition hover:border-primary hover:text-primary"
+                aria-label="Proximo mes"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day) => {
-              const isoValue = toDateInputValue(day);
-              const isCurrentMonth = day.getMonth() === viewDate.getMonth();
-              const isSelected = isoValue === value;
+            <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
+              {weekdayLabels.map((day) => <span key={day}>{day}</span>)}
+            </div>
 
-              return (
-                <button
-                  key={isoValue}
-                  type="button"
-                  onClick={() => {
-                    onChange(isoValue);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    'flex h-9 items-center justify-center rounded-xl text-sm transition',
-                    isSelected ? 'bg-primary text-on-primary font-bold' : isCurrentMonth ? 'text-on-surface hover:bg-primary/10' : 'text-on-surface-variant/50 hover:bg-surface-container'
-                  )}
-                >
-                  {day.getDate()}
-                </button>
-              );
-            })}
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day) => {
+                const isoValue = toDateInputValue(day);
+                const isCurrentMonth = day.getMonth() === viewDate.getMonth();
+                const isSelected = isoValue === selectedDate;
+
+                return (
+                  <button
+                    key={isoValue}
+                    type="button"
+                    onClick={() => {
+                      if (activeField === 'start') onStartDateChange(isoValue);
+                      else onEndDateChange(isoValue);
+                    }}
+                    className={cn(
+                      'flex h-6.5 items-center justify-center rounded-lg text-[0.95rem] transition',
+                      isSelected ? 'bg-primary text-on-primary font-bold' : isCurrentMonth ? 'text-on-surface hover:bg-primary/10' : 'text-on-surface-variant/50 hover:bg-surface-container',
+                    )}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeField === 'start') onStartDateChange('');
+                  else onEndDateChange('');
+                }}
+                className="text-[0.95rem] font-medium text-on-surface-variant transition hover:text-primary"
+              >
+                Limpar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const today = toDateInputValue(new Date());
+                  if (activeField === 'start') onStartDateChange(today);
+                  else onEndDateChange(today);
+                }}
+                className="text-[0.95rem] font-bold text-primary"
+              >
+                Hoje
+              </button>
+            </div>
           </div>
         </div>
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+function SelectPill({
+  icon: Icon,
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="relative min-w-0">
+      <Icon className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-primary" />
+      <CustomSelect
+        value={value}
+        onChange={onChange}
+        options={options}
+        placeholder={label}
+        className="w-full"
+        buttonClassName="rounded-2xl border-outline-variant/10 bg-surface-container-lowest py-3 pl-12 pr-11 text-sm font-medium text-on-surface shadow-sm hover:border-primary/20"
+        menuClassName="w-full"
+      />
     </div>
   );
 }
@@ -114,127 +211,112 @@ interface ReportsLayoutProps {
   children: React.ReactNode;
 }
 
-export default function ReportsLayout(props: ReportsLayoutProps) {
-  const {
-    activeTab,
-    onTabChange,
-    startDate,
-    endDate,
-    onStartDateChange,
-    onEndDateChange,
-    vehicleFilter,
-    onVehicleFilterChange,
-    companyFilter,
-    onCompanyFilterChange,
-    onResetFilters,
-    vehicles,
-    companies,
-    loading,
-    refreshing,
-    loadError,
-    onRefresh,
-    children,
-  } = props;
-
+export default function ReportsLayout({
+  activeTab,
+  onTabChange,
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange,
+  vehicleFilter,
+  onVehicleFilterChange,
+  companyFilter,
+  onCompanyFilterChange,
+  onResetFilters,
+  vehicles,
+  companies,
+  loading,
+  refreshing,
+  loadError,
+  onRefresh,
+  children,
+}: ReportsLayoutProps) {
   const activeTabMeta = REPORT_TABS.find((tab) => tab.id === activeTab);
+
+  const vehicleOptions = useMemo(
+    () => [
+      { value: 'all', label: `Todos os veiculos (${vehicles.length})` },
+      ...vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.name} (${vehicle.plate})` })),
+    ],
+    [vehicles],
+  );
+
+  const companyOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todas as empresas' },
+      ...companies.map((company) => ({ value: company.id, label: company.corporateName })),
+    ],
+    [companies],
+  );
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <Loader2 className="w-12 h-12 text-primary animate-spin" />
-        <p className="text-on-surface-variant font-bold text-lg">Gerando relatorios...</p>
+      <div className="flex flex-col items-center justify-center gap-4 py-40">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-lg font-bold text-on-surface-variant">Loading analytics...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-10">
-      <header className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <header className="space-y-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <span className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Espaco de Trabalho Analitico</span>
-            <h2 className="text-4xl font-extrabold tracking-tight text-on-surface mt-2">Relatorios da Transportadora</h2>
-            <p className="text-on-surface-variant mt-2">
-              Separe a leitura por area de decisao para enxergar o financeiro, a operacao e a gestao do negocio com mais clareza.
-            </p>
+            <h1 className="font-headline text-5xl font-extrabold tracking-tight text-on-surface">Relatorios Avancados</h1>
+            <p className="mt-3 text-lg text-on-surface-variant">Leitura operacional, financeira e gerencial com foco nas decisoes da transportadora.</p>
           </div>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="inline-flex items-center gap-2 self-start rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-bold text-on-surface transition hover:border-primary/40"
-          >
-            <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-            Atualizar dados
-          </button>
         </div>
 
-        {loadError && (
+        <div className="flex flex-wrap items-center gap-2">
+          {REPORT_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onTabChange(tab.id)}
+              className={cn(
+                'rounded-full px-4 py-2.5 text-sm font-bold transition-all',
+                activeTab === tab.id
+                  ? 'bg-[#d4ed7f] text-[#526600]'
+                  : 'bg-surface-container-low text-on-surface-variant hover:bg-primary/10 hover:text-on-surface',
+              )}
+            >
+              {tab.label.replace('Relatorio ', '')}
+            </button>
+          ))}
+        </div>
+
+        <section className="rounded-3xl bg-surface-container-low p-2">
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-center">
+            <DateRangePill
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={onStartDateChange}
+              onEndDateChange={onEndDateChange}
+            />
+            <SelectPill icon={Truck} label="Todos os veiculos" value={vehicleFilter} options={vehicleOptions} onChange={onVehicleFilterChange} />
+            <SelectPill icon={Building2} label="Todas as empresas" value={companyFilter} options={companyOptions} onChange={onCompanyFilterChange} />
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="inline-flex shrink-0 items-center justify-center gap-3 whitespace-nowrap rounded-2xl px-6 py-3 font-bold text-primary transition hover:bg-primary/5 xl:ml-auto"
+            >
+              Limpar filtros
+            </button>
+          </div>
+        </section>
+
+        {loadError ? (
           <div className="rounded-2xl border border-error/20 bg-error/10 px-4 py-3 text-sm text-error">
             {loadError}
           </div>
-        )}
-
-        <div className="rounded-3xl border border-outline-variant bg-surface-container-lowest p-4">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Visao ativa</p>
-              <p className="mt-2 text-xl font-black text-on-surface">{activeTabMeta?.label}</p>
-              <p className="mt-1 text-sm text-on-surface-variant">{activeTabMeta?.description}</p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {REPORT_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => onTabChange(tab.id)}
-                  className={cn(
-                    'rounded-full border px-4 py-2 text-sm font-bold transition-all',
-                    activeTab === tab.id
-                      ? 'border-primary bg-primary text-on-primary shadow-lg shadow-primary/15'
-                      : 'border-outline-variant bg-surface text-on-surface-variant hover:border-primary/40 hover:text-on-surface'
-                  )}
-                >
-                  {tab.label.replace('Relatorio ', '')}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        ) : null}
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-surface-container-low rounded-xl p-5 flex flex-col gap-2 md:col-span-2">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Intervalo de datas</label>
-          <div className="flex items-end gap-3 flex-nowrap">
-            <DateFilterInput value={startDate} onChange={onStartDateChange} />
-            <DateFilterInput value={endDate} onChange={onEndDateChange} />
-          </div>
-        </div>
-        <div className="bg-surface-container-low rounded-xl p-5 flex flex-col gap-2">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Veiculo</label>
-          <select value={vehicleFilter} onChange={(e) => onVehicleFilterChange(e.target.value)} className="bg-transparent text-on-surface font-medium focus:outline-none">
-            <option value="all">Todos os veiculos</option>
-            {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.name} ({vehicle.plate})</option>)}
-          </select>
-        </div>
-        <div className="bg-surface-container-low rounded-xl p-5 flex flex-col gap-2">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Empresa</label>
-          <select value={companyFilter} onChange={(e) => onCompanyFilterChange(e.target.value)} className="bg-transparent text-on-surface font-medium focus:outline-none">
-            <option value="all">Todas as empresas</option>
-            {companies.map((company) => <option key={company.id} value={company.id}>{company.corporateName}</option>)}
-          </select>
-        </div>
+      <section className="space-y-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Visao atual</p>
+        <h2 className="font-headline text-2xl font-bold text-on-surface">{activeTabMeta?.label}</h2>
       </section>
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onResetFilters}
-          className="rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-2 text-sm font-bold text-on-surface-variant transition hover:border-primary/40 hover:text-on-surface"
-        >
-          Limpar filtros
-        </button>
-      </div>
 
       {children}
     </div>

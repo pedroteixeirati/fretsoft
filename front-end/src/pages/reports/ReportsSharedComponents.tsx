@@ -1,4 +1,5 @@
 import React from 'react';
+import KpiCard from '../../components/KpiCard';
 import { cn } from '../../lib/utils';
 
 export function Panel({ title, children }: { title: string; children: React.ReactNode }) {
@@ -12,13 +13,13 @@ export function Panel({ title, children }: { title: string; children: React.Reac
 
 export function MetricBox({ label, value, icon: Icon, highlight }: { label: string; value: string; icon: React.ElementType; highlight?: boolean }) {
   return (
-    <div className={cn('rounded-3xl border p-6 shadow-sm', highlight ? 'border-primary/20 bg-primary-container/20' : 'border-outline-variant bg-surface-container-lowest')}>
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-on-surface-variant">{label}</p>
-        <Icon className={cn('h-5 w-5', highlight ? 'text-primary' : 'text-on-surface-variant')} />
-      </div>
-      <p className="text-3xl font-black text-on-surface">{value}</p>
-    </div>
+    <KpiCard
+      label={label}
+      value={value}
+      icon={Icon}
+      tone={highlight ? 'success' : undefined}
+      valueClassName={value.trim().startsWith('R$') ? 'text-[2.05rem] xl:text-[2.2rem]' : 'text-[2.3rem] xl:text-[2.55rem]'}
+    />
   );
 }
 

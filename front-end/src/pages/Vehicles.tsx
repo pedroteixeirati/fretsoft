@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Car, Filter, Loader2, MoreVertical, Plus, Search, Trash2, Truck } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { vehiclesApi } from '../lib/api';
@@ -175,20 +176,30 @@ export default function Vehicles() {
             />
             <div className="h-6 w-px bg-outline/20 mx-2" />
             <div className="flex items-center gap-2 px-2">
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="bg-transparent text-primary text-sm font-semibold appearance-none cursor-pointer focus:outline-none">
-                <option value="all">Todos os tipos</option>
-                <option value="Carga Pesada">Carga Pesada</option>
-                <option value="Longo Percurso">Longo Percurso</option>
-                <option value="Utilitario">Utilitario</option>
-                <option value="Executivo">Executivo</option>
-              </select>
+              <CustomSelect
+                value={typeFilter}
+                onChange={setTypeFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os tipos' },
+                  { value: 'Carga Pesada', label: 'Carga Pesada' },
+                  { value: 'Longo Percurso', label: 'Longo Percurso' },
+                  { value: 'Utilitario', label: 'Utilitario' },
+                  { value: 'Executivo', label: 'Executivo' },
+                ]}
+              />
               <div className="h-6 w-px bg-outline/20 mx-2" />
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent text-primary text-sm font-semibold appearance-none cursor-pointer focus:outline-none">
-                <option value="all">Todos os status</option>
-                <option value="active">Ativo</option>
-                <option value="maintenance">Manutencao</option>
-                <option value="alert">Alerta</option>
-              </select>
+              <CustomSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os status' },
+                  { value: 'active', label: 'Ativo' },
+                  { value: 'maintenance', label: 'Manutencao' },
+                  { value: 'alert', label: 'Alerta' },
+                ]}
+              />
               <Filter className="w-4 h-4 text-primary" />
             </div>
           </div>
@@ -264,7 +275,14 @@ export default function Vehicles() {
             <Input label="Nome do veiculo" value={formData.name} onChange={(value) => setFormData({ ...formData, name: value })} placeholder="Ex: Volvo FH 540" />
             <Input label="Placa" value={formData.plate} onChange={(value) => setFormData({ ...formData, plate: value.toUpperCase() })} placeholder="ABC-1234" />
             <Input label="Motorista" value={formData.driver} onChange={(value) => setFormData({ ...formData, driver: value })} placeholder="Nome do motorista" />
-            <Select label="Tipo" value={formData.type} onChange={(value) => setFormData({ ...formData, type: value })} options={['Carga Pesada', 'Longo Percurso', 'Utilitario', 'Executivo']} />
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo</label>
+              <CustomSelect
+                value={formData.type}
+                onChange={(value) => setFormData({ ...formData, type: value })}
+                options={['Carga Pesada', 'Longo Percurso', 'Utilitario', 'Executivo'].map((option) => ({ value: option, label: option }))}
+              />
+            </div>
             <Input label="Quilometragem" type="number" value={String(formData.km)} onChange={(value) => setFormData({ ...formData, km: Number(value) })} />
             <Input label="Proxima manutencao" type="date" value={formData.nextMaintenance} onChange={(value) => setFormData({ ...formData, nextMaintenance: value })} />
           </div>
@@ -290,13 +308,3 @@ function Input({ label, value, onChange, placeholder, type = 'text' }: { label: 
   );
 }
 
-function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <select className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((option) => <option key={option}>{option}</option>)}
-      </select>
-    </div>
-  );
-}

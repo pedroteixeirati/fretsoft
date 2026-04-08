@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Filter, Loader2, Plus, Search, ShieldCheck, UserRoundPlus } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { platformTenantsApi } from '../lib/api';
@@ -159,10 +161,10 @@ export default function PlatformTenants() {
       </div>
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard label="Transportadoras" value={String(tenants.length)} />
-        <StatCard label="Ativas" value={String(tenants.filter((tenant) => tenant.status === 'active').length)} />
-        <StatCard label="Owners vinculados" value={String(tenants.filter((tenant) => tenant.ownerLinked).length)} />
-        <StatCard label="Planos ativos" value={String(new Set(tenants.map((tenant) => tenant.plan).filter(Boolean)).size)} />
+        <KpiCard label="Transportadoras" value={String(tenants.length)} />
+        <KpiCard label="Ativas" value={String(tenants.filter((tenant) => tenant.status === 'active').length)} />
+        <KpiCard label="Owners vinculados" value={String(tenants.filter((tenant) => tenant.ownerLinked).length)} />
+        <KpiCard label="Planos ativos" value={String(new Set(tenants.map((tenant) => tenant.plan).filter(Boolean)).size)} />
       </section>
 
       {submitSuccess && <p className="text-sm font-bold text-primary">{submitSuccess}</p>}
@@ -174,12 +176,17 @@ export default function PlatformTenants() {
             <input type="text" placeholder="Buscar por transportadora ou owner..." className="w-full border-none focus:ring-0 bg-transparent text-on-surface text-sm py-2 px-4 placeholder:text-outline/60" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             <div className="h-6 w-px bg-outline/20 mx-2" />
             <div className="flex items-center gap-2 px-2">
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-transparent text-primary text-sm font-semibold appearance-none cursor-pointer focus:outline-none">
-                <option value="all">Todos os Status</option>
-                <option value="active">Ativa</option>
-                <option value="inactive">Inativa</option>
-                <option value="suspended">Suspensa</option>
-              </select>
+              <CustomSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os Status' },
+                  { value: 'active', label: 'Ativa' },
+                  { value: 'inactive', label: 'Inativa' },
+                  { value: 'suspended', label: 'Suspensa' },
+                ]}
+              />
               <Filter className="w-4 h-4 text-primary" />
             </div>
           </div>
@@ -282,19 +289,27 @@ export default function PlatformTenants() {
             />
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Plano</label>
-              <select className="w-full rounded-xl border border-outline-variant bg-surface-container px-4 py-3 outline-none transition-all focus:ring-2 focus:ring-primary/20" value={formData.plan} onChange={(event) => setFormData({ ...formData, plan: event.target.value })}>
-                <option value="starter">Starter</option>
-                <option value="growth">Growth</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
+              <CustomSelect
+                value={formData.plan}
+                onChange={(value) => setFormData({ ...formData, plan: value })}
+                options={[
+                  { value: 'starter', label: 'Starter' },
+                  { value: 'growth', label: 'Growth' },
+                  { value: 'enterprise', label: 'Enterprise' },
+                ]}
+              />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Status</label>
-              <select className="w-full rounded-xl border border-outline-variant bg-surface-container px-4 py-3 outline-none transition-all focus:ring-2 focus:ring-primary/20" value={formData.status} onChange={(event) => setFormData({ ...formData, status: event.target.value as typeof formData.status })}>
-                <option value="active">Ativa</option>
-                <option value="inactive">Inativa</option>
-                <option value="suspended">Suspensa</option>
-              </select>
+              <CustomSelect
+                value={formData.status}
+                onChange={(value) => setFormData({ ...formData, status: value as typeof formData.status })}
+                options={[
+                  { value: 'active', label: 'Ativa' },
+                  { value: 'inactive', label: 'Inativa' },
+                  { value: 'suspended', label: 'Suspensa' },
+                ]}
+              />
             </div>
           </div>
 
@@ -345,10 +360,6 @@ export default function PlatformTenants() {
       </Modal>
     </div>
   );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-3xl border border-outline-variant bg-surface-container-lowest p-6 shadow-sm"><p className="mb-2 text-sm font-medium text-on-surface-variant">{label}</p><p className="text-3xl font-black text-on-surface">{value}</p></div>;
 }
 
 function Field({

@@ -1,48 +1,12 @@
 import React, { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { Building2, ChevronLeft, ChevronRight, FileText, Filter, Loader2, MoreVertical, RefreshCw, Search } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import { revenuesApi } from '../lib/api';
 import { Revenue } from '../types';
 
 function currency(value: number) {
   return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  variant,
-}: {
-  label: string;
-  value: string;
-  icon: React.ElementType;
-  variant: 'primary' | 'secondary' | 'tertiary' | 'error';
-}) {
-  const borderClass = {
-    primary: 'border-primary/20',
-    secondary: 'border-secondary/20',
-    tertiary: 'border-tertiary/20',
-    error: 'border-error/20',
-  }[variant];
-
-  const badgeClass = {
-    primary: 'bg-primary/10 text-primary',
-    secondary: 'bg-secondary/10 text-secondary',
-    tertiary: 'bg-tertiary/10 text-tertiary',
-    error: 'bg-error/10 text-error',
-  }[variant];
-
-  return (
-    <div className={`bg-surface-container-lowest p-6 rounded-2xl shadow-sm border-b-2 ${borderClass}`}>
-      <div className="flex justify-between items-start mb-4">
-        <span className={`p-2 rounded-lg ${badgeClass}`}>
-          <Icon className="w-5 h-5" />
-        </span>
-      </div>
-      <p className="text-on-surface-variant text-sm font-medium">{label}</p>
-      <p className="text-2xl font-black text-on-surface mt-1 whitespace-nowrap">{value}</p>
-    </div>
-  );
 }
 
 function canChargeRevenue(revenue: Revenue) {
@@ -176,10 +140,10 @@ export default function Revenues() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Titulos filtrados" value={currency(totalFiltered)} icon={FileText} variant="primary" />
-        <StatCard label="Recebidas" value={currency(totalReceived)} icon={RefreshCw} variant="secondary" />
-        <StatCard label="Em aberto" value={currency(totalOpen)} icon={Building2} variant="tertiary" />
-        <StatCard label="Em atraso" value={currency(totalOverdue)} icon={MoreVertical} variant="error" />
+        <KpiCard label="Titulos filtrados" value={currency(totalFiltered)} icon={FileText} tone="primary" />
+        <KpiCard label="Recebidas" value={currency(totalReceived)} icon={RefreshCw} tone="success" />
+        <KpiCard label="Em aberto" value={currency(totalOpen)} icon={Building2} tone="tertiary" />
+        <KpiCard label="Em atraso" value={currency(totalOverdue)} icon={MoreVertical} tone="danger" />
       </div>
 
       <section className="bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden flex flex-col">
@@ -196,18 +160,19 @@ export default function Revenues() {
               />
             </div>
             <div className="flex items-center gap-2 rounded-full bg-surface px-4 py-2">
-              <select
+              <CustomSelect
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-transparent text-primary text-sm font-semibold appearance-none cursor-pointer focus:outline-none"
-              >
-                <option value="all">Todos os Status</option>
-                <option value="pending">Pendente</option>
-                <option value="billed">Cobrada</option>
-                <option value="received">Recebida</option>
-                <option value="overdue">Em atraso</option>
-                <option value="canceled">Cancelada</option>
-              </select>
+                onChange={setStatusFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os Status' },
+                  { value: 'pending', label: 'Pendente' },
+                  { value: 'billed', label: 'Cobrada' },
+                  { value: 'received', label: 'Recebida' },
+                  { value: 'overdue', label: 'Em atraso' },
+                  { value: 'canceled', label: 'Cancelada' },
+                ]}
+              />
               <Filter className="w-4 h-4 text-primary" />
             </div>
           </div>

@@ -11,6 +11,8 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
+import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { companiesApi, payablesApi, vehiclesApi } from '../lib/api';
 import { getErrorMessage } from '../lib/errors';
@@ -310,10 +312,10 @@ export default function Payables({ onNavigate }: PayablesProps) {
       ) : null}
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border bg-surface-container-lowest p-6 shadow-sm"><p className="text-sm text-on-surface-variant">Compromissos filtrados</p><p className="mt-1 text-2xl font-black text-on-surface">{currency(totalFiltered)}</p></div>
-        <div className="rounded-2xl border bg-surface-container-lowest p-6 shadow-sm"><p className="text-sm text-on-surface-variant">Em aberto</p><p className="mt-1 text-2xl font-black text-on-surface">{currency(totalOpen)}</p></div>
-        <div className="rounded-2xl border bg-surface-container-lowest p-6 shadow-sm"><p className="text-sm text-on-surface-variant">Pagas</p><p className="mt-1 text-2xl font-black text-on-surface">{currency(totalPaid)}</p></div>
-        <div className="rounded-2xl border bg-surface-container-lowest p-6 shadow-sm"><p className="text-sm text-on-surface-variant">Em atraso</p><p className="mt-1 text-2xl font-black text-on-surface">{currency(totalOverdue)}</p></div>
+        <KpiCard label="Compromissos filtrados" value={currency(totalFiltered)} icon={CreditCard} tone="primary" />
+        <KpiCard label="Em aberto" value={currency(totalOpen)} tone="warning" />
+        <KpiCard label="Pagas" value={currency(totalPaid)} tone="success" />
+        <KpiCard label="Em atraso" value={currency(totalOverdue)} icon={AlertTriangle} tone="danger" />
       </div>
 
       <section className="overflow-hidden rounded-3xl bg-surface-container-lowest shadow-sm">
@@ -324,13 +326,18 @@ export default function Payables({ onNavigate }: PayablesProps) {
               <input type="text" placeholder="Buscar conta, fornecedor ou veiculo..." className="min-w-[260px] rounded-full border-none bg-surface py-2 pl-10 pr-4 text-sm font-medium text-on-surface-variant focus:ring-2 focus:ring-primary/20" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
             <div className="flex items-center gap-2 rounded-full bg-surface px-4 py-2">
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | Payable['status'])} className="appearance-none bg-transparent text-sm font-semibold text-primary focus:outline-none">
-                <option value="all">Todos os status</option>
-                <option value="open">Em aberto</option>
-                <option value="paid">Paga</option>
-                <option value="overdue">Em atraso</option>
-                <option value="canceled">Cancelada</option>
-              </select>
+              <CustomSelect
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value as 'all' | Payable['status'])}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todos os status' },
+                  { value: 'open', label: 'Em aberto' },
+                  { value: 'paid', label: 'Paga' },
+                  { value: 'overdue', label: 'Em atraso' },
+                  { value: 'canceled', label: 'Cancelada' },
+                ]}
+              />
               <Filter className="h-4 w-4 text-primary" />
             </div>
           </div>
@@ -399,13 +406,13 @@ export default function Payables({ onNavigate }: PayablesProps) {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Descricao</label><input required className={inputClassName()} value={formData.description} onChange={(e) => setFormData((current) => ({ ...current, description: e.target.value }))} placeholder="Ex: Manutencao preventiva" /></div>
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Fornecedor</label><input className={inputClassName()} value={formData.providerName} onChange={(e) => setFormData((current) => ({ ...current, providerName: e.target.value }))} placeholder="Ex: Oficina Diesel Centro" /></div>
-            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Origem</label><select className={inputClassName()} value={formData.sourceType} onChange={(e) => setFormData((current) => ({ ...current, sourceType: e.target.value as PayableFormData['sourceType'], sourceId: e.target.value === 'manual' ? '' : current.sourceId }))}><option value="manual">Manual</option><option value="expense">Custo operacional</option></select></div>
+            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Origem</label><CustomSelect value={formData.sourceType} onChange={(value) => setFormData((current) => ({ ...current, sourceType: value as PayableFormData['sourceType'], sourceId: value === 'manual' ? '' : current.sourceId }))} options={[{ value: 'manual', label: 'Manual' }, { value: 'expense', label: 'Custo operacional' }]} /></div>
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">ID da origem</label><input className={inputClassName()} value={formData.sourceId} onChange={(e) => setFormData((current) => ({ ...current, sourceId: e.target.value }))} placeholder="UUID do custo operacional" disabled={formData.sourceType === 'manual'} /></div>
-            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Veiculo</label><select className={inputClassName()} value={formData.vehicleId} onChange={(e) => setFormData((current) => ({ ...current, vehicleId: e.target.value }))}><option value="">Nao vincular</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.name} ({vehicle.plate})</option>)}</select></div>
-            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Empresa</label><select className={inputClassName()} value={formData.contractId} onChange={(e) => setFormData((current) => ({ ...current, contractId: e.target.value }))}><option value="">Nao vincular</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.tradeName}</option>)}</select></div>
+            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Veiculo</label><CustomSelect value={formData.vehicleId} onChange={(value) => setFormData((current) => ({ ...current, vehicleId: value }))} placeholder="Nao vincular" options={vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.name} (${vehicle.plate})` }))} /></div>
+            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Empresa</label><CustomSelect value={formData.contractId} onChange={(value) => setFormData((current) => ({ ...current, contractId: value }))} placeholder="Nao vincular" options={companies.map((company) => ({ value: company.id, label: company.tradeName }))} /></div>
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Valor</label><input required type="number" step="0.01" className={inputClassName()} value={String(formData.amount)} onChange={(e) => setFormData((current) => ({ ...current, amount: Number(e.target.value) }))} /></div>
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Vencimento</label><input required type="date" className={inputClassName()} value={formData.dueDate} onChange={(e) => setFormData((current) => ({ ...current, dueDate: e.target.value }))} /></div>
-            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Status</label><select className={inputClassName()} value={formData.status} onChange={(e) => setFormData((current) => ({ ...current, status: e.target.value as Payable['status'] }))}><option value="open">Em aberto</option><option value="paid">Paga</option><option value="overdue">Em atraso</option><option value="canceled">Cancelada</option></select></div>
+            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Status</label><CustomSelect value={formData.status} onChange={(value) => setFormData((current) => ({ ...current, status: value as Payable['status'] }))} options={[{ value: 'open', label: 'Em aberto' }, { value: 'paid', label: 'Paga' }, { value: 'overdue', label: 'Em atraso' }, { value: 'canceled', label: 'Cancelada' }]} /></div>
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Data do pagamento</label><input type="date" className={inputClassName()} value={formData.paidAt} onChange={(e) => setFormData((current) => ({ ...current, paidAt: e.target.value }))} disabled={formData.status !== 'paid'} /></div>
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Forma de pagamento</label><input className={inputClassName()} value={formData.paymentMethod} onChange={(e) => setFormData((current) => ({ ...current, paymentMethod: e.target.value }))} placeholder="Ex: PIX, boleto, transferencia" /></div>
             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Comprovante (URL)</label><input className={inputClassName()} value={formData.proofUrl} onChange={(e) => setFormData((current) => ({ ...current, proofUrl: e.target.value }))} placeholder="https://..." /></div>
