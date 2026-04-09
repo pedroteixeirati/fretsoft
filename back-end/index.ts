@@ -7,7 +7,7 @@ async function start() {
   await pool.query('select 1');
   startBackgroundJobs();
   app.listen(config.port, () => {
-    console.log(`API Nova Log escutando na porta ${config.port}`);
+    console.log(`API Fretsoft escutando na porta ${config.port}`);
   });
 }
 

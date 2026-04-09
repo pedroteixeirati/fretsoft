@@ -16,8 +16,8 @@ function makeProfile(role: UserProfile['role']): UserProfile {
     email: `${role}@teste.com`,
     role,
     tenantId: 'tenant-1',
-    tenantName: 'Nova Log',
-    tenantSlug: 'nova-log',
+    tenantName: 'Transportadora Teste',
+    tenantSlug: 'transportadora-teste',
   };
 }
 

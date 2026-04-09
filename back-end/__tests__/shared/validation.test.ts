@@ -48,6 +48,6 @@ test('valida email, telefone e numeros financeiros', () => {
 });
 
 test('gera slug seguro para cadastros administrativos', () => {
-  assert.equal(slugify('Nova Log Transportes LTDA'), 'nova-log-transportes-ltda');
+  assert.equal(slugify('Fretsoft Transportes LTDA'), 'fretsoft-transportes-ltda');
   assert.equal(slugify('  JP Soft / Plataforma  '), 'jp-soft-plataforma');
 });
