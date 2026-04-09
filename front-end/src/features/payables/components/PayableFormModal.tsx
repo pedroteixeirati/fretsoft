@@ -2,15 +2,19 @@ import React from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import Modal from '../../../components/Modal';
+import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
+import Input from '../../../shared/ui/Input';
+import { FormFieldErrors } from '../../../lib/errors';
 import { Company } from '../../companies/types/company.types';
 import { Payable } from '../types/payable.types';
 import { Vehicle } from '../../vehicles/types/vehicle.types';
-import { PayableFormData } from '../hooks/usePayableForm';
+import { PayableFormData, PayableFormField } from '../hooks/usePayableForm';
 
 interface PayableFormModalProps {
   isOpen: boolean;
   editing: boolean;
   submitError: string;
+  fieldErrors: FormFieldErrors<PayableFormField>;
   formData: PayableFormData;
   isSubmitting: boolean;
   vehicles: Vehicle[];
@@ -18,16 +22,14 @@ interface PayableFormModalProps {
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onChange: (next: PayableFormData) => void;
-}
-
-function inputClassName() {
-  return 'w-full rounded-xl border border-outline-variant bg-surface-container px-4 py-3 outline-none transition-all focus:ring-2 focus:ring-primary/20';
+  onClearFieldError: (field: PayableFormField) => void;
 }
 
 export default function PayableFormModal({
   isOpen,
   editing,
   submitError,
+  fieldErrors,
   formData,
   isSubmitting,
   vehicles,
@@ -35,49 +37,68 @@ export default function PayableFormModal({
   onClose,
   onSubmit,
   onChange,
+  onClearFieldError,
 }: PayableFormModalProps) {
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
+  const canSubmit = hasRequiredFieldsFilled(formData, [
+    'description',
+    { field: 'amount', isFilled: (value) => Number(value) > 0 },
+    'dueDate',
+  ]) && (formData.sourceType !== 'expense' || formData.sourceId.trim().length > 0);
+  const { formRef, alertRef } = useFormErrorFocus({
+    enabled: isOpen,
+    fieldErrors,
+    message: formMessage,
+  });
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={editing ? 'Editar conta a pagar' : 'Nova conta a pagar'}>
-      <form onSubmit={onSubmit} className="space-y-6">
-        {submitError ? (
-          <div className="rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm font-medium text-error">
-            {submitError}
-          </div>
-        ) : null}
+      <form ref={formRef} onSubmit={onSubmit} className="space-y-6">
+        <div ref={alertRef}>
+          <FormAlert message={formMessage} />
+        </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Descricao</label>
-            <input
-              required
-              className={inputClassName()}
-              value={formData.description}
-              onChange={(event) => onChange({ ...formData, description: event.target.value })}
-              placeholder="Ex: Manutencao preventiva"
-            />
-          </div>
+          <Input
+            required
+            label="Descricao"
+            error={fieldErrors.description}
+            value={formData.description}
+            onChange={(event) => {
+              onClearFieldError('description');
+              onChange({ ...formData, description: event.target.value });
+            }}
+            placeholder="Ex: Manutencao preventiva"
+          />
+
+          <Input
+            label="Fornecedor"
+            error={fieldErrors.providerName}
+            value={formData.providerName}
+            onChange={(event) => {
+              onClearFieldError('providerName');
+              onChange({ ...formData, providerName: event.target.value });
+            }}
+            placeholder="Ex: Oficina Diesel Centro"
+          />
 
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Fornecedor</label>
-            <input
-              className={inputClassName()}
-              value={formData.providerName}
-              onChange={(event) => onChange({ ...formData, providerName: event.target.value })}
-              placeholder="Ex: Oficina Diesel Centro"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Origem</label>
+            <FieldLabel required>Origem</FieldLabel>
             <CustomSelect
               value={formData.sourceType}
               onChange={(value) =>
-                onChange({
-                  ...formData,
-                  sourceType: value as PayableFormData['sourceType'],
-                  sourceId: value === 'manual' ? '' : formData.sourceId,
-                })
+                {
+                  onClearFieldError('sourceType');
+                  onClearFieldError('sourceId');
+                  onChange({
+                    ...formData,
+                    sourceType: value as PayableFormData['sourceType'],
+                    sourceId: value === 'manual' ? '' : formData.sourceId,
+                  });
+                }
               }
+              error={fieldErrors.sourceType}
               options={[
                 { value: 'manual', label: 'Manual' },
                 { value: 'expense', label: 'Custo operacional' },
@@ -85,22 +106,28 @@ export default function PayableFormModal({
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">ID da origem</label>
-            <input
-              className={inputClassName()}
-              value={formData.sourceId}
-              onChange={(event) => onChange({ ...formData, sourceId: event.target.value })}
-              placeholder="UUID do custo operacional"
-              disabled={formData.sourceType === 'manual'}
-            />
-          </div>
+          <Input
+            label="ID da origem"
+            error={fieldErrors.sourceId}
+            value={formData.sourceId}
+            onChange={(event) => {
+              onClearFieldError('sourceId');
+              onChange({ ...formData, sourceId: event.target.value });
+            }}
+            placeholder="UUID do custo operacional"
+            disabled={formData.sourceType === 'manual'}
+            required={formData.sourceType === 'expense'}
+          />
 
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Veiculo</label>
+            <FieldLabel>Veiculo</FieldLabel>
             <CustomSelect
               value={formData.vehicleId}
-              onChange={(value) => onChange({ ...formData, vehicleId: value })}
+              onChange={(value) => {
+                onClearFieldError('vehicleId');
+                onChange({ ...formData, vehicleId: value });
+              }}
+              error={fieldErrors.vehicleId}
               placeholder="Nao vincular"
               options={vehicles.map((vehicle) => ({
                 value: vehicle.id,
@@ -110,10 +137,14 @@ export default function PayableFormModal({
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Empresa</label>
+            <FieldLabel>Empresa</FieldLabel>
             <CustomSelect
               value={formData.contractId}
-              onChange={(value) => onChange({ ...formData, contractId: value })}
+              onChange={(value) => {
+                onClearFieldError('contractId');
+                onChange({ ...formData, contractId: value });
+              }}
+              error={fieldErrors.contractId}
               placeholder="Nao vincular"
               options={companies.map((company) => ({
                 value: company.id,
@@ -122,34 +153,40 @@ export default function PayableFormModal({
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Valor</label>
-            <input
-              required
-              type="number"
-              step="0.01"
-              className={inputClassName()}
-              value={String(formData.amount)}
-              onChange={(event) => onChange({ ...formData, amount: Number(event.target.value) })}
-            />
-          </div>
+          <Input
+            required
+            type="number"
+            step="0.01"
+            label="Valor"
+            error={fieldErrors.amount}
+            value={String(formData.amount)}
+            onChange={(event) => {
+              onClearFieldError('amount');
+              onChange({ ...formData, amount: Number(event.target.value) });
+            }}
+          />
+
+          <FormDatePicker
+            required
+            label="Vencimento"
+            error={fieldErrors.dueDate}
+            value={formData.dueDate}
+            onChange={(value) => {
+              onClearFieldError('dueDate');
+              onChange({ ...formData, dueDate: value });
+            }}
+          />
 
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Vencimento</label>
-            <input
-              required
-              type="date"
-              className={inputClassName()}
-              value={formData.dueDate}
-              onChange={(event) => onChange({ ...formData, dueDate: event.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Status</label>
+            <FieldLabel required>Status</FieldLabel>
             <CustomSelect
               value={formData.status}
-              onChange={(value) => onChange({ ...formData, status: value as Payable['status'] })}
+              onChange={(value) => {
+                onClearFieldError('status');
+                onClearFieldError('paidAt');
+                onChange({ ...formData, status: value as Payable['status'] });
+              }}
+              error={fieldErrors.status}
               options={[
                 { value: 'open', label: 'Em aberto' },
                 { value: 'paid', label: 'Paga' },
@@ -159,45 +196,54 @@ export default function PayableFormModal({
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Data do pagamento</label>
-            <input
-              type="date"
-              className={inputClassName()}
-              value={formData.paidAt}
-              onChange={(event) => onChange({ ...formData, paidAt: event.target.value })}
-              disabled={formData.status !== 'paid'}
-            />
-          </div>
+          <FormDatePicker
+            label="Data do pagamento"
+            error={fieldErrors.paidAt}
+            value={formData.paidAt}
+            onChange={(value) => {
+              onClearFieldError('paidAt');
+              onChange({ ...formData, paidAt: value });
+            }}
+            required={false}
+            disabled={formData.status !== 'paid'}
+          />
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Forma de pagamento</label>
-            <input
-              className={inputClassName()}
-              value={formData.paymentMethod}
-              onChange={(event) => onChange({ ...formData, paymentMethod: event.target.value })}
-              placeholder="Ex: PIX, boleto, transferencia"
-            />
-          </div>
+          <Input
+            label="Forma de pagamento"
+            error={fieldErrors.paymentMethod}
+            value={formData.paymentMethod}
+            onChange={(event) => {
+              onClearFieldError('paymentMethod');
+              onChange({ ...formData, paymentMethod: event.target.value });
+            }}
+            placeholder="Ex: PIX, boleto, transferencia"
+          />
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Comprovante (URL)</label>
-            <input
-              className={inputClassName()}
-              value={formData.proofUrl}
-              onChange={(event) => onChange({ ...formData, proofUrl: event.target.value })}
-              placeholder="https://..."
-            />
-          </div>
+          <Input
+            label="Comprovante (URL)"
+            error={fieldErrors.proofUrl}
+            value={formData.proofUrl}
+            onChange={(event) => {
+              onClearFieldError('proofUrl');
+              onChange({ ...formData, proofUrl: event.target.value });
+            }}
+            placeholder="https://..."
+          />
 
           <div className="space-y-2 md:col-span-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Observacoes</label>
+            <FieldLabel required={false}>Observacoes</FieldLabel>
             <textarea
-              className={`${inputClassName()} min-h-[110px] resize-none`}
+              className={`min-h-[110px] w-full rounded-2xl bg-surface px-4 py-3.5 text-on-surface outline-none ring-1 transition-all placeholder:text-on-surface-variant/65 focus:ring-2 ${
+                fieldErrors.notes ? 'ring-error/35 focus:ring-error/20' : 'ring-primary/5 focus:ring-primary/20'
+              } resize-none`}
               value={formData.notes}
-              onChange={(event) => onChange({ ...formData, notes: event.target.value })}
+              onChange={(event) => {
+                onClearFieldError('notes');
+                onChange({ ...formData, notes: event.target.value });
+              }}
               placeholder="Contexto financeiro, acordo com fornecedor, observacoes de pagamento..."
             />
+            <FormFieldError message={fieldErrors.notes} />
           </div>
         </div>
 
@@ -211,7 +257,7 @@ export default function PayableFormModal({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !canSubmit}
             className="rounded-full bg-primary px-8 py-3 font-bold text-on-primary shadow-lg shadow-primary/20 disabled:opacity-50"
           >
             <span className="inline-flex items-center gap-2">

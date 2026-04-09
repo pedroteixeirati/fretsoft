@@ -1,6 +1,8 @@
 import express from 'express';
 import { canPerform } from '../../../shared/authorization/permissions';
+import { notFoundError } from '../../../shared/errors/app-error';
 import { ensureAllowed } from '../../../shared/http/ensure-allowed';
+import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import {
@@ -18,7 +20,7 @@ router.get('/:resourceName', loadAuthContext, async (req: AuthenticatedRequest, 
   try {
     const resource = getResourceConfig(req.params.resourceName);
     if (!resource || !supportedResources.has(req.params.resourceName)) {
-      res.status(404).json({ error: 'Recurso nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Recurso nao encontrado.', 'resource_not_found'));
       return;
     }
 
@@ -36,7 +38,7 @@ router.post('/:resourceName', loadAuthContext, async (req: AuthenticatedRequest,
   try {
     const resource = getResourceConfig(req.params.resourceName);
     if (!resource || !supportedResources.has(req.params.resourceName)) {
-      res.status(404).json({ error: 'Recurso nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Recurso nao encontrado.', 'resource_not_found'));
       return;
     }
 
@@ -55,7 +57,7 @@ router.put('/:resourceName/:id', loadAuthContext, async (req: AuthenticatedReque
   try {
     const resource = getResourceConfig(req.params.resourceName);
     if (!resource || !supportedResources.has(req.params.resourceName)) {
-      res.status(404).json({ error: 'Recurso nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Recurso nao encontrado.', 'resource_not_found'));
       return;
     }
 
@@ -65,7 +67,7 @@ router.put('/:resourceName/:id', loadAuthContext, async (req: AuthenticatedReque
 
     const updated = await updateResource(req.params.resourceName, req.auth, req.params.id, req.body as Record<string, unknown>);
     if (updated === undefined) {
-      res.status(404).json({ error: 'Registro nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'resource_record_not_found'));
       return;
     }
 
@@ -79,7 +81,7 @@ router.delete('/:resourceName/:id', loadAuthContext, async (req: AuthenticatedRe
   try {
     const resource = getResourceConfig(req.params.resourceName);
     if (!resource || !supportedResources.has(req.params.resourceName)) {
-      res.status(404).json({ error: 'Recurso nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Recurso nao encontrado.', 'resource_not_found'));
       return;
     }
 
@@ -89,7 +91,7 @@ router.delete('/:resourceName/:id', loadAuthContext, async (req: AuthenticatedRe
 
     const deleted = await removeResource(req.params.resourceName, req.auth, req.params.id);
     if (!deleted) {
-      res.status(404).json({ error: 'Registro nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'resource_record_not_found'));
       return;
     }
 

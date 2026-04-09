@@ -1,3 +1,4 @@
+import { notFoundError } from '../../../shared/errors/app-error';
 import {
   addMonths,
   formatCompetenceLabel,
@@ -147,7 +148,7 @@ export async function syncFreightRevenue(tenantId: string | undefined, freight: 
   if (freight.billing_type === 'contract_per_trip' && freight.contract_id) {
     const linkedContract = await findLinkedContract(tenantId, freight.contract_id);
     if (!linkedContract) {
-      throw new Error('Contrato vinculado ao frete nao encontrado neste tenant.');
+      throw notFoundError('Contrato vinculado ao frete nao encontrado neste tenant.', 'freight_contract_not_found');
     }
 
     companyId = linkedContract.company_id;

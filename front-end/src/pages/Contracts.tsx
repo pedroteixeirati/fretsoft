@@ -5,9 +5,12 @@ import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { companiesApi, contractsApi, vehiclesApi } from '../lib/api';
-import { getErrorMessage } from '../lib/errors';
+import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
+import { isValidDateInput } from '../lib/validation';
 import { Company, Contract, Vehicle } from '../types';
+import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import Input from '../shared/ui/Input';
 
 const initialFormData = {
   companyId: '',
@@ -21,6 +24,54 @@ const initialFormData = {
   notes: '',
   vehicleIds: [] as string[],
 };
+
+type ContractFormField =
+  | 'companyId'
+  | 'contractName'
+  | 'remunerationType'
+  | 'annualValue'
+  | 'startDate'
+  | 'endDate'
+  | 'status'
+  | 'notes'
+  | 'vehicleIds';
+
+function getContractFormErrors(formData: typeof initialFormData): FormFieldErrors<ContractFormField> {
+  const errors: FormFieldErrors<ContractFormField> = {};
+
+  if (!formData.companyId) {
+    errors.companyId = 'Selecione a empresa contratante.';
+  }
+
+  if (formData.contractName.trim().length < 3) {
+    errors.contractName = 'Informe o nome do contrato.';
+  }
+
+  if (formData.remunerationType === 'recurring') {
+    const annualValue = Number(formData.annualValue);
+    if (!Number.isFinite(annualValue) || annualValue <= 0) {
+      errors.annualValue = 'Informe um valor anual maior que zero.';
+    }
+  }
+
+  if (!isValidDateInput(formData.startDate)) {
+    errors.startDate = 'Informe a data de inicio.';
+  }
+
+  if (!isValidDateInput(formData.endDate)) {
+    errors.endDate = 'Informe a data de termino.';
+  }
+
+  if (isValidDateInput(formData.startDate) && isValidDateInput(formData.endDate) && formData.endDate < formData.startDate) {
+    errors.endDate = 'A data de termino deve ser igual ou posterior a data de inicio.';
+  }
+
+  if (formData.vehicleIds.length === 0) {
+    errors.vehicleIds = 'Selecione ao menos um caminhao para o contrato.';
+  }
+
+  return errors;
+}
 
 export default function Contracts() {
   const { userProfile } = useFirebase();
@@ -40,6 +91,7 @@ export default function Contracts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [formData, setFormData] = useState(initialFormData);
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<ContractFormField>>({});
 
   const loadData = async () => {
     setLoading(true);
@@ -83,22 +135,59 @@ export default function Contracts() {
     [contracts, searchTerm, statusFilter]
   );
 
+  const formValidationErrors = useMemo(() => getContractFormErrors(formData), [formData]);
+  const canSubmit = hasRequiredFieldsFilled(formData, [
+    'companyId',
+    'contractName',
+    'startDate',
+    'endDate',
+    { field: 'vehicleIds', isFilled: (value) => Array.isArray(value) && value.length > 0 },
+    { field: 'annualValue', isFilled: (value, currentFormData) => currentFormData.remunerationType !== 'recurring' || (typeof value === 'string' && value.trim().length > 0) },
+  ]);
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
+  const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
+  const { formRef, alertRef } = useFormErrorFocus({
+    enabled: isModalOpen,
+    fieldErrors,
+    message: formMessage,
+  });
+
   const resetForm = () => {
     setFormData(initialFormData);
     setEditingContract(null);
     setSubmitError('');
+    setFieldErrors({});
     setIsModalOpen(false);
+  };
+
+  const updateField = (field: Exclude<ContractFormField, 'vehicleIds'>, value: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return {
+        ...current,
+        [field]: undefined,
+      };
+    });
+    setFormData((current) => ({ ...current, [field]: value }));
   };
 
   const handleOpenCreate = () => {
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setFormData(initialFormData);
     setEditingContract(null);
     setIsModalOpen(true);
   };
 
   const handleToggleVehicle = (vehicleId: string) => {
+    setFieldErrors((current) => {
+      if (!current.vehicleIds) return current;
+      return {
+        ...current,
+        vehicleIds: undefined,
+      };
+    });
     setFormData((current) => ({
       ...current,
       vehicleIds: current.vehicleIds.includes(vehicleId)
@@ -111,20 +200,26 @@ export default function Contracts() {
     e.preventDefault();
     setSubmitError('');
     setSubmitSuccess('');
+
+    if (Object.keys(formValidationErrors).length > 0) {
+      setFieldErrors(formValidationErrors);
+      return;
+    }
+
     const annualValue = formData.remunerationType === 'recurring' ? Number(formData.annualValue) : 0;
     const selectedCompany = companies.find((company) => company.id === formData.companyId);
     const selectedVehicles = vehicles.filter((vehicle) => formData.vehicleIds.includes(vehicle.id));
     const payload = {
       companyId: formData.companyId,
       companyName: selectedCompany?.corporateName || formData.companyName,
-      contractName: formData.contractName,
+      contractName: formData.contractName.trim(),
       remunerationType: formData.remunerationType,
       annualValue,
       monthlyValue: formData.remunerationType === 'recurring' ? annualValue / 12 : 0,
       startDate: formData.startDate,
       endDate: formData.endDate,
       status: formData.status,
-      notes: formData.notes,
+      notes: formData.notes.trim(),
       vehicleIds: selectedVehicles.map((vehicle) => vehicle.id),
       vehicleNames: selectedVehicles.map((vehicle) => `${vehicle.name} (${vehicle.plate})`),
     };
@@ -140,7 +235,26 @@ export default function Contracts() {
       setSubmitSuccess(editingContract ? 'Contrato atualizado com sucesso.' : 'Contrato cadastrado com sucesso.');
       resetForm();
     } catch (error) {
-      setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar o contrato.'));
+      const resolvedFieldError = resolveFieldError<ContractFormField>(error, {
+        fieldMap: {
+          companyId: 'companyId',
+          contractName: 'contractName',
+          annualValue: 'annualValue',
+          startDate: 'startDate',
+          endDate: 'endDate',
+          vehicleIds: 'vehicleIds',
+        },
+      });
+
+      if (resolvedFieldError?.field) {
+        setFieldErrors((current) => ({
+          ...current,
+          [resolvedFieldError.field!]: resolvedFieldError.message,
+        }));
+        setSubmitError('');
+      } else {
+        setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar o contrato.'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -148,6 +262,7 @@ export default function Contracts() {
 
   const handleEdit = (contract: Contract) => {
     setEditingContract(contract);
+    setFieldErrors({});
     setFormData({
       companyId: contract.companyId || '',
       companyName: contract.companyName,
@@ -329,57 +444,64 @@ export default function Contracts() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={resetForm} title={editingContract ? 'Editar contrato' : 'Novo contrato'}>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {submitError && (
-            <div className="rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm font-medium text-error">
-              {submitError}
-            </div>
-          )}
+        <form ref={formRef} noValidate onSubmit={handleSubmit} className="space-y-6">
+          <div ref={alertRef}>
+            <FormAlert message={formMessage} />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Empresa contratante</label>
+              <FieldLabel required>Empresa contratante</FieldLabel>
               <CustomSelect
                 value={formData.companyId}
                 onChange={(value) => {
                   const selectedCompany = companies.find((company) => company.id === value);
-                  setFormData({ ...formData, companyId: value, companyName: selectedCompany?.corporateName || '' });
+                  updateField('companyId', value);
+                  setFormData((current) => ({ ...current, companyName: selectedCompany?.corporateName || current.companyName }));
                 }}
+                error={fieldErrors.companyId}
                 placeholder="Selecione uma empresa cadastrada"
                 options={companies.map((company) => ({ value: company.id, label: `${company.corporateName} (${company.cnpj})` }))}
               />
             </div>
-            <Field label="Nome do contrato" value={formData.contractName} onChange={(value) => setFormData({ ...formData, contractName: value })} />
+
+            <Field label="Nome do contrato" value={formData.contractName} onChange={(value) => updateField('contractName', value)} error={fieldErrors.contractName} />
+
             <div className="space-y-2">
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo de remuneracao</label>
+              <FieldLabel required>Tipo de remuneracao</FieldLabel>
               <CustomSelect
                 value={formData.remunerationType}
-                onChange={(value) => setFormData({ ...formData, remunerationType: value as 'recurring' | 'per_trip' })}
+                onChange={(value) => updateField('remunerationType', value)}
+                error={fieldErrors.remunerationType}
                 options={[
                   { value: 'recurring', label: 'Receita recorrente' },
                   { value: 'per_trip', label: 'Receita por viagem' },
                 ]}
               />
             </div>
-            {formData.remunerationType === 'recurring' && (
+
+            {formData.remunerationType === 'recurring' ? (
               <>
-                <Field label="Valor anual do contrato" type="number" value={formData.annualValue} onChange={(value) => setFormData({ ...formData, annualValue: value })} />
+                <Field label="Valor anual do contrato" type="number" min={0} step="0.01" value={formData.annualValue} onChange={(value) => updateField('annualValue', value)} error={fieldErrors.annualValue} />
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Repasse mensal previsto</label>
+                  <FieldLabel>Repasse mensal previsto</FieldLabel>
                   <div className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 text-on-surface font-bold">
                     R$ {computedMonthlyValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </div>
                 </div>
               </>
-            )}
-            <Field label="Data de inicio" type="date" value={formData.startDate} onChange={(value) => setFormData({ ...formData, startDate: value })} />
-            <Field label="Data de termino" type="date" value={formData.endDate} onChange={(value) => setFormData({ ...formData, endDate: value })} />
+            ) : null}
+
+            <FormDatePicker label="Data de inicio" value={formData.startDate} onChange={(value) => updateField('startDate', value)} error={fieldErrors.startDate} />
+            <FormDatePicker label="Data de termino" value={formData.endDate} onChange={(value) => updateField('endDate', value)} error={fieldErrors.endDate} min={formData.startDate || undefined} />
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status do contrato</label>
+            <FieldLabel>Status do contrato</FieldLabel>
             <CustomSelect
               value={formData.status}
-              onChange={(value) => setFormData({ ...formData, status: value as 'active' | 'renewal' | 'closed' })}
+              onChange={(value) => updateField('status', value)}
+              error={fieldErrors.status}
               options={[
                 { value: 'active', label: 'Ativo' },
                 { value: 'renewal', label: 'Em renovacao' },
@@ -390,7 +512,7 @@ export default function Contracts() {
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Caminhoes vinculados</label>
+              <FieldLabel required>Caminhoes vinculados</FieldLabel>
               <span className="text-xs text-on-surface-variant">{formData.vehicleIds.length} selecionado(s)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -408,24 +530,26 @@ export default function Contracts() {
                 </label>
               ))}
             </div>
+            <FormFieldError message={fieldErrors.vehicleIds} />
             {companies.length === 0 && <div className="bg-tertiary-container/20 text-on-surface rounded-2xl p-4 text-sm">Cadastre antes uma empresa no menu Empresas para poder gerar contratos vinculados corretamente.</div>}
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Observacoes</label>
+            <FieldLabel>Observacoes</FieldLabel>
             <textarea
               rows={4}
               className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none"
               placeholder="Detalhes operacionais, condicoes comerciais ou observacoes da operacao."
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={(e) => updateField('notes', e.target.value)}
             />
+            <FormFieldError message={fieldErrors.notes} />
           </div>
 
           <div className="pt-6 flex justify-end gap-4">
             <button type="button" onClick={resetForm} className="px-8 py-3 rounded-full font-bold text-on-surface-variant hover:bg-surface-container transition-colors">Cancelar</button>
             <button
-              disabled={isSubmitting || vehicles.length === 0 || companies.length === 0 || formData.vehicleIds.length === 0 || !formData.companyId}
+              disabled={isSubmitting || !canSubmit}
               type="submit"
               className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
             >
@@ -439,12 +563,35 @@ export default function Contracts() {
   );
 }
 
-function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  error,
+  min,
+  step,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  error?: string;
+  min?: number;
+  step?: string;
+}) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <input required type={type} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" value={value} onChange={(e) => onChange(e.target.value)} />
-    </div>
+    <Input
+      label={label}
+      required
+      type={type}
+      min={min}
+      step={step}
+      value={value}
+      error={error}
+      onChange={(event) => onChange(event.target.value)}
+      className="rounded-xl bg-surface-container"
+    />
   );
 }
 

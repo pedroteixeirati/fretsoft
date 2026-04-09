@@ -38,6 +38,8 @@ export default function PayablesPage({ onNavigate }: PayablesPageProps) {
     editingPayable,
     formData,
     setFormData,
+    fieldErrors,
+    setFieldErrors,
     submitError,
     setSubmitError,
     submitSuccess,
@@ -91,6 +93,27 @@ export default function PayablesPage({ onNavigate }: PayablesPageProps) {
     event.preventDefault();
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
+
+    const nextFieldErrors: typeof fieldErrors = {};
+
+    if (formData.description.trim().length < 3) nextFieldErrors.description = 'Informe uma descricao valida para a conta a pagar.';
+    if (formData.sourceType === 'expense' && !formData.sourceId.trim()) nextFieldErrors.sourceId = 'Informe o identificador do custo operacional.';
+    if (!Number.isFinite(Number(formData.amount)) || Number(formData.amount) <= 0) nextFieldErrors.amount = 'O valor da conta a pagar deve ser maior que zero.';
+    if (!formData.dueDate) nextFieldErrors.dueDate = 'Informe um vencimento valido para a conta a pagar.';
+    if (formData.status === 'paid' && !formData.paidAt) nextFieldErrors.paidAt = 'Informe a data do pagamento ou deixe o sistema usar o vencimento.';
+    if (formData.proofUrl) {
+      try {
+        new URL(formData.proofUrl);
+      } catch {
+        nextFieldErrors.proofUrl = 'Informe uma URL valida para o comprovante.';
+      }
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
 
     try {
       const payload = {
@@ -208,6 +231,7 @@ export default function PayablesPage({ onNavigate }: PayablesPageProps) {
         isOpen={isModalOpen}
         editing={Boolean(editingPayable)}
         submitError={submitError}
+        fieldErrors={fieldErrors}
         formData={formData}
         isSubmitting={isSubmitting}
         vehicles={vehicles}
@@ -215,6 +239,7 @@ export default function PayablesPage({ onNavigate }: PayablesPageProps) {
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}
+        onClearFieldError={(field) => setFieldErrors((current) => ({ ...current, [field]: undefined }))}
       />
     </div>
   );

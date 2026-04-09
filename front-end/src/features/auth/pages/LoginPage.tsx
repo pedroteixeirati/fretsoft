@@ -1,31 +1,173 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ArrowRight, Lock, Mail } from 'lucide-react';
+import { FormAlert, FormFieldError, useFormErrorFocus } from '../../../shared/forms';
+import { FormFieldErrors } from '../../../lib/errors';
 import { useAuth } from '../hooks/useAuth';
+import { loginSchema, LoginFormValues } from '../validations/login.schema';
+
+type LoginField = keyof LoginFormValues;
+
+const firebaseErrorMap: Record<string, { message: string; field?: LoginField }> = {
+  'auth/invalid-email': {
+    message: 'Informe um e-mail valido.',
+    field: 'email',
+  },
+  'auth/user-not-found': {
+    message: 'Nao encontramos uma conta com este e-mail.',
+  },
+  'auth/wrong-password': {
+    message: 'E-mail ou senha incorretos.',
+  },
+  'auth/invalid-credential': {
+    message: 'E-mail ou senha incorretos.',
+  },
+  'auth/user-disabled': {
+    message: 'Este acesso foi desativado. Fale com o suporte.',
+  },
+  'auth/too-many-requests': {
+    message: 'Muitas tentativas seguidas. Aguarde um pouco e tente novamente.',
+  },
+  'auth/network-request-failed': {
+    message: 'Nao foi possivel conectar. Verifique sua internet e tente novamente.',
+  },
+  'auth/operation-not-allowed': {
+    message: 'O login por e-mail e senha nao esta habilitado.',
+  },
+};
+
+function resolveLoginError(error: unknown) {
+  const code =
+    typeof error === 'object' && error && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : '';
+
+  return (
+    firebaseErrorMap[code] ?? {
+      message: 'Nao foi possivel entrar agora. Tente novamente em instantes.',
+    }
+  );
+}
+
+interface AuthInputProps {
+  label: string;
+  type: 'email' | 'password';
+  placeholder: string;
+  value: string;
+  icon: React.ElementType;
+  error?: string;
+  trailingContent?: React.ReactNode;
+  onChange: (value: string) => void;
+}
+
+function AuthInput({
+  label,
+  type,
+  placeholder,
+  value,
+  icon: Icon,
+  error,
+  trailingContent,
+  onChange,
+}: AuthInputProps) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-4">
+        <label className="block pl-1 text-xs font-medium uppercase tracking-[0.18em] text-on-surface">
+          {label}
+        </label>
+        {trailingContent}
+      </div>
+
+      <div
+        className={`flex items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-inner shadow-primary/5 ring-1 transition-all ${
+          error
+            ? 'ring-error/35 focus-within:ring-2 focus-within:ring-error/20'
+            : 'ring-primary/5 focus-within:ring-2 focus-within:ring-primary/20'
+        }`}
+      >
+        <Icon className="h-4.5 w-4.5 text-on-surface-variant" />
+        <input
+          type={type}
+          placeholder={placeholder}
+          className="w-full bg-transparent text-lg text-on-surface placeholder:text-on-surface-variant/65 outline-none"
+          aria-invalid={Boolean(error)}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+
+      <FormFieldError message={error} />
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<LoginField>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { formRef, alertRef } = useFormErrorFocus({
+    fieldErrors,
+    message: authError,
+  });
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const hasFieldErrors = useMemo(
+    () => Object.values(fieldErrors).some(Boolean),
+    [fieldErrors],
+  );
+
+  const formMessage =
+    authError || (hasFieldErrors ? 'Revise os campos destacados antes de entrar.' : '');
+  const isLoginReady = email.trim().length > 0 && password.trim().length > 0;
+
+  const clearFieldError = (field: LoginField) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return {
+        ...current,
+        [field]: undefined,
+      };
+    });
+  };
+
+  const handleAuth = async (event: React.FormEvent) => {
+    event.preventDefault();
     setAuthError('');
+    setFieldErrors({});
+
+    const validation = loginSchema.safeParse({ email, password });
+
+    if (!validation.success) {
+      const nextFieldErrors: FormFieldErrors<LoginField> = {};
+
+      for (const issue of validation.error.issues) {
+        const field = issue.path[0] as LoginField | undefined;
+        if (!field || nextFieldErrors[field]) continue;
+        nextFieldErrors[field] = issue.message;
+      }
+
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       await signIn(email, password);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Auth error:', error);
-      let message = 'Ocorreu um erro na autenticacao.';
-      if (error.code === 'auth/user-not-found') message = 'Usuario nao encontrado.';
-      if (error.code === 'auth/wrong-password') message = 'Senha incorreta.';
-      if (error.code === 'auth/email-already-in-use') message = 'Este e-mail ja esta em uso.';
-      if (error.code === 'auth/weak-password') message = 'A senha deve ter pelo menos 6 caracteres.';
-      if (error.code === 'auth/invalid-email') message = 'E-mail invalido.';
-      if (error.code === 'auth/operation-not-allowed') message = 'O login por E-mail/Senha nao esta ativado no Console do Firebase.';
-      setAuthError(message);
+
+      const resolvedError = resolveLoginError(error);
+      setAuthError(resolvedError.message);
+
+      if (resolvedError.field) {
+        setFieldErrors((current) => ({
+          ...current,
+          [resolvedError.field!]: resolvedError.message,
+        }));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -54,57 +196,47 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center">
             <h1 className="text-3xl font-black tracking-tight text-primary">Fretsoft</h1>
-            <p className="mt-2 text-[13px] uppercase tracking-[0.22em] text-on-surface-variant">GESTAO MODERNA PARA FROTAS</p>
+            <p className="mt-2 text-[13px] uppercase tracking-[0.22em] text-on-surface-variant">
+              GESTAO MODERNA PARA FROTAS
+            </p>
           </div>
 
-          <form onSubmit={handleAuth} className="mt-8 space-y-5">
-            <div className="space-y-2">
-              <label className="block pl-1 text-xs font-medium uppercase tracking-[0.18em] text-on-surface">Email</label>
-              <div className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-inner shadow-primary/5 ring-1 ring-primary/5">
-                <Mail className="h-4.5 w-4.5 text-on-surface-variant" />
-                <input
-                  required
-                  type="email"
-                  placeholder="seu@email.com"
-                  className="w-full bg-transparent text-lg text-on-surface placeholder:text-on-surface-variant/65 outline-none"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+          <form ref={formRef} noValidate onSubmit={handleAuth} className="mt-8 space-y-5">
+            <div ref={alertRef}>
+              <FormAlert message={formMessage} />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-4">
-                <label className="block pl-1 text-xs font-medium uppercase tracking-[0.18em] text-on-surface">Senha</label>
+            <AuthInput
+              label="Email"
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              icon={Mail}
+              error={fieldErrors.email}
+              onChange={(value) => {
+                clearFieldError('email');
+                setEmail(value);
+              }}
+            />
+
+            <AuthInput
+              label="Senha"
+              type="password"
+              placeholder="********"
+              value={password}
+              icon={Lock}
+              error={fieldErrors.password}
+              trailingContent={
                 <span className="text-sm font-bold text-primary">Esqueceu?</span>
-              </div>
-              <div className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-inner shadow-primary/5 ring-1 ring-primary/5">
-                <Lock className="h-4.5 w-4.5 text-on-surface-variant" />
-                <input
-                  required
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full bg-transparent text-lg text-on-surface placeholder:text-on-surface-variant/65 outline-none"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {authError && (
-              <div className="rounded-2xl border border-error/20 bg-error/10 p-4">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-error">Erro de autenticacao</p>
-                <p className="mt-1 text-sm leading-relaxed text-on-surface-variant">{authError}</p>
-                {authError.includes('Console do Firebase') && (
-                  <p className="mt-2 text-xs italic text-on-surface-variant">
-                    Acesse: Console {' > '} Authentication {' > '} Sign-in method {' > '} Ativar E-mail/Senha.
-                  </p>
-                )}
-              </div>
-            )}
+              }
+              onChange={(value) => {
+                clearFieldError('password');
+                setPassword(value);
+              }}
+            />
 
             <button
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isLoginReady}
               type="submit"
               className="flex w-full items-center justify-center gap-3 rounded-2xl bg-primary px-6 py-4 text-lg font-black text-on-primary shadow-[0_16px_26px_rgba(82,102,0,0.2)] transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
             >

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FormFieldErrors } from '../../../lib/errors';
 import { Payable } from '../types/payable.types';
 
 export interface PayableFormData {
@@ -16,6 +17,21 @@ export interface PayableFormData {
   proofUrl: string;
   notes: string;
 }
+
+export type PayableFormField =
+  | 'sourceType'
+  | 'sourceId'
+  | 'description'
+  | 'providerName'
+  | 'vehicleId'
+  | 'contractId'
+  | 'amount'
+  | 'dueDate'
+  | 'status'
+  | 'paidAt'
+  | 'paymentMethod'
+  | 'proofUrl'
+  | 'notes';
 
 export function defaultPayableFormData(): PayableFormData {
   const today = new Date().toISOString().split('T')[0];
@@ -42,6 +58,7 @@ export function usePayableForm() {
   const [editingPayable, setEditingPayable] = useState<Payable | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<PayableFormField>>({});
   const [formData, setFormData] = useState<PayableFormData>(defaultPayableFormData());
 
   const openCreate = () => {
@@ -49,6 +66,7 @@ export function usePayableForm() {
     setFormData(defaultPayableFormData());
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -71,6 +89,7 @@ export function usePayableForm() {
     });
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -79,6 +98,8 @@ export function usePayableForm() {
     setEditingPayable(null);
     setFormData(defaultPayableFormData());
     setSubmitError('');
+    setSubmitSuccess('');
+    setFieldErrors({});
   };
 
   return {
@@ -86,6 +107,8 @@ export function usePayableForm() {
     editingPayable,
     formData,
     setFormData,
+    fieldErrors,
+    setFieldErrors,
     submitError,
     setSubmitError,
     submitSuccess,

@@ -1,3 +1,4 @@
+import { conflictError, validationError } from '../../../shared/errors/app-error';
 import { pool } from '../../../shared/infra/database/pool';
 import {
   isValidCnpj,
@@ -34,20 +35,20 @@ export async function validateCompanyPayload(
   const notes = normalizeOptionalText(body.notes as string);
   const status = body.status as string;
 
-  if (corporateName.length < 3) throw new Error('Informe a razao social da empresa.');
-  if (tradeName.length < 2) throw new Error('Informe o nome fantasia da empresa.');
-  if (!isValidCnpj(cnpj)) throw new Error('Informe um CNPJ valido para a empresa.');
-  if (stateRegistration.length < 2) throw new Error('Informe a inscricao estadual da empresa.');
-  if (municipalRegistration.length < 2) throw new Error('Informe a inscricao municipal da empresa.');
-  if (legalRepresentative.length < 3) throw new Error('Informe o representante legal da empresa.');
-  if (!isValidCpf(representativeCpf)) throw new Error('Informe um CPF valido para o representante.');
-  if (!isValidEmail(email)) throw new Error('Informe um e-mail valido para a empresa.');
-  if (!isValidPhone(phone)) throw new Error('Informe um telefone valido para a empresa.');
-  if (address.length < 5) throw new Error('Informe um endereco valido para a empresa.');
-  if (city.length < 2) throw new Error('Informe a cidade da empresa.');
-  if (!isValidState(state)) throw new Error('Informe uma UF valida para a empresa.');
-  if (zipCode.replace(/\D/g, '').length !== 8) throw new Error('Informe um CEP valido para a empresa.');
-  if (!['active', 'inactive'].includes(status)) throw new Error('Status da empresa invalido.');
+  if (corporateName.length < 3) throw validationError('Informe a razao social da empresa.', 'invalid_company_corporate_name', 'corporateName');
+  if (tradeName.length < 2) throw validationError('Informe o nome fantasia da empresa.', 'invalid_company_trade_name', 'tradeName');
+  if (!isValidCnpj(cnpj)) throw validationError('Informe um CNPJ valido para a empresa.', 'invalid_company_cnpj', 'cnpj');
+  if (stateRegistration.length < 2) throw validationError('Informe a inscricao estadual da empresa.', 'invalid_company_state_registration', 'stateRegistration');
+  if (municipalRegistration.length < 2) throw validationError('Informe a inscricao municipal da empresa.', 'invalid_company_municipal_registration', 'municipalRegistration');
+  if (legalRepresentative.length < 3) throw validationError('Informe o representante legal da empresa.', 'invalid_company_legal_representative', 'legalRepresentative');
+  if (!isValidCpf(representativeCpf)) throw validationError('Informe um CPF valido para o representante.', 'invalid_company_representative_cpf', 'representativeCpf');
+  if (!isValidEmail(email)) throw validationError('Informe um e-mail valido para a empresa.', 'invalid_company_email', 'email');
+  if (!isValidPhone(phone)) throw validationError('Informe um telefone valido para a empresa.', 'invalid_company_phone', 'phone');
+  if (address.length < 5) throw validationError('Informe um endereco valido para a empresa.', 'invalid_company_address', 'address');
+  if (city.length < 2) throw validationError('Informe a cidade da empresa.', 'invalid_company_city', 'city');
+  if (!isValidState(state)) throw validationError('Informe uma UF valida para a empresa.', 'invalid_company_state', 'state');
+  if (zipCode.replace(/\D/g, '').length !== 8) throw validationError('Informe um CEP valido para a empresa.', 'invalid_company_zip_code', 'zipCode');
+  if (!['active', 'inactive'].includes(status)) throw validationError('Status da empresa invalido.', 'invalid_company_status', 'status');
 
   const duplicate = await pool.query<{ id: string }>(
     `select id
@@ -59,7 +60,7 @@ export async function validateCompanyPayload(
     [tenantId, cnpj, recordId || null]
   );
 
-  if (duplicate.rows[0]) throw new Error('Ja existe uma empresa cadastrada com esse CNPJ.');
+  if (duplicate.rows[0]) throw conflictError('Ja existe uma empresa cadastrada com esse CNPJ.', 'company_cnpj_conflict', 'cnpj');
 
   return {
     corporateName,

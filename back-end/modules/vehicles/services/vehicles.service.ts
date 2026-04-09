@@ -1,3 +1,4 @@
+import { conflictError, validationError } from '../../../shared/errors/app-error';
 import { pool } from '../../../shared/infra/database/pool';
 import {
   isNonNegativeNumber,
@@ -21,13 +22,13 @@ export async function validateVehiclePayload(
   const nextMaintenance = normalizeOptionalText(body.nextMaintenance as string);
   const status = body.status as string;
 
-  if (name.length < 3) throw new Error('Informe um nome valido para o veiculo.');
-  if (!isValidPlate(plate)) throw new Error('Informe uma placa valida para o veiculo.');
-  if (driver.length < 3) throw new Error('Informe o motorista responsavel pelo veiculo.');
-  if (type.length < 3) throw new Error('Informe o tipo do veiculo.');
-  if (!isNonNegativeNumber(km)) throw new Error('A quilometragem deve ser um numero igual ou maior que zero.');
-  if (nextMaintenance && !isValidDate(nextMaintenance)) throw new Error('A proxima manutencao deve ser uma data valida.');
-  if (!['active', 'maintenance', 'alert'].includes(status)) throw new Error('Status do veiculo invalido.');
+  if (name.length < 3) throw validationError('Informe um nome valido para o veiculo.', 'invalid_vehicle_name', 'name');
+  if (!isValidPlate(plate)) throw validationError('Informe uma placa valida para o veiculo.', 'invalid_plate', 'plate');
+  if (driver.length < 3) throw validationError('Informe o motorista responsavel pelo veiculo.', 'invalid_vehicle_driver', 'driver');
+  if (type.length < 3) throw validationError('Informe o tipo do veiculo.', 'invalid_vehicle_type', 'type');
+  if (!isNonNegativeNumber(km)) throw validationError('A quilometragem deve ser um numero igual ou maior que zero.', 'invalid_vehicle_km', 'km');
+  if (nextMaintenance && !isValidDate(nextMaintenance)) throw validationError('A proxima manutencao deve ser uma data valida.', 'invalid_vehicle_next_maintenance', 'nextMaintenance');
+  if (!['active', 'maintenance', 'alert'].includes(status)) throw validationError('Status do veiculo invalido.', 'invalid_vehicle_status', 'status');
 
   const duplicate = await pool.query<{ id: string }>(
     `select id
@@ -39,7 +40,7 @@ export async function validateVehiclePayload(
     [tenantId, plate, recordId || null]
   );
 
-  if (duplicate.rows[0]) throw new Error('Ja existe um veiculo cadastrado com essa placa.');
+  if (duplicate.rows[0]) throw conflictError('Ja existe um veiculo cadastrado com essa placa.', 'vehicle_plate_conflict', 'plate');
 
   return { name, plate, driver, type, km, nextMaintenance: nextMaintenance || '', status };
 }

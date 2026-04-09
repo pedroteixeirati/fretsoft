@@ -1,5 +1,7 @@
 import express from 'express';
+import { notFoundError } from '../../../shared/errors/app-error';
 import { ensureAllowed } from '../../../shared/http/ensure-allowed';
+import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import {
@@ -23,7 +25,7 @@ router.get('/tenant-profile', loadAuthContext, async (req: AuthenticatedRequest,
 
     const profile = await getTenantProfile(req.auth);
     if (!profile) {
-      res.status(404).json({ error: 'Transportadora nao encontrada.' });
+      sendErrorResponse(res, notFoundError('Transportadora nao encontrada.', 'tenant_not_found'));
       return;
     }
 
@@ -41,7 +43,7 @@ router.put('/tenant-profile', loadAuthContext, async (req: AuthenticatedRequest,
 
     const updated = await updateTenantProfile(req.auth, req.body as Record<string, string>);
     if (!updated) {
-      res.status(404).json({ error: 'Transportadora nao encontrada.' });
+      sendErrorResponse(res, notFoundError('Transportadora nao encontrada.', 'tenant_not_found'));
       return;
     }
 

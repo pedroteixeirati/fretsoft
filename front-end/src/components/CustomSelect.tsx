@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
+import FormFieldError from '../shared/forms/FormFieldError';
 
 export type CustomSelectOption = {
   value: string;
@@ -17,6 +18,8 @@ type CustomSelectProps = {
   className?: string;
   buttonClassName?: string;
   menuClassName?: string;
+  error?: string;
+  hint?: string;
 };
 
 export default function CustomSelect({
@@ -29,6 +32,8 @@ export default function CustomSelect({
   className,
   buttonClassName,
   menuClassName,
+  error,
+  hint,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -44,16 +49,18 @@ export default function CustomSelect({
   }, [isOpen]);
 
   return (
-    <div ref={rootRef} className={cn('relative min-w-0', className)}>
+    <div ref={rootRef} className={cn('relative min-w-0 space-y-2', className)}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
+        aria-invalid={Boolean(error)}
         className={cn(
           'w-full min-w-0 transition-all disabled:cursor-not-allowed disabled:opacity-60',
           variant === 'field'
-            ? 'grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-3 rounded-xl border border-outline-variant bg-surface-container px-4 py-3 text-left hover:border-primary/30 focus:ring-2 focus:ring-primary/20'
+            ? 'grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-3 rounded-2xl border bg-surface-container px-4 py-3.5 text-left hover:border-primary/30 focus:ring-2 focus:ring-primary/20'
             : 'inline-flex items-center gap-2 bg-transparent text-sm font-semibold text-primary focus:outline-none',
+          variant === 'field' ? (error ? 'border-error/35 focus:ring-error/20' : 'border-outline-variant') : '',
           buttonClassName,
         )}
       >
@@ -104,6 +111,9 @@ export default function CustomSelect({
           </div>
         </div>
       ) : null}
+
+      {variant === 'field' && error ? <FormFieldError message={error} /> : null}
+      {variant === 'field' && !error && hint ? <p className="pl-1 text-xs text-on-surface-variant">{hint}</p> : null}
     </div>
   );
 }

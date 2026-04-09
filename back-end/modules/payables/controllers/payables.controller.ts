@@ -1,6 +1,8 @@
 import express from 'express';
 import { canPerform } from '../../../shared/authorization/permissions';
+import { notFoundError } from '../../../shared/errors/app-error';
 import { ensureAllowed } from '../../../shared/http/ensure-allowed';
+import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { payablesPermissions } from '../payables.resource';
@@ -49,7 +51,7 @@ router.put('/payables/:id', loadAuthContext, async (req: AuthenticatedRequest, r
 
     const updated = await updatePayable(req.params.id, req.auth?.tenantId, req.auth?.userId, req.body as PayableInput);
     if (!updated) {
-      res.status(404).json({ error: 'Conta a pagar nao encontrada.' });
+      sendErrorResponse(res, notFoundError('Conta a pagar nao encontrada.', 'payable_not_found'));
       return;
     }
 
@@ -67,7 +69,7 @@ router.delete('/payables/:id', loadAuthContext, async (req: AuthenticatedRequest
 
     const deleted = await removePayable(req.params.id, req.auth?.tenantId);
     if (!deleted) {
-      res.status(404).json({ error: 'Conta a pagar nao encontrada.' });
+      sendErrorResponse(res, notFoundError('Conta a pagar nao encontrada.', 'payable_not_found'));
       return;
     }
 
@@ -85,7 +87,7 @@ router.post('/payables/:id/pay', loadAuthContext, async (req: AuthenticatedReque
 
     const payable = await payPayable(req.params.id, req.auth?.tenantId, req.auth?.userId);
     if (!payable) {
-      res.status(404).json({ error: 'Conta a pagar nao encontrada.' });
+      sendErrorResponse(res, notFoundError('Conta a pagar nao encontrada.', 'payable_not_found'));
       return;
     }
 
@@ -103,7 +105,7 @@ router.post('/payables/:id/overdue', loadAuthContext, async (req: AuthenticatedR
 
     const payable = await overduePayable(req.params.id, req.auth?.tenantId, req.auth?.userId);
     if (!payable) {
-      res.status(404).json({ error: 'Conta a pagar nao encontrada.' });
+      sendErrorResponse(res, notFoundError('Conta a pagar nao encontrada.', 'payable_not_found'));
       return;
     }
 

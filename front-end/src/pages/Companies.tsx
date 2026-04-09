@@ -5,9 +5,12 @@ import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { companiesApi } from '../lib/api';
-import { getErrorMessage } from '../lib/errors';
+import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
+import { formatCnpj, formatCpf, formatPhone, isValidCnpj, isValidCpf, isValidEmail, isValidStateCode } from '../lib/validation';
 import { Company } from '../types';
+import { FieldLabel, FormAlert, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import Input from '../shared/ui/Input';
 
 const initialFormData = {
   corporateName: '',
@@ -28,6 +31,70 @@ const initialFormData = {
   status: 'active' as const,
 };
 
+type CompanyFormField =
+  | 'corporateName'
+  | 'tradeName'
+  | 'cnpj'
+  | 'stateRegistration'
+  | 'municipalRegistration'
+  | 'legalRepresentative'
+  | 'representativeCpf'
+  | 'email'
+  | 'phone'
+  | 'address'
+  | 'city'
+  | 'state'
+  | 'zipCode'
+  | 'contractContact'
+  | 'notes'
+  | 'status';
+
+function getCompanyFormErrors(formData: typeof initialFormData): FormFieldErrors<CompanyFormField> {
+  const errors: FormFieldErrors<CompanyFormField> = {};
+
+  if (formData.corporateName.trim().length < 3) {
+    errors.corporateName = 'A razao social deve ter pelo menos 3 caracteres.';
+  }
+
+  if (formData.tradeName.trim() && formData.tradeName.trim().length < 2) {
+    errors.tradeName = 'Informe um nome fantasia valido.';
+  }
+
+  if (!isValidCnpj(formData.cnpj)) {
+    errors.cnpj = 'Informe um CNPJ valido.';
+  }
+
+  if (formData.legalRepresentative.trim().length < 3) {
+    errors.legalRepresentative = 'Informe o nome do representante legal.';
+  }
+
+  if (formData.representativeCpf.trim() && !isValidCpf(formData.representativeCpf)) {
+    errors.representativeCpf = 'Informe um CPF valido para o representante.';
+  }
+
+  if (!isValidEmail(formData.email)) {
+    errors.email = 'Informe um e-mail valido.';
+  }
+
+  if (formData.phone.replace(/\D/g, '').length < 10) {
+    errors.phone = 'Informe um telefone valido com DDD.';
+  }
+
+  if (formData.address.trim().length < 5) {
+    errors.address = 'Informe um endereco valido.';
+  }
+
+  if (formData.city.trim().length < 2) {
+    errors.city = 'Informe a cidade.';
+  }
+
+  if (!isValidStateCode(formData.state)) {
+    errors.state = 'A UF deve conter 2 letras.';
+  }
+
+  return errors;
+}
+
 export default function Companies() {
   const { userProfile } = useFirebase();
   const canCreate = canAccess(userProfile, 'companies', 'create');
@@ -44,6 +111,7 @@ export default function Companies() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [formData, setFormData] = useState(initialFormData);
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<CompanyFormField>>({});
 
   const loadCompanies = async () => {
     setLoading(true);
@@ -72,16 +140,48 @@ export default function Companies() {
     [companies, searchTerm, statusFilter]
   );
 
+  const formValidationErrors = useMemo(() => getCompanyFormErrors(formData), [formData]);
+  const canSubmit = hasRequiredFieldsFilled(formData, [
+    'corporateName',
+    'cnpj',
+    'legalRepresentative',
+    'email',
+    'phone',
+    'address',
+    'city',
+    'state',
+  ]);
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
+  const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
+  const { formRef, alertRef } = useFormErrorFocus({
+    enabled: isModalOpen,
+    fieldErrors,
+    message: formMessage,
+  });
+
   const resetForm = () => {
     setFormData(initialFormData);
     setEditingCompany(null);
     setSubmitError('');
+    setFieldErrors({});
     setIsModalOpen(false);
+  };
+
+  const updateField = (field: CompanyFormField, value: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return {
+        ...current,
+        [field]: undefined,
+      };
+    });
+    setFormData((current) => ({ ...current, [field]: value }));
   };
 
   const handleOpenCreate = () => {
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setFormData(initialFormData);
     setEditingCompany(null);
     setIsModalOpen(true);
@@ -89,6 +189,7 @@ export default function Companies() {
 
   const handleEdit = (company: Company) => {
     setEditingCompany(company);
+    setFieldErrors({});
     setFormData({
       corporateName: company.corporateName,
       tradeName: company.tradeName,
@@ -116,28 +217,60 @@ export default function Companies() {
     e.preventDefault();
     setSubmitError('');
     setSubmitSuccess('');
+
+    if (Object.keys(formValidationErrors).length > 0) {
+      setFieldErrors(formValidationErrors);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const payload = {
         ...formData,
         corporateName: formData.corporateName.trim(),
         tradeName: formData.tradeName.trim(),
+        cnpj: formData.cnpj.trim(),
         legalRepresentative: formData.legalRepresentative.trim(),
+        representativeCpf: formData.representativeCpf.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         city: formData.city.trim(),
+        state: formData.state.trim().toUpperCase(),
+        zipCode: formData.zipCode.trim(),
+        contractContact: formData.contractContact.trim(),
+        notes: formData.notes.trim(),
       };
+
       if (editingCompany) {
         await companiesApi.update(editingCompany.id, payload);
       } else {
         await companiesApi.create(payload as Omit<Company, 'id'>);
       }
+
       await loadCompanies();
       setSubmitSuccess(editingCompany ? 'Empresa atualizada com sucesso.' : 'Empresa cadastrada com sucesso.');
       resetForm();
     } catch (error) {
-      setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar a empresa.'));
+      const resolvedFieldError = resolveFieldError<CompanyFormField>(error, {
+        fieldMap: {
+          cnpj: 'cnpj',
+          email: 'email',
+          legalRepresentative: 'legalRepresentative',
+          representativeCpf: 'representativeCpf',
+          state: 'state',
+        },
+      });
+
+      if (resolvedFieldError?.field) {
+        setFieldErrors((current) => ({
+          ...current,
+          [resolvedFieldError.field!]: resolvedFieldError.message,
+        }));
+        setSubmitError('');
+      } else {
+        setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar a empresa.'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -272,35 +405,32 @@ export default function Companies() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={resetForm} title={editingCompany ? 'Editar empresa' : 'Nova empresa'}>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {submitError && (
-            <div className="rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm font-medium text-error">
-              {submitError}
-            </div>
-          )}
+        <form ref={formRef} noValidate onSubmit={handleSubmit} className="space-y-6">
+          <div ref={alertRef}>
+            <FormAlert message={formMessage} />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Razao social" value={formData.corporateName} onChange={(value) => setFormData({ ...formData, corporateName: value })} />
-            <Field label="Nome fantasia" value={formData.tradeName} onChange={(value) => setFormData({ ...formData, tradeName: value })} />
-            <Field label="CNPJ" value={formData.cnpj} onChange={(value) => setFormData({ ...formData, cnpj: value })} />
-            <Field label="Inscricao estadual" value={formData.stateRegistration} onChange={(value) => setFormData({ ...formData, stateRegistration: value })} required={false} />
-            <Field label="Inscricao municipal" value={formData.municipalRegistration} onChange={(value) => setFormData({ ...formData, municipalRegistration: value })} required={false} />
-            <Field label="Representante legal" value={formData.legalRepresentative} onChange={(value) => setFormData({ ...formData, legalRepresentative: value })} />
-            <Field label="CPF do representante" value={formData.representativeCpf} onChange={(value) => setFormData({ ...formData, representativeCpf: value })} />
-            <Field label="Contato contratual" value={formData.contractContact} onChange={(value) => setFormData({ ...formData, contractContact: value })} required={false} />
-            <Field label="E-mail" type="email" value={formData.email} onChange={(value) => setFormData({ ...formData, email: value })} />
-            <Field label="Telefone" value={formData.phone} onChange={(value) => setFormData({ ...formData, phone: value })} />
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Endereco</label>
-              <input required type="text" className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
-            </div>
-            <Field label="Cidade" value={formData.city} onChange={(value) => setFormData({ ...formData, city: value })} />
-            <Field label="UF" value={formData.state} onChange={(value) => setFormData({ ...formData, state: value.toUpperCase() })} />
-            <Field label="CEP" value={formData.zipCode} onChange={(value) => setFormData({ ...formData, zipCode: value })} />
+            <Field label="Razao social" value={formData.corporateName} onChange={(value) => updateField('corporateName', value)} error={fieldErrors.corporateName} />
+            <Field label="Nome fantasia" value={formData.tradeName} onChange={(value) => updateField('tradeName', value)} required={false} error={fieldErrors.tradeName} />
+            <Field label="CNPJ" value={formData.cnpj} onChange={(value) => updateField('cnpj', formatCnpj(value))} placeholder="00.000.000/0000-00" error={fieldErrors.cnpj} />
+            <Field label="Inscricao estadual" value={formData.stateRegistration} onChange={(value) => updateField('stateRegistration', value)} required={false} error={fieldErrors.stateRegistration} />
+            <Field label="Inscricao municipal" value={formData.municipalRegistration} onChange={(value) => updateField('municipalRegistration', value)} required={false} error={fieldErrors.municipalRegistration} />
+            <Field label="Representante legal" value={formData.legalRepresentative} onChange={(value) => updateField('legalRepresentative', value)} error={fieldErrors.legalRepresentative} />
+            <Field label="CPF do representante" value={formData.representativeCpf} onChange={(value) => updateField('representativeCpf', formatCpf(value))} required={false} placeholder="000.000.000-00" error={fieldErrors.representativeCpf} />
+            <Field label="Contato contratual" value={formData.contractContact} onChange={(value) => updateField('contractContact', value)} required={false} error={fieldErrors.contractContact} />
+            <Field label="E-mail" type="email" value={formData.email} onChange={(value) => updateField('email', value)} error={fieldErrors.email} />
+            <Field label="Telefone" value={formData.phone} onChange={(value) => updateField('phone', formatPhone(value))} placeholder="(11) 99999-9999" error={fieldErrors.phone} />
+            <Field label="Endereco" value={formData.address} onChange={(value) => updateField('address', value)} containerClassName="md:col-span-2" error={fieldErrors.address} />
+            <Field label="Cidade" value={formData.city} onChange={(value) => updateField('city', value)} error={fieldErrors.city} />
+            <Field label="UF" value={formData.state} onChange={(value) => updateField('state', value.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase())} placeholder="SP" maxLength={2} error={fieldErrors.state} />
+            <Field label="CEP" value={formData.zipCode} onChange={(value) => updateField('zipCode', value)} required={false} error={fieldErrors.zipCode} />
             <div className="space-y-2">
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Status</label>
+              <FieldLabel>Status</FieldLabel>
               <CustomSelect
                 value={formData.status}
-                onChange={(value) => setFormData({ ...formData, status: value as 'active' | 'inactive' })}
+                onChange={(value) => updateField('status', value)}
+                error={fieldErrors.status}
                 options={[
                   { value: 'active', label: 'Ativa' },
                   { value: 'inactive', label: 'Inativa' },
@@ -308,13 +438,16 @@ export default function Companies() {
               />
             </div>
           </div>
+
           <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Observacoes</label>
-            <textarea rows={4} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
+            <FieldLabel>Observacoes</FieldLabel>
+            <textarea rows={4} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none" value={formData.notes} onChange={(e) => updateField('notes', e.target.value)} />
+            <FormFieldError message={fieldErrors.notes} />
           </div>
+
           <div className="pt-6 flex justify-end gap-4">
             <button type="button" onClick={resetForm} className="px-8 py-3 rounded-full font-bold text-on-surface-variant hover:bg-surface-container transition-colors">Cancelar</button>
-            <button disabled={isSubmitting} type="submit" className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
+            <button disabled={isSubmitting || !canSubmit} type="submit" className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
               {editingCompany ? 'Salvar alteracoes' : 'Cadastrar empresa'}
             </button>
@@ -325,11 +458,39 @@ export default function Companies() {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', required = true }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  required = true,
+  placeholder,
+  maxLength,
+  error,
+  containerClassName,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+  maxLength?: number;
+  error?: string;
+  containerClassName?: string;
+}) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <input required={required} type={type} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" value={value} onChange={(e) => onChange(e.target.value)} />
-    </div>
+    <Input
+      label={label}
+      required={required}
+      type={type}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      value={value}
+      error={error}
+      onChange={(event) => onChange(event.target.value)}
+      containerClassName={containerClassName}
+      className="rounded-xl bg-surface-container"
+    />
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FormFieldErrors } from '../../../lib/errors';
 import { Vehicle } from '../types/vehicle.types';
 
 export interface VehicleFormData {
@@ -10,6 +11,8 @@ export interface VehicleFormData {
   nextMaintenance: string;
   status: Vehicle['status'];
 }
+
+export type VehicleFormField = 'name' | 'plate' | 'driver' | 'type' | 'km' | 'nextMaintenance' | 'status';
 
 export const defaultVehicleFormData: VehicleFormData = {
   name: '',
@@ -26,11 +29,13 @@ export function useVehicleForm() {
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<VehicleFormField>>({});
   const [formData, setFormData] = useState<VehicleFormData>(defaultVehicleFormData);
 
   const openCreate = () => {
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setEditingVehicle(null);
     setFormData(defaultVehicleFormData);
     setIsModalOpen(true);
@@ -39,6 +44,7 @@ export function useVehicleForm() {
   const openEdit = (vehicle: Vehicle) => {
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setEditingVehicle(vehicle);
     setFormData({
       name: vehicle.name,
@@ -56,6 +62,8 @@ export function useVehicleForm() {
     setEditingVehicle(null);
     setFormData(defaultVehicleFormData);
     setSubmitError('');
+    setSubmitSuccess('');
+    setFieldErrors({});
     setIsModalOpen(false);
   };
 
@@ -64,6 +72,8 @@ export function useVehicleForm() {
     editingVehicle,
     formData,
     setFormData,
+    fieldErrors,
+    setFieldErrors,
     submitError,
     setSubmitError,
     submitSuccess,

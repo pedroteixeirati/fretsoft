@@ -5,8 +5,45 @@ import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { providersApi } from '../lib/api';
+import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
+import { formatPhone, isValidEmail } from '../lib/validation';
 import { Provider } from '../types';
+import { FieldLabel, FormAlert, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import Input from '../shared/ui/Input';
+
+const initialFormData = {
+  name: '',
+  type: 'Oficina',
+  status: 'Ativo',
+  contact: '',
+  email: '',
+  address: '',
+};
+
+type SupplierFormField = 'name' | 'type' | 'status' | 'contact' | 'email' | 'address';
+
+function getSupplierFormErrors(formData: typeof initialFormData): FormFieldErrors<SupplierFormField> {
+  const errors: FormFieldErrors<SupplierFormField> = {};
+
+  if (formData.name.trim().length < 3) {
+    errors.name = 'Informe o nome do fornecedor.';
+  }
+
+  if (formData.email.trim() && !isValidEmail(formData.email)) {
+    errors.email = 'Informe um e-mail valido.';
+  }
+
+  if (formData.contact.trim() && formData.contact.replace(/\D/g, '').length < 10) {
+    errors.contact = 'Informe um telefone valido com DDD.';
+  }
+
+  if (formData.address.trim() && formData.address.trim().length < 5) {
+    errors.address = 'Informe um endereco mais completo.';
+  }
+
+  return errors;
+}
 
 export default function Suppliers() {
   const { userProfile } = useFirebase();
@@ -18,16 +55,11 @@ export default function Suppliers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'Oficina',
-    status: 'Ativo',
-    contact: '',
-    email: '',
-    address: '',
-  });
+  const [formData, setFormData] = useState(initialFormData);
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<SupplierFormField>>({});
 
   const loadProviders = async () => {
     setLoading(true);
@@ -53,30 +85,80 @@ export default function Suppliers() {
     [providers, searchTerm, typeFilter]
   );
 
+  const formValidationErrors = useMemo(() => getSupplierFormErrors(formData), [formData]);
+  const canSubmit = hasRequiredFieldsFilled(formData, ['name']);
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
+  const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
+  const { formRef, alertRef } = useFormErrorFocus({
+    enabled: isModalOpen,
+    fieldErrors,
+    message: formMessage,
+  });
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingProvider(null);
-    setFormData({
-      name: '',
-      type: 'Oficina',
-      status: 'Ativo',
-      contact: '',
-      email: '',
-      address: '',
+    setSubmitError('');
+    setFieldErrors({});
+    setFormData(initialFormData);
+  };
+
+  const updateField = (field: SupplierFormField, value: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return {
+        ...current,
+        [field]: undefined,
+      };
     });
+    setFormData((current) => ({ ...current, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError('');
+
+    if (Object.keys(formValidationErrors).length > 0) {
+      setFieldErrors(formValidationErrors);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      const payload = {
+        ...formData,
+        name: formData.name.trim(),
+        contact: formData.contact.trim(),
+        email: formData.email.trim(),
+        address: formData.address.trim(),
+      };
+
       if (editingProvider) {
-        await providersApi.update(editingProvider.id, formData);
+        await providersApi.update(editingProvider.id, payload);
       } else {
-        await providersApi.create(formData as Omit<Provider, 'id'>);
+        await providersApi.create(payload as Omit<Provider, 'id'>);
       }
       await loadProviders();
       handleCloseModal();
+    } catch (error) {
+      const resolvedFieldError = resolveFieldError<SupplierFormField>(error, {
+        fieldMap: {
+          name: 'name',
+          email: 'email',
+          contact: 'contact',
+          address: 'address',
+        },
+      });
+
+      if (resolvedFieldError?.field) {
+        setFieldErrors((current) => ({
+          ...current,
+          [resolvedFieldError.field!]: resolvedFieldError.message,
+        }));
+        setSubmitError('');
+      } else {
+        setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar o fornecedor.'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -84,6 +166,8 @@ export default function Suppliers() {
 
   const handleEdit = (provider: Provider) => {
     setEditingProvider(provider);
+    setSubmitError('');
+    setFieldErrors({});
     setFormData({
       name: provider.name,
       type: provider.type,
@@ -212,20 +296,41 @@ export default function Suppliers() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingProvider ? 'Editar Fornecedor' : 'Novo Fornecedor'}>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <TextInput label="Nome do Fornecedor" value={formData.name} onChange={(value) => setFormData({ ...formData, name: value })} placeholder="Ex: Posto Central" />
-            <div className="grid grid-cols-2 gap-4">
-              <SelectInput label="Tipo" value={formData.type} onChange={(value) => setFormData({ ...formData, type: value })} options={['Oficina', 'Posto de Combustivel', 'Seguradora', 'Concessionaria', 'Outros']} />
-              <SelectInput label="Status" value={formData.status} onChange={(value) => setFormData({ ...formData, status: value })} options={['Ativo', 'Inativo']} />
-            </div>
-            <TextInput label="E-mail" type="email" required={false} value={formData.email} onChange={(value) => setFormData({ ...formData, email: value })} placeholder="exemplo@email.com" />
-            <TextInput label="Endereco" required={false} value={formData.address} onChange={(value) => setFormData({ ...formData, address: value })} placeholder="Rua, Numero, Bairro, Cidade - UF" />
-            <TextInput label="Contato (Telefone)" required={false} value={formData.contact} onChange={(value) => setFormData({ ...formData, contact: value })} placeholder="(11) 99999-9999" />
+        <form ref={formRef} noValidate onSubmit={handleSubmit} className="space-y-6">
+          <div ref={alertRef}>
+            <FormAlert message={formMessage} />
           </div>
+
+          <div className="space-y-4">
+            <Field label="Nome do fornecedor" value={formData.name} onChange={(value) => updateField('name', value)} placeholder="Ex: Posto Central" error={fieldErrors.name} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <FieldLabel>Tipo</FieldLabel>
+                <CustomSelect
+                  value={formData.type}
+                  onChange={(value) => updateField('type', value)}
+                  error={fieldErrors.type}
+                  options={['Oficina', 'Posto de Combustivel', 'Seguradora', 'Concessionaria', 'Outros'].map((option) => ({ value: option, label: option }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel>Status</FieldLabel>
+                <CustomSelect
+                  value={formData.status}
+                  onChange={(value) => updateField('status', value)}
+                  error={fieldErrors.status}
+                  options={['Ativo', 'Inativo'].map((option) => ({ value: option, label: option }))}
+                />
+              </div>
+            </div>
+            <Field label="E-mail" type="email" required={false} value={formData.email} onChange={(value) => updateField('email', value)} placeholder="exemplo@email.com" error={fieldErrors.email} />
+            <Field label="Endereco" required={false} value={formData.address} onChange={(value) => updateField('address', value)} placeholder="Rua, Numero, Bairro, Cidade - UF" error={fieldErrors.address} />
+            <Field label="Contato (Telefone)" required={false} value={formData.contact} onChange={(value) => updateField('contact', formatPhone(value))} placeholder="(11) 99999-9999" error={fieldErrors.contact} />
+          </div>
+
           <div className="pt-6 flex justify-end gap-4">
             <button type="button" onClick={handleCloseModal} className="px-8 py-3 rounded-full font-bold text-on-surface-variant hover:bg-surface-container transition-colors">Cancelar</button>
-            <button disabled={isSubmitting} type="submit" className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
+            <button disabled={isSubmitting || !canSubmit} type="submit" className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
               {editingProvider ? 'Salvar Alteracoes' : 'Cadastrar Fornecedor'}
             </button>
@@ -236,24 +341,33 @@ export default function Suppliers() {
   );
 }
 
-function TextInput({ label, value, onChange, placeholder, type = 'text', required = true }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; required?: boolean }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+  required = true,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+  required?: boolean;
+  error?: string;
+}) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <input required={required} type={type} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
-    </div>
-  );
-}
-
-function SelectInput({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
-  return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <CustomSelect
-        value={value}
-        onChange={onChange}
-        options={options.map((option) => ({ value: option, label: option }))}
-      />
-    </div>
+    <Input
+      label={label}
+      required={required}
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      error={error}
+      onChange={(event) => onChange(event.target.value)}
+      className="rounded-xl bg-surface-container"
+    />
   );
 }

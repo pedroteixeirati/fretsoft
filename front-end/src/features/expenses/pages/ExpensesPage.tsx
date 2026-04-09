@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { FormFieldErrors } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
 import { getErrorMessage } from '../../../lib/errors';
 import { NavItem } from '../../../shared/types/common.types';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { useExpenseMutations } from '../hooks/useExpenseMutations';
 import { useExpensesQuery } from '../hooks/useExpensesQuery';
-import { useExpenseForm } from '../hooks/useExpenseForm';
+import { ExpenseFormField, useExpenseForm } from '../hooks/useExpenseForm';
 import ExpensesHeader from '../components/ExpensesHeader';
 import ExpensesStats from '../components/ExpensesStats';
 import ExpensesFilters from '../components/ExpensesFilters';
@@ -39,6 +40,8 @@ export default function ExpensesPage({ onNavigate }: ExpensesPageProps) {
     editingExpense,
     formData,
     setFormData,
+    fieldErrors,
+    setFieldErrors,
     submitError,
     setSubmitError,
     submitSuccess,
@@ -112,42 +115,29 @@ export default function ExpensesPage({ onNavigate }: ExpensesPageProps) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!formData.date) {
-      setSubmitError('Informe a data do custo operacional.');
-      return;
-    }
-    if (!formData.time) {
-      setSubmitError('Informe a hora do custo operacional.');
-      return;
-    }
+    setSubmitError('');
+    setSubmitSuccess('');
+    setFieldErrors({});
+
+    const nextFieldErrors: FormFieldErrors<ExpenseFormField> = {};
+
+    if (!formData.date) nextFieldErrors.date = 'Informe a data do custo operacional.';
+    if (!formData.time) nextFieldErrors.time = 'Informe a hora do custo operacional.';
     const selectedVehicle = vehicles.find((vehicle) => vehicle.id === formData.vehicleId);
-    if (!selectedVehicle) {
-      setSubmitError('Selecione um veiculo cadastrado para registrar o custo operacional.');
-      return;
-    }
-    if (!formData.provider.trim()) {
-      setSubmitError('Selecione um fornecedor para registrar o custo operacional.');
-      return;
-    }
-    if (!formData.category.trim()) {
-      setSubmitError('Selecione uma categoria para o custo operacional.');
-      return;
-    }
-    if (!Number.isFinite(Number(formData.amount)) || Number(formData.amount) <= 0) {
-      setSubmitError('Informe um valor total maior que zero para o custo operacional.');
-      return;
-    }
-    if (formData.paymentRequired && !formData.dueDate) {
-      setSubmitError('Informe a data de vencimento para gerar a conta a pagar.');
+    if (!selectedVehicle) nextFieldErrors.vehicleId = 'Selecione um veiculo cadastrado para registrar o custo operacional.';
+    if (!formData.provider.trim()) nextFieldErrors.provider = 'Selecione um fornecedor para registrar o custo operacional.';
+    if (!formData.category.trim()) nextFieldErrors.category = 'Selecione uma categoria para o custo operacional.';
+    if (!Number.isFinite(Number(formData.amount)) || Number(formData.amount) <= 0) nextFieldErrors.amount = 'Informe um valor total maior que zero para o custo operacional.';
+    if (formData.paymentRequired && !formData.dueDate) nextFieldErrors.dueDate = 'Informe a data de vencimento para gerar a conta a pagar.';
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
       return;
     }
     if (editingExpense?.linkedPayableId && !formData.paymentRequired) {
       const confirmed = window.confirm('Ao remover a exigencia financeira, a conta a pagar vinculada sera excluida. Deseja continuar?');
       if (!confirmed) return;
     }
-
-    setSubmitError('');
-    setSubmitSuccess('');
     try {
       const payload = { ...formData, vehicleName: selectedVehicle.name };
       if (editingExpense) {
@@ -212,6 +202,7 @@ export default function ExpensesPage({ onNavigate }: ExpensesPageProps) {
         isOpen={isModalOpen}
         editing={Boolean(editingExpense)}
         submitError={submitError}
+        fieldErrors={fieldErrors}
         formData={formData}
         isSubmitting={isSubmitting}
         canReadProviders={canReadProviders}
@@ -221,6 +212,7 @@ export default function ExpensesPage({ onNavigate }: ExpensesPageProps) {
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}
+        onClearFieldError={(field) => setFieldErrors((current) => ({ ...current, [field]: undefined }))}
       />
 
       <ExpensesInsights aiLoading={aiLoading} aiSummary={aiSummary} onNavigate={onNavigate} />

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { FormFieldErrors } from '../../../lib/errors';
 import { Expense } from '../types/expense.types';
 import { Provider } from '../../providers/types/provider.types';
 
@@ -18,6 +19,18 @@ export interface ExpenseFormData {
   linkedPayableId: string | null;
   observations: string;
 }
+
+export type ExpenseFormField =
+  | 'date'
+  | 'time'
+  | 'vehicleId'
+  | 'provider'
+  | 'category'
+  | 'amount'
+  | 'odometer'
+  | 'quantity'
+  | 'dueDate'
+  | 'observations';
 
 export function defaultExpenseFormData() {
   return {
@@ -47,6 +60,7 @@ export function useExpenseForm({ providers }: UseExpenseFormOptions) {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<ExpenseFormField>>({});
   const [formData, setFormData] = useState<ExpenseFormData>(defaultExpenseFormData());
 
   const providerOptions = useMemo(() => {
@@ -67,6 +81,7 @@ export function useExpenseForm({ providers }: UseExpenseFormOptions) {
   const openCreate = () => {
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setEditingExpense(null);
     setFormData(defaultExpenseFormData());
     setIsModalOpen(true);
@@ -76,6 +91,7 @@ export function useExpenseForm({ providers }: UseExpenseFormOptions) {
     setIsModalOpen(false);
     setEditingExpense(null);
     setSubmitError('');
+    setFieldErrors({});
     setFormData(defaultExpenseFormData());
   };
 
@@ -99,6 +115,7 @@ export function useExpenseForm({ providers }: UseExpenseFormOptions) {
     });
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -107,6 +124,8 @@ export function useExpenseForm({ providers }: UseExpenseFormOptions) {
     editingExpense,
     formData,
     setFormData,
+    fieldErrors,
+    setFieldErrors,
     submitError,
     setSubmitError,
     submitSuccess,

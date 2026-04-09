@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
+import { getErrorMessage, resolveFieldError } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
-import { getErrorMessage } from '../../../lib/errors';
+import { isValidDateInput, isValidPlate } from '../../../lib/validation';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { useVehiclesQuery } from '../hooks/useVehiclesQuery';
 import { useVehicleMutations } from '../hooks/useVehicleMutations';
@@ -29,6 +30,8 @@ export default function VehiclesPage() {
     editingVehicle,
     formData,
     setFormData,
+    fieldErrors,
+    setFieldErrors,
     submitError,
     setSubmitError,
     submitSuccess,
@@ -59,6 +62,7 @@ export default function VehiclesPage() {
     event.preventDefault();
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
 
     const payload = {
       ...formData,
@@ -66,6 +70,20 @@ export default function VehiclesPage() {
       plate: formData.plate.toUpperCase().trim(),
       driver: formData.driver.trim(),
     };
+
+    const nextFieldErrors: typeof fieldErrors = {};
+
+    if (payload.name.length < 3) nextFieldErrors.name = 'Informe um nome valido para o veiculo.';
+    if (!isValidPlate(payload.plate)) nextFieldErrors.plate = 'Placa invalida. Use o formato ABC1D23 ou ABC-1234.';
+    if (payload.driver.length < 3) nextFieldErrors.driver = 'Informe o motorista responsavel pelo veiculo.';
+    if (!payload.type.trim()) nextFieldErrors.type = 'Selecione o tipo do veiculo.';
+    if (!Number.isFinite(Number(payload.km)) || Number(payload.km) < 0) nextFieldErrors.km = 'A quilometragem deve ser zero ou maior.';
+    if (payload.nextMaintenance && !isValidDateInput(payload.nextMaintenance)) nextFieldErrors.nextMaintenance = 'Informe uma data valida para a proxima manutencao.';
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
 
     try {
       if (editingVehicle) {
@@ -77,6 +95,23 @@ export default function VehiclesPage() {
       setSubmitSuccess(editingVehicle ? 'Veiculo atualizado com sucesso.' : 'Veiculo cadastrado com sucesso.');
       closeModal();
     } catch (error) {
+      const fieldError = resolveFieldError(error, {
+        fieldMap: {
+          name: 'name',
+          plate: 'plate',
+          driver: 'driver',
+          type: 'type',
+          km: 'km',
+          nextMaintenance: 'nextMaintenance',
+          status: 'status',
+        },
+      });
+
+      if (fieldError?.field) {
+        setFieldErrors({ [fieldError.field]: fieldError.message });
+        return;
+      }
+
       setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar o veiculo.'));
     }
   };
@@ -139,11 +174,13 @@ export default function VehiclesPage() {
         isOpen={isModalOpen}
         editing={Boolean(editingVehicle)}
         submitError={submitError}
+        fieldErrors={fieldErrors}
         isSubmitting={isSubmitting}
         formData={formData}
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}
+        onClearFieldError={(field) => setFieldErrors((current) => ({ ...current, [field]: undefined }))}
       />
     </div>
   );

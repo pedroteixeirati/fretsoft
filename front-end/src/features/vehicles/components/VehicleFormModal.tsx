@@ -2,91 +2,96 @@ import React from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import Modal from '../../../components/Modal';
-import { VehicleFormData } from '../hooks/useVehicleForm';
+import Input from '../../../shared/ui/Input';
+import { FieldLabel, FormAlert, FormDatePicker, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
+import { VehicleFormData, VehicleFormField } from '../hooks/useVehicleForm';
+import { FormFieldErrors } from '../../../lib/errors';
 
 interface VehicleFormModalProps {
   isOpen: boolean;
   editing: boolean;
   submitError: string;
+  fieldErrors: FormFieldErrors<VehicleFormField>;
   isSubmitting: boolean;
   formData: VehicleFormData;
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onChange: (next: VehicleFormData) => void;
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
-  return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <input
-        required
-        type={type}
-        min={type === 'number' ? 0 : undefined}
-        className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-        placeholder={placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </div>
-  );
+  onClearFieldError: (field: VehicleFormField) => void;
 }
 
 export default function VehicleFormModal({
   isOpen,
   editing,
   submitError,
+  fieldErrors,
   isSubmitting,
   formData,
   onClose,
   onSubmit,
   onChange,
+  onClearFieldError,
 }: VehicleFormModalProps) {
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
+  const canSubmit = hasRequiredFieldsFilled(formData, ['name', 'plate', 'driver']);
+  const { formRef, alertRef } = useFormErrorFocus({
+    enabled: isOpen,
+    fieldErrors,
+    message: formMessage,
+  });
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={editing ? 'Editar veiculo' : 'Novo veiculo'}>
-      <form onSubmit={onSubmit} className="space-y-6">
-        {submitError ? (
-          <div className="rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm font-medium text-error">
-            {submitError}
-          </div>
-        ) : null}
+      <form ref={formRef} onSubmit={onSubmit} className="space-y-6">
+        <div ref={alertRef}>
+          <FormAlert message={formMessage} />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Input
             label="Nome do veiculo"
+            required
+            error={fieldErrors.name}
             value={formData.name}
-            onChange={(value) => onChange({ ...formData, name: value })}
+            onChange={(event) => {
+              onClearFieldError('name');
+              onChange({ ...formData, name: event.target.value });
+            }}
             placeholder="Ex: Volvo FH 540"
           />
           <Input
             label="Placa"
+            required
+            error={fieldErrors.plate}
+            hint="Formatos aceitos: ABC1D23 ou ABC-1234."
             value={formData.plate}
-            onChange={(value) => onChange({ ...formData, plate: value.toUpperCase() })}
+            onChange={(event) => {
+              onClearFieldError('plate');
+              onChange({ ...formData, plate: event.target.value.toUpperCase() });
+            }}
             placeholder="ABC-1234"
           />
           <Input
             label="Motorista"
+            required
+            error={fieldErrors.driver}
             value={formData.driver}
-            onChange={(value) => onChange({ ...formData, driver: value })}
+            onChange={(event) => {
+              onClearFieldError('driver');
+              onChange({ ...formData, driver: event.target.value });
+            }}
             placeholder="Nome do motorista"
           />
           <div className="space-y-2">
-            <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo</label>
+            <FieldLabel required>Tipo</FieldLabel>
             <CustomSelect
               value={formData.type}
-              onChange={(value) => onChange({ ...formData, type: value })}
+              onChange={(value) => {
+                onClearFieldError('type');
+                onChange({ ...formData, type: value });
+              }}
+              error={fieldErrors.type}
               options={['Carga Pesada', 'Longo Percurso', 'Utilitario', 'Executivo'].map((option) => ({
                 value: option,
                 label: option,
@@ -96,14 +101,21 @@ export default function VehicleFormModal({
           <Input
             label="Quilometragem"
             type="number"
+            error={fieldErrors.km}
             value={String(formData.km)}
-            onChange={(value) => onChange({ ...formData, km: Number(value) })}
+            onChange={(event) => {
+              onClearFieldError('km');
+              onChange({ ...formData, km: Number(event.target.value) });
+            }}
           />
-          <Input
+          <FormDatePicker
             label="Proxima manutencao"
-            type="date"
+            error={fieldErrors.nextMaintenance}
             value={formData.nextMaintenance}
-            onChange={(value) => onChange({ ...formData, nextMaintenance: value })}
+            onChange={(value) => {
+              onClearFieldError('nextMaintenance');
+              onChange({ ...formData, nextMaintenance: value });
+            }}
           />
         </div>
 
@@ -116,7 +128,7 @@ export default function VehicleFormModal({
             Cancelar
           </button>
           <button
-            disabled={isSubmitting}
+            disabled={isSubmitting || !canSubmit}
             type="submit"
             className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
           >

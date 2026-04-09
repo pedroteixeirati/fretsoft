@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MetricCard from '../components/MetricCard';
-import { AlertTriangle, ArrowRight, CheckCircle, Loader2, Shield, TrendingUp, Zap } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, Loader2, TrendingUp } from 'lucide-react';
 import ExpendituresChart from '../components/ExpendituresChart';
 import { expensesApi, providersApi, vehiclesApi } from '../lib/api';
 import { useFirebase } from '../context/FirebaseContext';
@@ -53,6 +53,42 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       }, {} as Record<string, number>),
     [expenses]
   );
+  const topVehicleCosts = useMemo(() => {
+    const palette = ['#526600', '#8ca33e', '#a0b63f', '#dee2c9', '#c581ce'];
+    const totalsByVehicle = new Map<
+      string,
+      { id: string; name: string; label: string; value: number }
+    >();
+
+    expenses.forEach((expense) => {
+      const vehicle = vehicles.find((item) => item.id === expense.vehicleId);
+      const id = expense.vehicleId || 'unlinked';
+      const name = vehicle?.name || expense.vehicleName || 'Veiculo nao vinculado';
+      const label = vehicle?.plate || expense.vehicleName || 'Sem vinculo';
+      const current = totalsByVehicle.get(id);
+
+      if (current) {
+        current.value += Number(expense.amount || 0);
+        return;
+      }
+
+      totalsByVehicle.set(id, {
+        id,
+        name,
+        label,
+        value: Number(expense.amount || 0),
+      });
+    });
+
+    return [...totalsByVehicle.values()]
+      .filter((item) => item.value > 0)
+      .sort((left, right) => right.value - left.value)
+      .slice(0, 5)
+      .map((item, index) => ({
+        ...item,
+        color: palette[index % palette.length],
+      }));
+  }, [expenses, vehicles]);
 
   const expenseCategories = [
     { label: 'Combustivel', value: expensesByType.Combustivel || 0, color: 'bg-primary' },
@@ -138,24 +174,38 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             <p className="text-sm text-on-surface-variant mt-1">Analise de alocacao de recursos por unidade especifica</p>
           </div>
 
-          <ExpendituresChart />
+          <ExpendituresChart data={topVehicleCosts} />
 
-          <div className="mt-8 pt-8 border-t border-outline-variant/30 flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <LegendDot color="bg-primary" label="Carga Pesada" />
-              <LegendDot color="bg-primary-container" label="Logistica" />
-              <LegendDot color="bg-tertiary-container" label="Nao Programado" />
-            </div>
+          <div className="mt-8 pt-8 border-t border-outline-variant/30 flex items-center justify-between gap-4">
+            <p className="text-xs text-on-surface-variant/70">
+              Ranking calculado a partir dos custos operacionais vinculados aos veiculos.
+            </p>
             <div className="text-xs italic text-on-surface-variant/60 font-medium">Dados carregados na abertura da pagina</div>
           </div>
         </section>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-        <div className="md:col-span-4 space-y-4">
-          <h5 className="text-sm font-black uppercase tracking-[0.2em] text-on-surface-variant mb-4">Pulso Operacional</h5>
+      {canReadExpenses ? (
+        <section className="rounded-2xl bg-surface-container-low p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h5 className="text-sm font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                Pulso operacional
+              </h5>
+              <p className="mt-2 text-sm text-on-surface-variant">
+                Acompanhamento das pendencias reais do modulo de custos operacionais.
+              </p>
+            </div>
 
-          {canReadExpenses && (
+            <button
+              onClick={() => onNavigate('expenses')}
+              className="text-primary font-bold text-xs flex items-center gap-1 hover:underline"
+            >
+              VER CUSTOS <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+
+          <div className="mt-6 space-y-4">
             <PulseCard
               onClick={() => onNavigate('expenses')}
               icon={AlertTriangle}
@@ -163,54 +213,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               description={`${expenses.filter((expense) => expense.status === 'pending').length} custos operacionais pendentes de aprovacao.`}
               tone="error"
             />
-          )}
-          {canReadReports && (
             <PulseCard
-              onClick={() => onNavigate('reports')}
-              icon={Zap}
-              title="Meta de Eficiencia"
-              description="Monitoramento continuo de consumo de combustivel."
+              onClick={() => onNavigate('expenses')}
+              icon={TrendingUp}
+              title="Itens aprovados"
+              description={`${expenses.filter((expense) => expense.status === 'approved').length} custos operacionais aprovados no sistema.`}
               tone="primary"
             />
-          )}
-          {canReadProviders && (
-            <PulseCard
-              onClick={() => onNavigate('suppliers')}
-              icon={Shield}
-              title="Auditoria de Fornecedor"
-              description={`${providers.length} fornecedores parceiros cadastrados.`}
-              tone="secondary"
-            />
-          )}
-        </div>
-
-        <div className="md:col-span-8 h-full min-h-[320px] rounded-2xl overflow-hidden relative group">
-          <img
-            src="https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&q=80&w=1200"
-            alt="Frota"
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-transparent flex items-end p-10">
-            <div className="text-on-primary">
-              <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-2">Perspectiva Sustentavel</p>
-              <h4 className="text-3xl font-headline font-extrabold tracking-tight">O futuro da eficiencia da frota e oliva.</h4>
-              <p className="mt-4 max-w-md text-sm opacity-90 leading-relaxed">
-                Nossa transicao para logistica sustentavel resultou em uma reducao significativa nos custos de manutencao. Precisao encontra ecologia.
-              </p>
-            </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`w-3 h-3 ${color} rounded-full`} />
-      <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter">{label}</span>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -226,11 +238,14 @@ function PulseCard({
   icon: React.ElementType;
   title: string;
   description: string;
-  tone: 'error' | 'primary' | 'secondary';
+  tone: 'error' | 'primary';
 }) {
-  const toneClass = tone === 'error' ? 'bg-error-container text-error' : tone === 'primary' ? 'bg-primary-fixed text-primary' : 'bg-secondary-fixed text-secondary';
+  const toneClass =
+    tone === 'error'
+      ? 'bg-error-container text-error'
+      : 'bg-primary-fixed text-primary';
   return (
-    <div onClick={onClick} className="bg-surface-container-low p-4 rounded-xl flex items-center gap-4 transition-all hover:bg-surface-container-high cursor-pointer group">
+    <div onClick={onClick} className="bg-surface p-4 rounded-xl flex items-center gap-4 transition-all hover:bg-surface-container-high cursor-pointer group">
       <div className={`w-12 h-12 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform ${toneClass}`}>
         <Icon className="w-6 h-6" />
       </div>

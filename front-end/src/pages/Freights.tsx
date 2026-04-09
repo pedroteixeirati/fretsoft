@@ -5,9 +5,12 @@ import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
 import { contractsApi, freightsApi, vehiclesApi } from '../lib/api';
-import { getErrorMessage } from '../lib/errors';
+import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
+import { isValidDateInput } from '../lib/validation';
 import { Contract, Freight, Vehicle } from '../types';
+import { FieldLabel, FormAlert, FormDatePicker, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import Input from '../shared/ui/Input';
 
 const initialFormData = {
   freightType: 'standalone',
@@ -18,6 +21,47 @@ const initialFormData = {
   route: '',
   amount: '',
 };
+
+type FreightFormField =
+  | 'freightType'
+  | 'vehicleId'
+  | 'contractId'
+  | 'date'
+  | 'route'
+  | 'amount';
+
+function getFreightFormErrors(
+  formData: typeof initialFormData,
+  selectedContract?: Contract,
+): FormFieldErrors<FreightFormField> {
+  const errors: FormFieldErrors<FreightFormField> = {};
+  const requiresAmount = !selectedContract || selectedContract.remunerationType === 'per_trip';
+
+  if (formData.freightType === 'contract' && !formData.contractId) {
+    errors.contractId = 'Selecione um contrato.';
+  }
+
+  if (!formData.vehicleId) {
+    errors.vehicleId = 'Selecione o caminhao do frete.';
+  }
+
+  if (!isValidDateInput(formData.date)) {
+    errors.date = 'Informe a data do frete.';
+  }
+
+  if (formData.route.trim().length < 5) {
+    errors.route = 'Informe uma rota valida.';
+  }
+
+  if (requiresAmount) {
+    const amount = Number(formData.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      errors.amount = 'Informe um valor de frete maior que zero.';
+    }
+  }
+
+  return errors;
+}
 
 export default function Freights() {
   const { userProfile } = useFirebase();
@@ -36,6 +80,7 @@ export default function Freights() {
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState(initialFormData);
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<FreightFormField>>({});
 
   const loadData = async () => {
     setLoading(true);
@@ -64,7 +109,6 @@ export default function Freights() {
     () => contracts.find((contract) => contract.id === formData.contractId),
     [contracts, formData.contractId]
   );
-  const requiresContractSelection = formData.freightType === 'contract' && !selectedContract;
   const showOperationalFields = formData.freightType === 'standalone' || !!selectedContract;
 
   const availableVehicles = useMemo(() => {
@@ -87,17 +131,57 @@ export default function Freights() {
       ),
     [freights, searchTerm]
   );
+  const selectableContracts = useMemo(
+    () => contracts.filter((contract) =>
+      contract.status === 'active' ||
+      contract.status === 'renewal' ||
+      contract.id === formData.contractId
+    ),
+    [contracts, formData.contractId]
+  );
+
+  const formValidationErrors = useMemo(() => getFreightFormErrors(formData, selectedContract), [formData, selectedContract]);
+  const canSubmit = hasRequiredFieldsFilled(formData, [
+    'vehicleId',
+    'date',
+    'route',
+    { field: 'contractId', isFilled: (value, currentFormData) => currentFormData.freightType !== 'contract' || (typeof value === 'string' && value.trim().length > 0) },
+    { field: 'amount', isFilled: (value, currentFormData) => {
+      const requiresCurrentAmount = currentFormData.freightType === 'standalone' || !selectedContract || selectedContract.remunerationType === 'per_trip';
+      return !requiresCurrentAmount || (typeof value === 'string' && value.trim().length > 0);
+    } },
+  ]);
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
+  const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
+  const { formRef, alertRef } = useFormErrorFocus({
+    enabled: isModalOpen,
+    fieldErrors,
+    message: formMessage,
+  });
 
   const resetForm = () => {
     setFormData(initialFormData);
     setEditingFreight(null);
     setSubmitError('');
+    setFieldErrors({});
     setIsModalOpen(false);
+  };
+
+  const updateField = (field: FreightFormField, value: string) => {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return {
+        ...current,
+        [field]: undefined,
+      };
+    });
+    setFormData((current) => ({ ...current, [field]: value }));
   };
 
   const handleOpenCreate = () => {
     setSubmitError('');
     setSubmitSuccess('');
+    setFieldErrors({});
     setFormData(initialFormData);
     setEditingFreight(null);
     setIsModalOpen(true);
@@ -105,6 +189,14 @@ export default function Freights() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError('');
+    setSubmitSuccess('');
+
+    if (Object.keys(formValidationErrors).length > 0) {
+      setFieldErrors(formValidationErrors);
+      return;
+    }
+
     const selectedVehicle = vehicles.find((vehicle) => vehicle.id === formData.vehicleId);
     const payload = {
       vehicleId: formData.vehicleId,
@@ -116,8 +208,6 @@ export default function Freights() {
     };
 
     setIsSubmitting(true);
-    setSubmitError('');
-    setSubmitSuccess('');
     try {
       if (editingFreight) {
         await freightsApi.update(editingFreight.id, payload);
@@ -128,7 +218,25 @@ export default function Freights() {
       setSubmitSuccess(editingFreight ? 'Frete atualizado com sucesso.' : 'Frete cadastrado com sucesso.');
       resetForm();
     } catch (error) {
-      setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar o frete.'));
+      const resolvedFieldError = resolveFieldError<FreightFormField>(error, {
+        fieldMap: {
+          vehicleId: 'vehicleId',
+          contractId: 'contractId',
+          date: 'date',
+          route: 'route',
+          amount: 'amount',
+        },
+      });
+
+      if (resolvedFieldError?.field) {
+        setFieldErrors((current) => ({
+          ...current,
+          [resolvedFieldError.field!]: resolvedFieldError.message,
+        }));
+        setSubmitError('');
+      } else {
+        setSubmitError(getErrorMessage(error, 'Nao foi possivel salvar o frete.'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -137,6 +245,7 @@ export default function Freights() {
   const handleEdit = (freight: Freight) => {
     const linkedVehicle = vehicles.find((vehicle) => vehicle.id === freight.vehicleId || vehicle.plate === freight.plate);
     setEditingFreight(freight);
+    setFieldErrors({});
     setFormData({
       freightType: freight.contractId ? 'contract' : 'standalone',
       vehicleId: linkedVehicle?.id || freight.vehicleId,
@@ -163,15 +272,6 @@ export default function Freights() {
       setSubmitError(getErrorMessage(error, 'Nao foi possivel excluir o frete.'));
     }
   };
-
-  const selectableContracts = useMemo(
-    () => contracts.filter((contract) =>
-      contract.status === 'active' ||
-      contract.status === 'renewal' ||
-      contract.id === formData.contractId
-    ),
-    [contracts, formData.contractId]
-  );
 
   return (
     <div className="space-y-10">
@@ -292,28 +392,27 @@ export default function Freights() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={resetForm} title={editingFreight ? 'Editar frete' : 'Novo frete'}>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {submitError && (
-            <div className="rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm font-medium text-error">
-              {submitError}
-            </div>
-          )}
+        <form ref={formRef} noValidate onSubmit={handleSubmit} className="space-y-6">
+          <div ref={alertRef}>
+            <FormAlert message={formMessage} />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tipo de frete</label>
+              <FieldLabel required>Tipo de frete</FieldLabel>
               <CustomSelect
                 value={formData.freightType}
                 onChange={(value) => {
                   const nextType = value as 'standalone' | 'contract';
+                  updateField('freightType', nextType);
                   setFormData((current) => ({
                     ...current,
                     freightType: nextType,
                     contractId: nextType === 'contract' ? current.contractId : '',
-                    vehicleId: nextType === 'contract' ? current.vehicleId : current.vehicleId,
-                    plate: nextType === 'contract' ? current.plate : current.plate,
                     amount: nextType === 'contract' && selectedContract?.remunerationType === 'recurring' ? '' : current.amount,
                   }));
                 }}
+                error={fieldErrors.freightType}
                 options={[
                   { value: 'standalone', label: 'Frete avulso' },
                   { value: 'contract', label: 'Frete por contrato' },
@@ -323,12 +422,13 @@ export default function Freights() {
 
             {formData.freightType === 'contract' && (
               <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Contrato</label>
+                <FieldLabel required>Contrato</FieldLabel>
                 <CustomSelect
                   value={formData.contractId}
                   onChange={(nextContractId) => {
                     const nextContract = contracts.find((contract) => contract.id === nextContractId);
                     const shouldResetVehicle = nextContract && !nextContract.vehicleIds.includes(formData.vehicleId);
+                    updateField('contractId', nextContractId);
                     setFormData((current) => ({
                       ...current,
                       contractId: nextContractId,
@@ -337,6 +437,7 @@ export default function Freights() {
                       amount: nextContract?.remunerationType === 'recurring' ? '' : current.amount,
                     }));
                   }}
+                  error={fieldErrors.contractId}
                   placeholder="Selecione um contrato"
                   options={selectableContracts.map((contract) => ({
                     value: contract.id,
@@ -349,27 +450,26 @@ export default function Freights() {
             {showOperationalFields && (
               <>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Placa</label>
+                  <FieldLabel required>Placa</FieldLabel>
                   <CustomSelect
                     value={formData.vehicleId}
                     onChange={(value) => {
                       const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === value);
-                      setFormData({ ...formData, vehicleId: value, plate: selectedVehicle?.plate || '' });
+                      updateField('vehicleId', value);
+                      setFormData((current) => ({ ...current, vehicleId: value, plate: selectedVehicle?.plate || current.plate }));
                     }}
+                    error={fieldErrors.vehicleId}
                     placeholder={selectedContract ? 'Selecione um caminhao do contrato' : 'Selecione um caminhao'}
                     options={availableVehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.plate} - ${vehicle.name}` }))}
                   />
                 </div>
 
-                <Field label="Data" type="date" value={formData.date} onChange={(value) => setFormData({ ...formData, date: value })} />
+                <FormDatePicker label="Data" value={formData.date} onChange={(value) => updateField('date', value)} error={fieldErrors.date} />
 
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Rota</label>
-                  <input required type="text" className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="Ex: Campinas/SP x Belo Horizonte/MG" value={formData.route} onChange={(e) => setFormData({ ...formData, route: e.target.value })} />
-                </div>
+                <Field label="Rota" value={formData.route} onChange={(value) => updateField('route', value)} containerClassName="md:col-span-2" placeholder="Ex: Campinas/SP x Belo Horizonte/MG" error={fieldErrors.route} />
 
                 {requiresAmount ? (
-                  <Field label="Valor do frete" type="number" value={formData.amount} onChange={(value) => setFormData({ ...formData, amount: value })} />
+                  <Field label="Valor do frete" type="number" min={0} step="0.01" value={formData.amount} onChange={(value) => updateField('amount', value)} error={fieldErrors.amount} />
                 ) : (
                   <div className="md:col-span-2 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-sm text-on-surface">
                     Este frete sera registrado apenas para controle operacional. O faturamento continuara vindo do contrato recorrente.
@@ -400,7 +500,7 @@ export default function Freights() {
 
           <div className="pt-6 flex justify-end gap-4">
             <button type="button" onClick={resetForm} className="px-8 py-3 rounded-full font-bold text-on-surface-variant hover:bg-surface-container transition-colors">Cancelar</button>
-            <button disabled={isSubmitting || vehicles.length === 0 || !formData.vehicleId || requiresContractSelection || (selectedContract && availableVehicles.length === 0)} type="submit" className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
+            <button disabled={isSubmitting || !canSubmit} type="submit" className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
               {editingFreight ? 'Salvar alteracoes' : 'Cadastrar frete'}
             </button>
@@ -433,11 +533,40 @@ function billingTypeTone(billingType?: Freight['billingType']) {
   }
 }
 
-function Field({ label, value, onChange, type = 'text', required = true, disabled = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; disabled?: boolean }) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  min,
+  step,
+  placeholder,
+  containerClassName,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  min?: number;
+  step?: string;
+  placeholder?: string;
+  containerClassName?: string;
+  error?: string;
+}) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{label}</label>
-      <input required={required} disabled={disabled} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.01' : undefined} type={type} className="w-full bg-surface-container border border-outline-variant rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-60" value={value} onChange={(e) => onChange(e.target.value)} />
-    </div>
+    <Input
+      label={label}
+      required
+      type={type}
+      min={min}
+      step={step}
+      placeholder={placeholder}
+      value={value}
+      error={error}
+      onChange={(event) => onChange(event.target.value)}
+      containerClassName={containerClassName}
+      className="rounded-xl bg-surface-container"
+    />
   );
 }

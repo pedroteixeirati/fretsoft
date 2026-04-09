@@ -1,4 +1,5 @@
 import { auth, OperationType, handleDataError } from '../../firebase';
+import { ApiRequestError, ApiErrorPayload } from '../../lib/errors';
 
 export type ResourceInput<T> = Omit<T, 'id'>;
 
@@ -24,8 +25,14 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, operat
     });
 
     if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.error || `Erro ${response.status}`);
+      const payload = await response.json().catch(() => ({} as ApiErrorPayload));
+      throw new ApiRequestError({
+        error: payload.error || `Erro ${response.status}`,
+        code: payload.code,
+        field: payload.field,
+        details: payload.details,
+        status: response.status,
+      });
     }
 
     if (response.status === 204) {
@@ -34,6 +41,9 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, operat
 
     return await response.json() as T;
   } catch (error) {
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
     handleDataError(error, operationType, path);
   }
 }

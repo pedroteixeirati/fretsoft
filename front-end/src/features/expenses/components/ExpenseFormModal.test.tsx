@@ -62,6 +62,7 @@ describe('ExpenseFormModal', () => {
         isOpen
         editing
         submitError="Erro ao salvar"
+        fieldErrors={{}}
         formData={makeFormData({ paymentRequired: true, dueDate: '2026-04-10', linkedPayableId: 'pay-1' })}
         isSubmitting={false}
         canReadProviders
@@ -71,6 +72,7 @@ describe('ExpenseFormModal', () => {
         onClose={() => undefined}
         onSubmit={(event) => event.preventDefault()}
         onChange={() => undefined}
+        onClearFieldError={() => undefined}
       />,
     );
 
@@ -86,6 +88,7 @@ describe('ExpenseFormModal', () => {
         isOpen
         editing={false}
         submitError=""
+        fieldErrors={{}}
         formData={makeFormData()}
         isSubmitting={false}
         canReadProviders={false}
@@ -95,6 +98,7 @@ describe('ExpenseFormModal', () => {
         onClose={() => undefined}
         onSubmit={(event) => event.preventDefault()}
         onChange={() => undefined}
+        onClearFieldError={() => undefined}
       />,
     );
 

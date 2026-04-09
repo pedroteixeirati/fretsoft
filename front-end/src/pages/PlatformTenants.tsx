@@ -4,8 +4,11 @@ import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
 import { useFirebase } from '../context/FirebaseContext';
+import { FormFieldErrors, resolveFieldError } from '../lib/errors';
 import { platformTenantsApi } from '../lib/api';
 import { canAccess } from '../lib/permissions';
+import { FieldLabel, FormAlert, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import Input from '../shared/ui/Input';
 import { PlatformTenant } from '../types';
 
 const initialForm = {
@@ -25,6 +28,67 @@ const initialForm = {
   ownerPasswordConfirm: '',
 };
 
+type TenantFormField =
+  | 'name'
+  | 'tradeName'
+  | 'slug'
+  | 'cnpj'
+  | 'phone'
+  | 'legalRepresentative'
+  | 'city'
+  | 'state'
+  | 'plan'
+  | 'status'
+  | 'ownerName'
+  | 'ownerEmail'
+  | 'ownerPassword'
+  | 'ownerPasswordConfirm';
+
+function getTenantFormErrors(formData: typeof initialForm): FormFieldErrors<TenantFormField> {
+  const normalizedCnpj = formData.cnpj.replace(/\D/g, '');
+  const normalizedPhone = formData.phone.replace(/\D/g, '');
+  const normalizedState = formData.state.trim().toUpperCase();
+  const errors: FormFieldErrors<TenantFormField> = {};
+
+  if (formData.name.trim().length < 3) {
+    errors.name = 'A razao social deve ter pelo menos 3 caracteres.';
+  }
+
+  if (formData.slug.trim() && !/^[a-z0-9-]+$/.test(formData.slug.trim())) {
+    errors.slug = 'Use apenas letras minusculas, numeros e hifens no slug.';
+  }
+
+  if (normalizedCnpj && !isValidCnpj(normalizedCnpj)) {
+    errors.cnpj = 'Informe um CNPJ valido.';
+  }
+
+  if (normalizedPhone && normalizedPhone.length < 10) {
+    errors.phone = 'Informe um telefone valido com DDD.';
+  }
+
+  if (normalizedState && !/^[A-Z]{2}$/.test(normalizedState)) {
+    errors.state = 'A UF deve conter 2 letras.';
+  }
+
+  if (formData.ownerName.trim().length < 3) {
+    errors.ownerName = 'Informe o nome completo do owner.';
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail.trim())) {
+    errors.ownerEmail = 'Informe um e-mail valido para o owner.';
+  }
+
+  if (formData.ownerPassword.length < 6) {
+    errors.ownerPassword = 'A senha inicial deve ter pelo menos 6 caracteres.';
+  }
+
+  if (formData.ownerPassword !== formData.ownerPasswordConfirm) {
+    errors.ownerPasswordConfirm = 'A confirmacao de senha nao confere.';
+  }
+
+  return errors;
+}
+
 export default function PlatformTenants() {
   const { userProfile } = useFirebase();
   const canCreate = canAccess(userProfile, 'platformTenants', 'create');
@@ -38,6 +102,7 @@ export default function PlatformTenants() {
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<TenantFormField>>({});
 
   const loadTenants = async () => {
     setLoading(true);
@@ -69,30 +134,28 @@ export default function PlatformTenants() {
     setSubmitError('');
     setSubmitSuccess('');
     setSlugEdited(false);
+    setFieldErrors({});
   };
-
-  const normalizedCnpj = formData.cnpj.replace(/\D/g, '');
-  const normalizedPhone = formData.phone.replace(/\D/g, '');
-  const normalizedState = formData.state.trim().toUpperCase();
+  const fieldValidationErrors = useMemo(() => getTenantFormErrors(formData), [formData]);
   const formValidationMessage =
-    formData.name.trim().length < 3 ? 'A razao social deve ter pelo menos 3 caracteres.' :
-    formData.ownerName.trim().length < 3 ? 'Informe o nome completo do owner.' :
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail.trim()) ? 'Informe um e-mail valido para o owner.' :
-    formData.ownerPassword.length > 0 && formData.ownerPassword.length < 6 ? 'A senha inicial deve ter pelo menos 6 caracteres.' :
-    formData.ownerPassword !== formData.ownerPasswordConfirm ? 'A confirmacao de senha nao confere.' :
-    normalizedPhone && normalizedPhone.length < 10 ? 'Informe um telefone valido com DDD.' :
-    normalizedCnpj && !isValidCnpj(normalizedCnpj) ? 'Informe um CNPJ valido.' :
-    normalizedState && !/^[A-Z]{2}$/.test(normalizedState) ? 'A UF deve conter 2 letras.' :
+    Object.values(fieldValidationErrors).find(Boolean) ||
     '';
-  const formIsValid =
-    formData.name.trim().length >= 3 &&
-    formData.ownerName.trim().length >= 3 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail.trim()) &&
-    formData.ownerPassword.length >= 6 &&
-    formData.ownerPassword === formData.ownerPasswordConfirm &&
-    (!normalizedPhone || normalizedPhone.length >= 10) &&
-    (!normalizedCnpj || isValidCnpj(normalizedCnpj)) &&
-    (!normalizedState || /^[A-Z]{2}$/.test(normalizedState));
+  const formIsValid = Object.keys(fieldValidationErrors).length === 0;
+  const canSubmit = hasRequiredFieldsFilled(formData, [
+    'name',
+    'ownerName',
+    'ownerEmail',
+    'ownerPassword',
+    'ownerPasswordConfirm',
+  ]);
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
+  const formMessage =
+    submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
+  const { formRef, alertRef } = useFormErrorFocus({
+    enabled: isModalOpen,
+    fieldErrors,
+    message: formMessage,
+  });
 
   useEffect(() => {
     if (slugEdited) return;
@@ -101,6 +164,13 @@ export default function PlatformTenants() {
   }, [formData.name, formData.tradeName, slugEdited]);
 
   const updateField = (field: keyof typeof initialForm, value: string) => {
+    setFieldErrors((current) => {
+      if (!current[field as TenantFormField]) return current;
+      return {
+        ...current,
+        [field]: undefined,
+      };
+    });
     setFormData((current) => ({ ...current, [field]: value }));
   };
 
@@ -111,7 +181,7 @@ export default function PlatformTenants() {
     setSubmitSuccess('');
 
     if (!formIsValid) {
-      setSubmitError(formValidationMessage || 'Revise os campos obrigatorios antes de salvar.');
+      setFieldErrors(fieldValidationErrors);
       return;
     }
 
@@ -137,8 +207,26 @@ export default function PlatformTenants() {
       setFormData(initialForm);
       setSlugEdited(false);
       setIsModalOpen(false);
+      setFieldErrors({});
       setSubmitSuccess('Transportadora cadastrada com sucesso.');
-    } catch (error: any) {
+    } catch (error) {
+      const resolvedFieldError = resolveFieldError<TenantFormField>(error, {
+        fieldMap: {
+          name: 'name',
+          slug: 'slug',
+          cnpj: 'cnpj',
+          ownerEmail: 'ownerEmail',
+          ownerPassword: 'ownerPassword',
+        },
+      });
+
+      if (resolvedFieldError?.field) {
+        setFieldErrors((current) => ({
+          ...current,
+          [resolvedFieldError.field!]: resolvedFieldError.message,
+        }));
+      }
+
       setSubmitError(extractErrorMessage(error));
     } finally {
       setIsSubmitting(false);
@@ -249,10 +337,25 @@ export default function PlatformTenants() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={resetForm} title="Nova transportadora">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form ref={formRef} noValidate onSubmit={handleSubmit} className="space-y-6">
+          <div ref={alertRef}>
+            <FormAlert message={formMessage} />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label="Razao social" value={formData.name} onChange={(value) => updateField('name', value)} />
-            <Field label="Nome fantasia" value={formData.tradeName} onChange={(value) => updateField('tradeName', value)} required={false} />
+            <Field
+              label="Razao social"
+              value={formData.name}
+              onChange={(value) => updateField('name', value)}
+              error={fieldErrors.name}
+            />
+            <Field
+              label="Nome fantasia"
+              value={formData.tradeName}
+              onChange={(value) => updateField('tradeName', value)}
+              required={false}
+              error={fieldErrors.tradeName}
+            />
             <Field
               label="Slug"
               value={formData.slug}
@@ -262,6 +365,7 @@ export default function PlatformTenants() {
               }}
               required={false}
               helperText="Usado no identificador interno da transportadora."
+              error={fieldErrors.slug}
             />
             <Field
               label="CNPJ"
@@ -269,6 +373,7 @@ export default function PlatformTenants() {
               onChange={(value) => updateField('cnpj', formatCnpj(value))}
               required={false}
               placeholder="00.000.000/0000-00"
+              error={fieldErrors.cnpj}
             />
             <Field
               label="Telefone principal"
@@ -276,9 +381,22 @@ export default function PlatformTenants() {
               onChange={(value) => updateField('phone', formatPhone(value))}
               required={false}
               placeholder="(11) 99999-9999"
+              error={fieldErrors.phone}
             />
-            <Field label="Responsavel legal" value={formData.legalRepresentative} onChange={(value) => updateField('legalRepresentative', value)} required={false} />
-            <Field label="Cidade" value={formData.city} onChange={(value) => updateField('city', value)} required={false} />
+            <Field
+              label="Responsavel legal"
+              value={formData.legalRepresentative}
+              onChange={(value) => updateField('legalRepresentative', value)}
+              required={false}
+              error={fieldErrors.legalRepresentative}
+            />
+            <Field
+              label="Cidade"
+              value={formData.city}
+              onChange={(value) => updateField('city', value)}
+              required={false}
+              error={fieldErrors.city}
+            />
             <Field
               label="UF"
               value={formData.state}
@@ -286,12 +404,14 @@ export default function PlatformTenants() {
               required={false}
               placeholder="SP"
               maxLength={2}
+              error={fieldErrors.state}
             />
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Plano</label>
+              <FieldLabel>Plano</FieldLabel>
               <CustomSelect
                 value={formData.plan}
-                onChange={(value) => setFormData({ ...formData, plan: value })}
+                onChange={(value) => updateField('plan', value)}
+                error={fieldErrors.plan}
                 options={[
                   { value: 'starter', label: 'Starter' },
                   { value: 'growth', label: 'Growth' },
@@ -300,10 +420,11 @@ export default function PlatformTenants() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Status</label>
+              <FieldLabel>Status</FieldLabel>
               <CustomSelect
                 value={formData.status}
-                onChange={(value) => setFormData({ ...formData, status: value as typeof formData.status })}
+                onChange={(value) => updateField('status', value)}
+                error={fieldErrors.status}
                 options={[
                   { value: 'active', label: 'Ativa' },
                   { value: 'inactive', label: 'Inativa' },
@@ -335,23 +456,43 @@ export default function PlatformTenants() {
               </button>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="Nome do owner" value={formData.ownerName} onChange={(value) => updateField('ownerName', value)} />
-              <Field label="E-mail do owner" type="email" value={formData.ownerEmail} onChange={(value) => updateField('ownerEmail', value)} />
+              <Field
+                label="Nome do owner"
+                value={formData.ownerName}
+                onChange={(value) => updateField('ownerName', value)}
+                error={fieldErrors.ownerName}
+              />
+              <Field
+                label="E-mail do owner"
+                type="email"
+                value={formData.ownerEmail}
+                onChange={(value) => updateField('ownerEmail', value)}
+                error={fieldErrors.ownerEmail}
+              />
               <div>
-                <Field label="Senha inicial" type="password" value={formData.ownerPassword} onChange={(value) => updateField('ownerPassword', value)} />
+                <Field
+                  label="Senha inicial"
+                  type="password"
+                  value={formData.ownerPassword}
+                  onChange={(value) => updateField('ownerPassword', value)}
+                  error={fieldErrors.ownerPassword}
+                />
               </div>
               <div>
-                <Field label="Confirmar senha" type="password" value={formData.ownerPasswordConfirm} onChange={(value) => updateField('ownerPasswordConfirm', value)} />
+                <Field
+                  label="Confirmar senha"
+                  type="password"
+                  value={formData.ownerPasswordConfirm}
+                  onChange={(value) => updateField('ownerPasswordConfirm', value)}
+                  error={fieldErrors.ownerPasswordConfirm}
+                />
               </div>
             </div>
           </section>
 
-          {submitError && <p className="text-sm font-bold text-error">{submitError}</p>}
-          {!submitError && formValidationMessage && <p className="text-sm font-bold text-on-surface-variant">{formValidationMessage}</p>}
-
           <div className="flex justify-end gap-4 pt-4">
             <button type="button" onClick={resetForm} className="rounded-full px-8 py-3 font-bold text-on-surface-variant transition-colors hover:bg-surface-container">Cancelar</button>
-            <button type="submit" disabled={isSubmitting || !formIsValid} className="flex items-center gap-2 rounded-full bg-primary px-8 py-3 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting || !canSubmit} className="flex items-center gap-2 rounded-full bg-primary px-8 py-3 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] disabled:opacity-50">
               {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               Cadastrar transportadora
             </button>
@@ -371,6 +512,7 @@ function Field({
   placeholder,
   helperText,
   maxLength,
+  error,
 }: {
   label: string;
   value: string;
@@ -380,21 +522,21 @@ function Field({
   placeholder?: string;
   helperText?: string;
   maxLength?: number;
+  error?: string;
 }) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">{label}</label>
-      <input
-        required={required}
-        type={type}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        className="w-full rounded-xl border border-outline-variant bg-surface-container px-4 py-3 outline-none transition-all focus:ring-2 focus:ring-primary/20"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {helperText && <p className="text-[11px] text-on-surface-variant">{helperText}</p>}
-    </div>
+    <Input
+      label={label}
+      required={required}
+      type={type}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      value={value}
+      error={error}
+      hint={helperText}
+      onChange={(event) => onChange(event.target.value)}
+      className="rounded-xl bg-surface-container"
+    />
   );
 }
 
