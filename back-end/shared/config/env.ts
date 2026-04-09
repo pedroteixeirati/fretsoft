@@ -9,6 +9,7 @@ function required(name: string) {
 }
 
 export const config = {
+  host: process.env.HOST || (process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0'),
   port: Number(process.env.PORT || 3001),
   databaseUrl: required('DATABASE_URL'),
   firebaseAdminProjectId: required('FIREBASE_ADMIN_PROJECT_ID'),

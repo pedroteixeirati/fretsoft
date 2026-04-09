@@ -6,8 +6,8 @@ import { startBackgroundJobs } from './shared/infra/jobs/job-runner';
 async function start() {
   await pool.query('select 1');
   startBackgroundJobs();
-  app.listen(config.port, () => {
-    console.log(`API Fretsoft escutando na porta ${config.port}`);
+  app.listen(config.port, config.host, () => {
+    console.log(`API Fretsoft escutando em ${config.host}:${config.port}`);
   });
 }
 
