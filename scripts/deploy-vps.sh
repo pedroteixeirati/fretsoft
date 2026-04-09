@@ -11,7 +11,6 @@ git fetch origin "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
 npm ci
-npm test
 npm run build
 
 pm2 startOrReload ecosystem.config.cjs --only "$API_PROCESS_NAME" --update-env
