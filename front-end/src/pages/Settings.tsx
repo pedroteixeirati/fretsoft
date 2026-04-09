@@ -8,6 +8,21 @@ import { logout } from '../firebase';
 export default function Settings() {
   const { user, userProfile, signUp } = useFirebase();
   const canManageUsers = canAccess(userProfile, 'users', 'create');
+  const canCreateAdmin = userProfile?.role === 'dev';
+  const roleOptions = canCreateAdmin
+    ? [
+        { value: 'admin', label: 'Administrador' },
+        { value: 'financial', label: 'Financeiro' },
+        { value: 'operational', label: 'Operacional' },
+        { value: 'driver', label: 'Motorista' },
+        { value: 'viewer', label: 'Visualizador' },
+      ]
+    : [
+        { value: 'financial', label: 'Financeiro' },
+        { value: 'operational', label: 'Operacional' },
+        { value: 'driver', label: 'Motorista' },
+        { value: 'viewer', label: 'Visualizador' },
+      ];
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -104,13 +119,7 @@ export default function Settings() {
                     <CustomSelect
                       value={newUserRole}
                       onChange={(value) => setNewUserRole(value as typeof newUserRole)}
-                      options={[
-                        { value: 'admin', label: 'Administrador' },
-                        { value: 'financial', label: 'Financeiro' },
-                        { value: 'operational', label: 'Operacional' },
-                        { value: 'driver', label: 'Motorista' },
-                        { value: 'viewer', label: 'Visualizador' },
-                      ]}
+                      options={roleOptions}
                     />
                   </Field>
                 </div>
