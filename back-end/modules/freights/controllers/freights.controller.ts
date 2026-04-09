@@ -1,6 +1,8 @@
 import express from 'express';
 import { canPerform } from '../../../shared/authorization/permissions';
+import { notFoundError } from '../../../shared/errors/app-error';
 import { ensureAllowed } from '../../../shared/http/ensure-allowed';
+import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { freightsResource } from '../freights.resource';
@@ -46,7 +48,7 @@ router.put('/freights/:id', loadAuthContext, async (req: AuthenticatedRequest, r
 
     const updated = await updateResourceByConfig('freights', freightsResource, req.auth, req.params.id, req.body as Record<string, unknown>);
     if (updated === undefined) {
-      res.status(404).json({ error: 'Registro nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'freight_not_found'));
       return;
     }
 
@@ -64,7 +66,7 @@ router.delete('/freights/:id', loadAuthContext, async (req: AuthenticatedRequest
 
     const deleted = await removeResourceByConfig('freights', freightsResource, req.auth, req.params.id);
     if (!deleted) {
-      res.status(404).json({ error: 'Registro nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'freight_not_found'));
       return;
     }
 

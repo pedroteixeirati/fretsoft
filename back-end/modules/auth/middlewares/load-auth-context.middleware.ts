@@ -1,4 +1,6 @@
 import type { NextFunction, Response } from 'express';
+import { forbiddenError, unauthorizedError } from '../../../shared/errors/app-error';
+import { sendErrorResponse } from '../../../shared/http/error-response';
 import { adminAuth } from '../../../shared/infra/firebase/firebaseAdmin';
 import type { AuthenticatedRequest } from '../dtos/auth-context';
 import { resolveAuthContext } from '../services/auth-context.service';
@@ -7,7 +9,7 @@ export async function loadAuthContext(req: AuthenticatedRequest, res: Response, 
   try {
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Token de autenticacao ausente.' });
+      sendErrorResponse(res, unauthorizedError('Token de autenticacao ausente.', 'missing_auth_token'));
       return;
     }
 
@@ -15,7 +17,13 @@ export async function loadAuthContext(req: AuthenticatedRequest, res: Response, 
     const authContext = await resolveAuthContext(decoded);
 
     if (!authContext) {
-      res.status(403).json({ error: 'Usuario autenticado sem vinculacao a uma transportadora ativa. Solicite acesso ao administrador da plataforma.' });
+      sendErrorResponse(
+        res,
+        forbiddenError(
+          'Usuario autenticado sem vinculacao a uma transportadora ativa. Solicite acesso ao administrador da plataforma.',
+          'tenant_access_required'
+        )
+      );
       return;
     }
 

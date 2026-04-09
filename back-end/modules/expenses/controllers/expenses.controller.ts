@@ -1,6 +1,8 @@
 import express from 'express';
 import { canPerform } from '../../../shared/authorization/permissions';
+import { notFoundError } from '../../../shared/errors/app-error';
 import { ensureAllowed } from '../../../shared/http/ensure-allowed';
+import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { expensesResource } from '../expenses.resource';
@@ -46,7 +48,7 @@ router.put('/expenses/:id', loadAuthContext, async (req: AuthenticatedRequest, r
 
     const updated = await updateResourceByConfig('expenses', expensesResource, req.auth, req.params.id, req.body as Record<string, unknown>);
     if (updated === undefined) {
-      res.status(404).json({ error: 'Registro nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'expense_not_found'));
       return;
     }
 
@@ -64,7 +66,7 @@ router.delete('/expenses/:id', loadAuthContext, async (req: AuthenticatedRequest
 
     const deleted = await removeResourceByConfig('expenses', expensesResource, req.auth, req.params.id);
     if (!deleted) {
-      res.status(404).json({ error: 'Registro nao encontrado.' });
+      sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'expense_not_found'));
       return;
     }
 

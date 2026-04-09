@@ -17,6 +17,9 @@ const revenuesControllerSource = readModule('back-end/modules/revenues/controlle
 const tenantsControllerSource = readModule('back-end/modules/tenants/controllers/tenants.controller.ts');
 const usersControllerSource = readModule('back-end/modules/users/controllers/users.controller.ts');
 const appSource = readModule('back-end/shared/infra/http/app.ts');
+const errorHandlerSource = readModule('back-end/shared/http/error-handler.ts');
+const ensureAllowedSource = readModule('back-end/shared/http/ensure-allowed.ts');
+const authMiddlewareSource = readModule('back-end/modules/auth/middlewares/load-auth-context.middleware.ts');
 
 test('app HTTP registra todos os routers principais da API', () => {
   assert.match(appSource, /app\.use\('\/api', authRouter\)/);
@@ -36,6 +39,14 @@ test('auth expoe endpoint de perfil autenticado com dados do tenant', () => {
   assert.match(authControllerSource, /tenantName: auth\.tenantName/);
   assert.match(authControllerSource, /tenantSlug: auth\.tenantSlug/);
   assert.match(authControllerSource, /tenantLogoUrl: auth\.tenantLogoUrl \|\| ''/);
+});
+
+test('contrato global de erro usa code field e details no backend', () => {
+  assert.match(errorHandlerSource, /sendErrorResponse\(res, error\)/);
+  assert.match(errorHandlerSource, /code: 'internal_server_error'/);
+  assert.match(ensureAllowedSource, /forbiddenError\(message\)/);
+  assert.match(authMiddlewareSource, /unauthorizedError\('Token de autenticacao ausente\.'/);
+  assert.match(authMiddlewareSource, /tenant_access_required/);
 });
 
 test('contracts expoe CRUD completo com permissoes e respostas esperadas', () => {
@@ -69,7 +80,7 @@ test('expenses expoe CRUD completo com serializer e not found consistente', () =
   assert.match(expensesControllerSource, /router\.delete\('\/expenses\/:id'/);
   assert.match(expensesControllerSource, /serializeExpenses\(await listResourcesByConfig\(expensesResource, req\.auth\)\)/);
   assert.match(expensesControllerSource, /serializeExpense\(await createResourceByConfig\('expenses'/);
-  assert.match(expensesControllerSource, /res\.status\(404\)\.json\(\{ error: 'Registro nao encontrado\.' \}\)/);
+  assert.match(expensesControllerSource, /sendErrorResponse\(res, notFoundError\('Registro nao encontrado\.', 'expense_not_found'\)\)/);
 });
 
 test('payables expoe CRUD e acoes financeiras minimas com guardas consistentes', () => {

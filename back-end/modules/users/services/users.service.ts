@@ -1,4 +1,5 @@
 import { adminAuth } from '../../../shared/infra/firebase/firebaseAdmin';
+import { conflictError, forbiddenError, validationError } from '../../../shared/errors/app-error';
 import { pool } from '../../../shared/infra/database/pool';
 import type { AppRole } from '../../../shared/authorization/permissions';
 import { isValidEmail, normalizeRequiredText } from '../../../shared/validation/validation';
@@ -27,25 +28,25 @@ export async function createTenantUser(auth: AuthContext | undefined, payload: C
     const normalizedPassword = payload.password || '';
 
     if (auth?.role !== 'dev' && payload.role === 'admin') {
-      throw new Error('Apenas o perfil dev pode promover usuarios para admin.');
+      throw forbiddenError('Apenas o perfil dev pode promover usuarios para admin.', 'admin_promotion_forbidden');
     }
 
     const allowedRoles = allowedRolesForCreator(auth?.role);
     if (!allowedRoles.includes(payload.role)) {
-      throw new Error('Perfil de acesso invalido para cadastro.');
+      throw validationError('Perfil de acesso invalido para cadastro.', 'invalid_user_role', 'role');
     }
 
     if (!isValidEmail(normalizedEmail)) {
-      throw new Error('Informe um e-mail valido para o usuario.');
+      throw validationError('Informe um e-mail valido para o usuario.', 'invalid_user_email', 'email');
     }
 
     if (normalizedPassword.length < 6) {
-      throw new Error('A senha inicial deve ter pelo menos 6 caracteres.');
+      throw validationError('A senha inicial deve ter pelo menos 6 caracteres.', 'invalid_user_password', 'password');
     }
 
     const existingUser = await findUserByEmail(client, normalizedEmail);
     if (existingUser) {
-      throw new Error('Ja existe um usuario cadastrado com esse e-mail.');
+      throw conflictError('Ja existe um usuario cadastrado com esse e-mail.', 'user_email_conflict', 'email');
     }
 
     try {
@@ -58,10 +59,10 @@ export async function createTenantUser(auth: AuthContext | undefined, payload: C
     } catch (firebaseError: any) {
       const code = firebaseError?.code || '';
       if (code.includes('email-already-exists')) {
-        throw new Error('Ja existe um usuario no Firebase com esse e-mail.');
+        throw conflictError('Ja existe um usuario no Firebase com esse e-mail.', 'firebase_user_email_conflict', 'email');
       }
       if (code.includes('invalid-password')) {
-        throw new Error('A senha inicial do usuario nao atende aos requisitos do Firebase.');
+        throw validationError('A senha inicial do usuario nao atende aos requisitos do Firebase.', 'invalid_firebase_user_password', 'password');
       }
       throw firebaseError;
     }

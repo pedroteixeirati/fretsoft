@@ -1,4 +1,5 @@
 import { adminAuth } from '../../../shared/infra/firebase/firebaseAdmin';
+import { conflictError, validationError } from '../../../shared/errors/app-error';
 import { pool } from '../../../shared/infra/database/pool';
 import type { AppRole } from '../../../shared/authorization/permissions';
 import {
@@ -170,42 +171,46 @@ export async function updateTenantProfile(auth: AuthContext | undefined, body: R
   const nextStatus = canManageBilling ? ((status || 'active') as 'active' | 'inactive' | 'suspended') : null;
 
   if (normalizedName.length < 3 || normalizedName.length > 120) {
-    throw new Error('A razao social deve ter entre 3 e 120 caracteres.');
+    throw validationError('A razao social deve ter entre 3 e 120 caracteres.', 'invalid_tenant_name', 'name');
   }
 
   if (normalizedTradeName && normalizedTradeName.length > 120) {
-    throw new Error('O nome fantasia deve ter no maximo 120 caracteres.');
+    throw validationError('O nome fantasia deve ter no maximo 120 caracteres.', 'invalid_tenant_trade_name', 'tradeName');
   }
 
   if (!isValidSlug(normalizedSlug)) {
-    throw new Error('O slug informado e invalido. Use apenas letras minusculas, numeros e hifens.');
+    throw validationError('O slug informado e invalido. Use apenas letras minusculas, numeros e hifens.', 'invalid_tenant_slug', 'slug');
   }
 
   if (normalizedCnpj && !isValidCnpj(normalizedCnpj)) {
-    throw new Error('Informe um CNPJ valido para a transportadora.');
+    throw validationError('Informe um CNPJ valido para a transportadora.', 'invalid_tenant_cnpj', 'cnpj');
   }
 
   if (!isValidState(normalizedState)) {
-    throw new Error('A UF deve conter exatamente 2 letras.');
+    throw validationError('A UF deve conter exatamente 2 letras.', 'invalid_tenant_state', 'state');
   }
 
   if (!isValidPlan(nextPlan) || !isValidTenantStatus(nextStatus)) {
-    throw new Error('Plano ou status da transportadora invalido.');
+    throw validationError('Plano ou status da transportadora invalido.', 'invalid_tenant_plan_or_status');
   }
 
   if (!isValidPhone(normalizedPhone) || !isValidPhone(normalizedWhatsapp)) {
-    throw new Error('Telefone e WhatsApp devem conter DDD e numero valido.');
+    throw validationError('Telefone e WhatsApp devem conter DDD e numero valido.', 'invalid_tenant_phone', 'phone');
   }
 
   for (const tenantEmail of [normalizedPrimaryEmail, normalizedFinancialEmail, normalizedFiscalEmail]) {
     if (tenantEmail && !isValidEmail(tenantEmail)) {
-      throw new Error('Um dos e-mails informados para a transportadora e invalido.');
+      throw validationError('Um dos e-mails informados para a transportadora e invalido.', 'invalid_tenant_email', 'email');
     }
   }
 
   const duplicateTenant = await findDuplicateTenantForUpdate(auth?.tenantId, normalizedSlug, normalizedCnpj);
   if (duplicateTenant) {
-    throw new Error(normalizedCnpj ? 'Ja existe outra transportadora com esse slug ou CNPJ.' : 'Ja existe outra transportadora com esse slug.');
+    throw conflictError(
+      normalizedCnpj ? 'Ja existe outra transportadora com esse slug ou CNPJ.' : 'Ja existe outra transportadora com esse slug.',
+      normalizedCnpj ? 'tenant_slug_or_cnpj_conflict' : 'tenant_slug_conflict',
+      normalizedCnpj ? 'cnpj' : 'slug'
+    );
   }
 
   const payload: UpdateTenantProfileInput = {
@@ -280,43 +285,43 @@ export async function createPlatformTenant(auth: AuthContext | undefined, body: 
   const normalizedStatus = (status as 'active' | 'inactive' | 'suspended') || 'active';
 
   if (!normalizedName || !normalizedOwnerEmail || !normalizedOwnerName || !normalizedPassword) {
-    throw new Error('Razao social, nome do owner, e-mail do owner e senha inicial sao obrigatorios.');
+    throw validationError('Razao social, nome do owner, e-mail do owner e senha inicial sao obrigatorios.', 'missing_platform_tenant_required_fields');
   }
 
   if (normalizedName.length < 3 || normalizedName.length > 120) {
-    throw new Error('A razao social deve ter entre 3 e 120 caracteres.');
+    throw validationError('A razao social deve ter entre 3 e 120 caracteres.', 'invalid_tenant_name', 'name');
   }
 
   if (normalizedTradeName && normalizedTradeName.length > 120) {
-    throw new Error('O nome fantasia deve ter no maximo 120 caracteres.');
+    throw validationError('O nome fantasia deve ter no maximo 120 caracteres.', 'invalid_tenant_trade_name', 'tradeName');
   }
 
   if (!isValidEmail(normalizedOwnerEmail)) {
-    throw new Error('Informe um e-mail valido para o owner.');
+    throw validationError('Informe um e-mail valido para o owner.', 'invalid_owner_email', 'ownerEmail');
   }
 
   if (normalizedPassword.length < 6) {
-    throw new Error('A senha inicial do owner deve ter pelo menos 6 caracteres.');
+    throw validationError('A senha inicial do owner deve ter pelo menos 6 caracteres.', 'invalid_owner_password', 'ownerPassword');
   }
 
   if (!isValidState(normalizedState)) {
-    throw new Error('A UF deve conter exatamente 2 letras.');
+    throw validationError('A UF deve conter exatamente 2 letras.', 'invalid_tenant_state', 'state');
   }
 
   if (!isValidPhone(normalizedPhone)) {
-    throw new Error('Informe um telefone principal valido com DDD.');
+    throw validationError('Informe um telefone principal valido com DDD.', 'invalid_tenant_phone', 'phone');
   }
 
   if (!isValidSlug(normalizedSlug)) {
-    throw new Error('O slug informado e invalido. Use apenas letras minusculas, numeros e hifens.');
+    throw validationError('O slug informado e invalido. Use apenas letras minusculas, numeros e hifens.', 'invalid_tenant_slug', 'slug');
   }
 
   if (normalizedCnpj && !isValidCnpj(normalizedCnpj)) {
-    throw new Error('Informe um CNPJ valido para a transportadora.');
+    throw validationError('Informe um CNPJ valido para a transportadora.', 'invalid_tenant_cnpj', 'cnpj');
   }
 
   if (!isValidPlan(normalizedPlan) || !isValidTenantStatus(normalizedStatus)) {
-    throw new Error('Plano ou status da transportadora invalido.');
+    throw validationError('Plano ou status da transportadora invalido.', 'invalid_tenant_plan_or_status');
   }
 
   const client = await pool.connect();
@@ -326,12 +331,16 @@ export async function createPlatformTenant(auth: AuthContext | undefined, body: 
   try {
     const duplicateTenant = await findDuplicateTenantForCreate(client, normalizedSlug, normalizedCnpj);
     if (duplicateTenant) {
-      throw new Error(normalizedCnpj ? 'Ja existe uma transportadora cadastrada com esse slug ou CNPJ.' : 'Ja existe uma transportadora cadastrada com esse slug.');
+      throw conflictError(
+        normalizedCnpj ? 'Ja existe uma transportadora cadastrada com esse slug ou CNPJ.' : 'Ja existe uma transportadora cadastrada com esse slug.',
+        normalizedCnpj ? 'tenant_slug_or_cnpj_conflict' : 'tenant_slug_conflict',
+        normalizedCnpj ? 'cnpj' : 'slug'
+      );
     }
 
     const duplicateUser = await findUserByEmail(client, normalizedOwnerEmail);
     if (duplicateUser) {
-      throw new Error('Ja existe um usuario cadastrado com esse e-mail.');
+      throw conflictError('Ja existe um usuario cadastrado com esse e-mail.', 'owner_email_conflict', 'ownerEmail');
     }
 
     try {
@@ -344,10 +353,10 @@ export async function createPlatformTenant(auth: AuthContext | undefined, body: 
     } catch (firebaseError: any) {
       const code = firebaseError?.code || '';
       if (code.includes('email-already-exists')) {
-        throw new Error('Ja existe um usuario no Firebase com esse e-mail.');
+        throw conflictError('Ja existe um usuario no Firebase com esse e-mail.', 'firebase_owner_email_conflict', 'ownerEmail');
       }
       if (code.includes('invalid-password')) {
-        throw new Error('A senha inicial do owner nao atende aos requisitos do Firebase.');
+        throw validationError('A senha inicial do owner nao atende aos requisitos do Firebase.', 'invalid_firebase_owner_password', 'ownerPassword');
       }
       throw firebaseError;
     }
