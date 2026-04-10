@@ -8,9 +8,19 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   containerClassName?: string;
   error?: string;
   hint?: string;
+  leftIcon?: React.ReactNode;
 }
 
-export default function Input({ label, containerClassName, className, id, error, hint, ...props }: InputProps) {
+export default function Input({
+  label,
+  containerClassName,
+  className,
+  id,
+  error,
+  hint,
+  leftIcon,
+  ...props
+}: InputProps) {
   return (
     <div className={cn('space-y-2', containerClassName)}>
       {label ? (
@@ -18,16 +28,23 @@ export default function Input({ label, containerClassName, className, id, error,
           {label}
         </FieldLabel>
       ) : null}
-      <input
-        id={id}
+      <div
         className={cn(
-          'w-full rounded-2xl bg-surface px-4 py-3.5 text-on-surface outline-none ring-1 transition-all placeholder:text-on-surface-variant/65 focus:ring-2 focus:ring-primary/20',
-          error ? 'ring-error/35 focus:ring-error/20' : 'ring-primary/5',
-          className,
+          'flex items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 ring-1 transition-all focus-within:ring-2 focus-within:ring-primary/20',
+          error ? 'ring-error/35 focus-within:ring-error/20' : 'ring-primary/5',
         )}
-        aria-invalid={Boolean(error)}
-        {...props}
-      />
+      >
+        {leftIcon ? <span className="shrink-0 text-on-surface-variant">{leftIcon}</span> : null}
+        <input
+          id={id}
+          className={cn(
+            'w-full bg-transparent text-on-surface outline-none placeholder:text-on-surface-variant/65',
+            className,
+          )}
+          aria-invalid={Boolean(error)}
+          {...props}
+        />
+      </div>
       <FormFieldError message={error} />
       {!error && hint ? <p className="pl-1 text-xs text-on-surface-variant">{hint}</p> : null}
     </div>
