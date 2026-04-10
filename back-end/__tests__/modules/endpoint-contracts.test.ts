@@ -86,6 +86,9 @@ test('cargas expoe CRUD proprio e listagem por frete com guardas consistentes', 
   assert.match(cargasControllerSource, /Sem permissao para editar cargas\./);
   assert.match(cargasControllerSource, /Sem permissao para excluir cargas\./);
   assert.match(cargasControllerSource, /Carga nao encontrada\./);
+  assert.match(cargasControllerSource, /serializeCargos\(await listCargos\(req\.auth\)\)/);
+  assert.match(cargasControllerSource, /serializeCargos\(await listCargosByFreight\(req\.auth, req\.params\.id\)\)/);
+  assert.match(cargasControllerSource, /serializeCargo\(await createCargo\(req\.auth, req\.body\)\)/);
 });
 
 test('expenses expoe CRUD completo com serializer e not found consistente', () => {

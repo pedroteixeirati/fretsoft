@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const cargosServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/cargas/services/cargas.service.ts'), 'utf8');
 const cargosErrorsSource = readFileSync(resolve(process.cwd(), 'back-end/modules/cargas/errors/cargas.errors.ts'), 'utf8');
-const cargosResourceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/cargas/cargas.resource.ts'), 'utf8');
+const cargosControllerSource = readFileSync(resolve(process.cwd(), 'back-end/modules/cargas/controllers/cargas.controller.ts'), 'utf8');
 const cargosRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/cargas/repositories/cargas.repository.ts'), 'utf8');
 
 test('validacao de cargas rejeita identificadores invalidos com code e field consistentes', () => {
@@ -28,12 +28,16 @@ test('repositorio de cargas consulta frete e cliente no mesmo tenant e lista por
   assert.match(cargosRepositorySource, /from freights[\s\S]*where id = \$1[\s\S]*tenant_id = \$2/i);
   assert.match(cargosRepositorySource, /from companies[\s\S]*where id = \$1[\s\S]*tenant_id = \$2/i);
   assert.match(cargosRepositorySource, /from cargas[\s\S]*where freight_id = \$1[\s\S]*tenant_id = \$2/i);
+  assert.match(cargosRepositorySource, /insert into cargas/i);
+  assert.match(cargosRepositorySource, /update cargas/i);
+  assert.match(cargosRepositorySource, /delete from cargas/i);
 });
 
-test('resource de cargas expoe campos operacionais e comerciais para o front', () => {
-  assert.match(cargosResourceSource, /\{ api: 'freightId', db: 'freight_id' \}/);
-  assert.match(cargosResourceSource, /\{ api: 'companyName', db: 'company_name' \}/);
-  assert.match(cargosResourceSource, /\{ api: 'cargoType', db: 'cargo_type' \}/);
-  assert.match(cargosResourceSource, /\{ api: 'merchandiseValue', db: 'merchandise_value', type: 'number' \}/);
-  assert.match(cargosResourceSource, /\{ api: 'scheduledDate', db: 'scheduled_date' \}/);
+test('controller e service de cargas usam fluxo explicito sem resources', () => {
+  assert.match(cargosServiceSource, /export const cargasPermissions: ResourcePermissions = \{/);
+  assert.match(cargosServiceSource, /export async function listCargos\(auth\?: AuthContext\)/);
+  assert.match(cargosServiceSource, /export async function createCargo\(auth: AuthContext \| undefined, body: CargoInput\)/);
+  assert.match(cargosControllerSource, /serializeCargos\(await listCargos\(req\.auth\)\)/);
+  assert.match(cargosControllerSource, /serializeCargo\(await createCargo\(req\.auth, req\.body\)\)/);
+  assert.doesNotMatch(cargosControllerSource, /createResourceByConfig|listResourcesByConfig|updateResourceByConfig|removeResourceByConfig|mapResourceRow/);
 });
