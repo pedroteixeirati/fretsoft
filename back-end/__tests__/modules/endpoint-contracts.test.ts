@@ -17,6 +17,7 @@ const resourcesControllerSource = readModule('back-end/modules/resources/control
 const revenuesControllerSource = readModule('back-end/modules/revenues/controllers/revenues.controller.ts');
 const tenantsControllerSource = readModule('back-end/modules/tenants/controllers/tenants.controller.ts');
 const usersControllerSource = readModule('back-end/modules/users/controllers/users.controller.ts');
+const vehiclesControllerSource = readModule('back-end/modules/vehicles/controllers/vehicles.controller.ts');
 const appSource = readModule('back-end/shared/infra/http/app.ts');
 const errorHandlerSource = readModule('back-end/shared/http/error-handler.ts');
 const ensureAllowedSource = readModule('back-end/shared/http/ensure-allowed.ts');
@@ -26,6 +27,7 @@ test('app HTTP registra todos os routers principais da API', () => {
   assert.match(appSource, /app\.use\('\/api', authRouter\)/);
   assert.match(appSource, /app\.use\('\/api', tenantsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', usersRouter\)/);
+  assert.match(appSource, /app\.use\('\/api', vehiclesRouter\)/);
   assert.match(appSource, /app\.use\('\/api', contractsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', cargasRouter\)/);
   assert.match(appSource, /app\.use\('\/api', freightsRouter\)/);
@@ -98,6 +100,16 @@ test('expenses expoe CRUD completo com serializer e not found consistente', () =
   assert.match(expensesControllerSource, /sendErrorResponse\(res, notFoundError\('Registro nao encontrado\.', 'expense_not_found'\)\)/);
 });
 
+test('vehicles expoe CRUD proprio com serializer e guardas consistentes', () => {
+  assert.match(vehiclesControllerSource, /router\.get\('\/vehicles'/);
+  assert.match(vehiclesControllerSource, /router\.post\('\/vehicles'/);
+  assert.match(vehiclesControllerSource, /router\.put\('\/vehicles\/:id'/);
+  assert.match(vehiclesControllerSource, /router\.delete\('\/vehicles\/:id'/);
+  assert.match(vehiclesControllerSource, /serializeVehicles\(await listVehicles\(req\.auth\)\)/);
+  assert.match(vehiclesControllerSource, /serializeVehicle\(await createVehicle\(req\.auth, req\.body as Record<string, unknown>\)\)/);
+  assert.match(vehiclesControllerSource, /sendErrorResponse\(res, notFoundError\('Registro nao encontrado\.', 'vehicle_not_found'\)\)/);
+});
+
 test('payables expoe CRUD e acoes financeiras minimas com guardas consistentes', () => {
   assert.match(payablesControllerSource, /router\.get\('\/payables'/);
   assert.match(payablesControllerSource, /router\.post\('\/payables'/);
@@ -114,8 +126,8 @@ test('payables expoe CRUD e acoes financeiras minimas com guardas consistentes',
   assert.match(payablesControllerSource, /Conta a pagar nao encontrada\./);
 });
 
-test('resources genericos cobrem vehicles providers e companies com CRUD seguro', () => {
-  assert.match(resourcesControllerSource, /new Set\(\['vehicles', 'providers', 'companies'\]\)/);
+test('resources genericos cobrem providers e companies com CRUD seguro', () => {
+  assert.match(resourcesControllerSource, /new Set\(\['providers', 'companies'\]\)/);
   assert.match(resourcesControllerSource, /router\.get\('\/:resourceName'/);
   assert.match(resourcesControllerSource, /router\.post\('\/:resourceName'/);
   assert.match(resourcesControllerSource, /router\.put\('\/:resourceName\/:id'/);

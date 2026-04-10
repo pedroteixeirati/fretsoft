@@ -11,6 +11,7 @@ import resourcesRouter from '../../../modules/resources/controllers/resources.co
 import { errorHandler } from '../../http/error-handler';
 import tenantsRouter from '../../../modules/tenants/controllers/tenants.controller';
 import usersRouter from '../../../modules/users/controllers/users.controller';
+import vehiclesRouter from '../../../modules/vehicles/controllers/vehicles.controller';
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', authRouter);
 app.use('/api', tenantsRouter);
 app.use('/api', usersRouter);
+app.use('/api', vehiclesRouter);
 app.use('/api', contractsRouter);
 app.use('/api', cargasRouter);
 app.use('/api', freightsRouter);
