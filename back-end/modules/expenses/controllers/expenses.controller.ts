@@ -5,24 +5,24 @@ import { ensureAllowed } from '../../../shared/http/ensure-allowed';
 import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
-import { expensesResource } from '../expenses.resource';
 import { serializeExpense, serializeExpenses } from '../serializers/expenses.serializer';
 import {
-  createResourceByConfig,
-  listResourcesByConfig,
-  removeResourceByConfig,
-  updateResourceByConfig,
-} from '../../resources/services/resources.service';
+  createExpense,
+  deleteExpense,
+  expensesPermissions,
+  listExpenses,
+  updateExpense,
+} from '../services/expenses.service';
 
 const router = express.Router();
 
 router.get('/expenses', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('read', expensesResource.permissions, req.auth?.role), 'Sem permissao para visualizar este recurso.')) {
+    if (!ensureAllowed(res, canPerform('read', expensesPermissions, req.auth?.role), 'Sem permissao para visualizar este recurso.')) {
       return;
     }
 
-    res.json(serializeExpenses(await listResourcesByConfig(expensesResource, req.auth)));
+    res.json(serializeExpenses(await listExpenses(req.auth)));
   } catch (error) {
     next(error);
   }
@@ -30,11 +30,11 @@ router.get('/expenses', loadAuthContext, async (req: AuthenticatedRequest, res, 
 
 router.post('/expenses', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('create', expensesResource.permissions, req.auth?.role), 'Sem permissao para criar neste recurso.')) {
+    if (!ensureAllowed(res, canPerform('create', expensesPermissions, req.auth?.role), 'Sem permissao para criar neste recurso.')) {
       return;
     }
 
-    res.status(201).json(serializeExpense(await createResourceByConfig('expenses', expensesResource, req.auth, req.body as Record<string, unknown>) as Record<string, unknown>));
+    res.status(201).json(serializeExpense(await createExpense(req.auth, req.body)));
   } catch (error) {
     next(error);
   }
@@ -42,11 +42,11 @@ router.post('/expenses', loadAuthContext, async (req: AuthenticatedRequest, res,
 
 router.put('/expenses/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('update', expensesResource.permissions, req.auth?.role), 'Sem permissao para editar este recurso.')) {
+    if (!ensureAllowed(res, canPerform('update', expensesPermissions, req.auth?.role), 'Sem permissao para editar este recurso.')) {
       return;
     }
 
-    const updated = await updateResourceByConfig('expenses', expensesResource, req.auth, req.params.id, req.body as Record<string, unknown>);
+    const updated = await updateExpense(req.auth, req.params.id, req.body);
     if (updated === undefined) {
       sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'expense_not_found'));
       return;
@@ -60,11 +60,11 @@ router.put('/expenses/:id', loadAuthContext, async (req: AuthenticatedRequest, r
 
 router.delete('/expenses/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('delete', expensesResource.permissions, req.auth?.role), 'Sem permissao para excluir este recurso.')) {
+    if (!ensureAllowed(res, canPerform('delete', expensesPermissions, req.auth?.role), 'Sem permissao para excluir este recurso.')) {
       return;
     }
 
-    const deleted = await removeResourceByConfig('expenses', expensesResource, req.auth, req.params.id);
+    const deleted = await deleteExpense(req.auth, req.params.id);
     if (!deleted) {
       sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'expense_not_found'));
       return;

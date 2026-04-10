@@ -1,4 +1,6 @@
 import type { ExpenseFinancialStatus, ExpenseInput, ExpensePayload } from '../dtos/expense.types';
+import type { AuthContext } from '../../auth/dtos/auth-context';
+import type { ResourcePermissions } from '../../../shared/authorization/permissions';
 import {
   isNonNegativeNumber,
   isPositiveNumber,
@@ -8,8 +10,51 @@ import {
   normalizeOptionalText,
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
-import { findTenantVehicleForExpense } from '../repositories/expenses.repository';
+import {
+  deleteTenantExpense,
+  findTenantExpenseById,
+  findTenantVehicleForExpense,
+  insertTenantExpense,
+  listTenantExpenses,
+  type ExpenseRow,
+  updateTenantExpense,
+} from '../repositories/expenses.repository';
 import { expenseErrors } from '../errors/expenses.errors';
+import { removeExpensePayable, syncExpensePayable } from '../../payables/services/payables.service';
+
+export const expensesPermissions: ResourcePermissions = {
+  read: ['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'],
+  create: ['dev', 'owner', 'admin', 'operational'],
+  update: ['dev', 'owner', 'admin', 'operational'],
+  delete: ['dev', 'owner', 'admin', 'operational'],
+};
+
+function mapExpenseRow(row: ExpenseRow) {
+  return {
+    id: row.id,
+    displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
+    date: row.date,
+    time: row.time,
+    costDate: row.cost_date,
+    vehicleId: row.vehicle_id,
+    vehicleName: row.vehicle_name,
+    provider: row.provider,
+    category: row.category,
+    quantity: row.quantity,
+    amount: Number(row.amount || 0),
+    odometer: row.odometer,
+    status: row.status,
+    paymentRequired: row.payment_required,
+    financialStatus: row.financial_status,
+    dueDate: row.due_date || '',
+    paidAt: row.paid_at || '',
+    linkedPayableId: row.linked_payable_id,
+    contractId: row.contract_id,
+    freightId: row.freight_id,
+    receiptUrl: row.receipt_url || '',
+    observations: row.observations || '',
+  };
+}
 
 function parseBooleanInput(value: ExpenseInput['paymentRequired']) {
   return value === true || value === 'true';
@@ -102,4 +147,52 @@ export async function validateExpensePayload(body: ExpenseInput, tenantId: strin
     receiptUrl: receiptUrl || '',
     observations: observations || '',
   };
+}
+
+async function getFreshExpenseOrFallback(tenantId: string, expenseId: string, fallback: ReturnType<typeof mapExpenseRow>) {
+  const fresh = await findTenantExpenseById(expenseId, tenantId);
+  return fresh ? mapExpenseRow(fresh) : fallback;
+}
+
+export async function listExpenses(auth?: AuthContext) {
+  if (!auth?.tenantId) return [];
+  const rows = await listTenantExpenses(auth.tenantId);
+  return rows.map(mapExpenseRow);
+}
+
+export async function createExpense(auth: AuthContext | undefined, body: ExpenseInput) {
+  const tenantId = auth?.tenantId || '';
+  const payload = await validateExpensePayload(body, tenantId);
+  const row = await insertTenantExpense(payload, tenantId, auth?.userId);
+  if (!row) return null;
+
+  const mapped = mapExpenseRow(row);
+  await syncExpensePayable({
+    id: row.id,
+    ...mapped,
+  }, tenantId, auth?.userId);
+
+  return getFreshExpenseOrFallback(tenantId, row.id, mapped);
+}
+
+export async function updateExpense(auth: AuthContext | undefined, id: string, body: ExpenseInput) {
+  const tenantId = auth?.tenantId || '';
+  const payload = await validateExpensePayload(body, tenantId);
+  const row = await updateTenantExpense(id, payload, tenantId, auth?.userId);
+  if (!row) return undefined;
+
+  const mapped = mapExpenseRow(row);
+  await syncExpensePayable({
+    id: row.id,
+    ...mapped,
+  }, tenantId, auth?.userId);
+
+  return getFreshExpenseOrFallback(tenantId, row.id, mapped);
+}
+
+export async function deleteExpense(auth: AuthContext | undefined, id: string) {
+  const tenantId = auth?.tenantId || '';
+  await removeExpensePayable(id, tenantId);
+  const deleted = await deleteTenantExpense(id, tenantId);
+  return Boolean(deleted);
 }

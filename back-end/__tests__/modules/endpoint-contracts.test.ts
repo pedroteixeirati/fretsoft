@@ -93,8 +93,8 @@ test('expenses expoe CRUD completo com serializer e not found consistente', () =
   assert.match(expensesControllerSource, /router\.post\('\/expenses'/);
   assert.match(expensesControllerSource, /router\.put\('\/expenses\/:id'/);
   assert.match(expensesControllerSource, /router\.delete\('\/expenses\/:id'/);
-  assert.match(expensesControllerSource, /serializeExpenses\(await listResourcesByConfig\(expensesResource, req\.auth\)\)/);
-  assert.match(expensesControllerSource, /serializeExpense\(await createResourceByConfig\('expenses'/);
+  assert.match(expensesControllerSource, /serializeExpenses\(await listExpenses\(req\.auth\)\)/);
+  assert.match(expensesControllerSource, /serializeExpense\(await createExpense\(req\.auth, req\.body\)\)/);
   assert.match(expensesControllerSource, /sendErrorResponse\(res, notFoundError\('Registro nao encontrado\.', 'expense_not_found'\)\)/);
 });
 

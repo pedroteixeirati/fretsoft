@@ -5,8 +5,8 @@ import { resolve } from 'node:path';
 
 const schemaSource = readFileSync(resolve(process.cwd(), 'back-end/schema.sql'), 'utf8');
 const expensesServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/expenses/services/expenses.service.ts'), 'utf8');
-const expensesResourceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/expenses/expenses.resource.ts'), 'utf8');
-const resourcesServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/resources/services/resources.service.ts'), 'utf8');
+const expensesControllerSource = readFileSync(resolve(process.cwd(), 'back-end/modules/expenses/controllers/expenses.controller.ts'), 'utf8');
+const expensesRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/expenses/repositories/expenses.repository.ts'), 'utf8');
 
 test('schema prepara expenses para o papel de custo operacional com metadados financeiros opcionais', () => {
   assert.match(schemaSource, /create table if not exists expenses \([\s\S]*cost_date text/i);
@@ -30,21 +30,22 @@ test('validacao de expenses define defaults coerentes para o fluxo operacional a
   assert.match(expensesServiceSource, /if \(paymentRequired && financialStatus === 'paid' && !paidAt\) \{[\s\S]*paidAt = dueDate \|\| costDate;[\s\S]*\}/i);
 });
 
-test('recurso expenses expoe novos campos preparatorios para futuras contas a pagar', () => {
-  assert.match(expensesResourceSource, /\{ api: 'costDate', db: 'cost_date' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'paymentRequired', db: 'payment_required' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'financialStatus', db: 'financial_status' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'dueDate', db: 'due_date' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'paidAt', db: 'paid_at' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'linkedPayableId', db: 'linked_payable_id' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'contractId', db: 'contract_id' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'freightId', db: 'freight_id' \}/i);
-  assert.match(expensesResourceSource, /\{ api: 'receiptUrl', db: 'receipt_url' \}/i);
+test('repositorio de expenses consulta e persiste metadados financeiros na tabela do dominio', () => {
+  assert.match(expensesRepositorySource, /from expenses[\s\S]*where tenant_id = \$1[\s\S]*order by date desc, time desc/i);
+  assert.match(expensesRepositorySource, /insert into expenses[\s\S]*payment_required[\s\S]*financial_status[\s\S]*linked_payable_id/i);
+  assert.match(expensesRepositorySource, /update expenses[\s\S]*payment_required = \$12[\s\S]*linked_payable_id = \$16/i);
+  assert.match(expensesRepositorySource, /select id,[\s\S]*linked_payable_id,[\s\S]*receipt_url,[\s\S]*observations/i);
 });
 
-test('custos operacionais podem gerar e remover conta a pagar de forma opcional', () => {
-  assert.match(resourcesServiceSource, /if \(resourceName !== 'expenses'\) \{[\s\S]*return;[\s\S]*\}/i);
-  assert.match(resourcesServiceSource, /await syncExpensePayable\(\{[\s\S]*paymentRequired: Boolean\(row\.paymentRequired\),/i);
-  assert.match(resourcesServiceSource, /resourceName === 'expenses'[\s\S]*getUpdatedExpenseResource/i);
-  assert.match(resourcesServiceSource, /if \(resourceName === 'expenses'\) \{[\s\S]*await removeExpensePayable\(id, auth\?\.tenantId\);[\s\S]*\}/i);
+test('custos operacionais agora orquestram payables diretamente no service do dominio', () => {
+  assert.match(expensesServiceSource, /export async function createExpense\(auth: AuthContext \| undefined, body: ExpenseInput\)/);
+  assert.match(expensesServiceSource, /await syncExpensePayable\(\{[\s\S]*id: row\.id,[\s\S]*\.\.\.mapped,[\s\S]*\}, tenantId, auth\?\.userId\);/i);
+  assert.match(expensesServiceSource, /return getFreshExpenseOrFallback\(tenantId, row\.id, mapped\);/);
+  assert.match(expensesServiceSource, /await removeExpensePayable\(id, tenantId\);/);
+});
+
+test('controller de expenses usa service explicito em vez do pipeline generico', () => {
+  assert.match(expensesControllerSource, /serializeExpenses\(await listExpenses\(req\.auth\)\)/);
+  assert.match(expensesControllerSource, /serializeExpense\(await createExpense\(req\.auth, req\.body\)\)/);
+  assert.doesNotMatch(expensesControllerSource, /createResourceByConfig|listResourcesByConfig|updateResourceByConfig|removeResourceByConfig/);
 });
