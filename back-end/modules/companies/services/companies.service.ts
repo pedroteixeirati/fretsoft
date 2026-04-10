@@ -1,5 +1,14 @@
+import type { ResourcePermissions } from '../../../shared/authorization/permissions';
+import type { AuthContext } from '../../auth/dtos/auth-context';
 import { conflictError, validationError } from '../../../shared/errors/app-error';
 import { pool } from '../../../shared/infra/database/pool';
+import {
+  deleteTenantCompany,
+  insertTenantCompany,
+  listTenantCompanies,
+  type CompanyRow,
+  updateTenantCompany,
+} from '../repositories/companies.repository';
 import {
   isValidCnpj,
   isValidCpf,
@@ -12,6 +21,36 @@ import {
   normalizePhone,
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
+
+export const companiesPermissions: ResourcePermissions = {
+  read: ['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'],
+  create: ['dev', 'owner', 'admin', 'operational'],
+  update: ['dev', 'owner', 'admin', 'operational'],
+  delete: ['dev', 'owner', 'admin', 'operational'],
+};
+
+function mapCompanyRow(row: CompanyRow) {
+  return {
+    id: row.id,
+    displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
+    corporateName: row.corporate_name,
+    tradeName: row.trade_name,
+    cnpj: row.cnpj,
+    stateRegistration: row.state_registration,
+    municipalRegistration: row.municipal_registration,
+    legalRepresentative: row.legal_representative,
+    representativeCpf: row.representative_cpf,
+    email: row.email,
+    phone: row.phone,
+    address: row.address,
+    city: row.city,
+    state: row.state,
+    zipCode: row.zip_code,
+    contractContact: row.contract_contact || '',
+    notes: row.notes || '',
+    status: row.status,
+  };
+}
 
 export async function validateCompanyPayload(
   body: Record<string, unknown>,
@@ -80,4 +119,26 @@ export async function validateCompanyPayload(
     notes: notes || '',
     status,
   };
+}
+
+export async function listCompanies(auth?: AuthContext) {
+  const rows = await listTenantCompanies(auth?.tenantId);
+  return rows.map(mapCompanyRow);
+}
+
+export async function createCompany(auth: AuthContext | undefined, body: Record<string, unknown>) {
+  const payload = await validateCompanyPayload(body, auth?.tenantId || '');
+  const row = await insertTenantCompany(payload as Record<string, unknown>, auth?.tenantId, auth?.userId);
+  return row ? mapCompanyRow(row) : null;
+}
+
+export async function updateCompany(auth: AuthContext | undefined, id: string, body: Record<string, unknown>) {
+  const payload = await validateCompanyPayload(body, auth?.tenantId || '', id);
+  const row = await updateTenantCompany(id, payload as Record<string, unknown>, auth?.tenantId, auth?.userId);
+  return row ? mapCompanyRow(row) : undefined;
+}
+
+export async function deleteCompany(auth: AuthContext | undefined, id: string) {
+  const row = await deleteTenantCompany(id, auth?.tenantId);
+  return Boolean(row);
 }

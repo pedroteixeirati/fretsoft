@@ -9,6 +9,7 @@ function readModule(relativePath: string) {
 
 const authControllerSource = readModule('back-end/modules/auth/controllers/auth.controller.ts');
 const cargasControllerSource = readModule('back-end/modules/cargas/controllers/cargas.controller.ts');
+const companiesControllerSource = readModule('back-end/modules/companies/controllers/companies.controller.ts');
 const contractsControllerSource = readModule('back-end/modules/contracts/controllers/contracts.controller.ts');
 const expensesControllerSource = readModule('back-end/modules/expenses/controllers/expenses.controller.ts');
 const freightsControllerSource = readModule('back-end/modules/freights/controllers/freights.controller.ts');
@@ -26,6 +27,7 @@ test('app HTTP registra todos os routers principais da API', () => {
   assert.match(appSource, /app\.use\('\/api', authRouter\)/);
   assert.match(appSource, /app\.use\('\/api', tenantsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', usersRouter\)/);
+  assert.match(appSource, /app\.use\('\/api', companiesRouter\)/);
   assert.match(appSource, /app\.use\('\/api', contractsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', cargasRouter\)/);
   assert.match(appSource, /app\.use\('\/api', freightsRouter\)/);
@@ -63,6 +65,16 @@ test('contracts expoe CRUD completo com permissoes e respostas esperadas', () =>
   assert.match(contractsControllerSource, /Registro nao encontrado\./);
   assert.match(contractsControllerSource, /serializeContracts\(await listResourcesByConfig\(contractsResource, req\.auth\)\)/);
   assert.match(contractsControllerSource, /res\.status\(201\)\.json\(serializeContract\(await createResourceByConfig\('contracts'/);
+});
+
+test('companies expoe CRUD proprio com serializer e guardas consistentes', () => {
+  assert.match(companiesControllerSource, /router\.get\('\/companies'/);
+  assert.match(companiesControllerSource, /router\.post\('\/companies'/);
+  assert.match(companiesControllerSource, /router\.put\('\/companies\/:id'/);
+  assert.match(companiesControllerSource, /router\.delete\('\/companies\/:id'/);
+  assert.match(companiesControllerSource, /serializeCompanies\(await listCompanies\(req\.auth\)\)/);
+  assert.match(companiesControllerSource, /serializeCompany\(await createCompany\(req\.auth, req\.body as Record<string, unknown>\)\)/);
+  assert.match(companiesControllerSource, /sendErrorResponse\(res, notFoundError\('Registro nao encontrado\.', 'company_not_found'\)\)/);
 });
 
 test('freights expoe CRUD completo com serializer e guardas de recurso', () => {
@@ -114,8 +126,8 @@ test('payables expoe CRUD e acoes financeiras minimas com guardas consistentes',
   assert.match(payablesControllerSource, /Conta a pagar nao encontrada\./);
 });
 
-test('resources genericos cobrem vehicles providers e companies com CRUD seguro', () => {
-  assert.match(resourcesControllerSource, /new Set\(\['vehicles', 'providers', 'companies'\]\)/);
+test('resources genericos cobrem vehicles e providers com CRUD seguro', () => {
+  assert.match(resourcesControllerSource, /new Set\(\['vehicles', 'providers'\]\)/);
   assert.match(resourcesControllerSource, /router\.get\('\/:resourceName'/);
   assert.match(resourcesControllerSource, /router\.post\('\/:resourceName'/);
   assert.match(resourcesControllerSource, /router\.put\('\/:resourceName\/:id'/);
