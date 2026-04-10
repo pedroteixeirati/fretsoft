@@ -707,7 +707,13 @@ export default function Freights() {
         onClose={closeCargoModal}
         onSubmit={handleSubmitCargo}
         onChange={setCargoFormData}
-        onClearFieldError={(field) => setCargoFieldErrors((current) => ({ ...current, [field]: undefined }))}
+        onClearFieldError={(field) =>
+          setCargoFieldErrors((current) => {
+            const next = { ...current };
+            delete next[field];
+            return next;
+          })
+        }
       />
     </div>
   );

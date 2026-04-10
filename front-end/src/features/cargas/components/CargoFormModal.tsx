@@ -48,7 +48,7 @@ export default function CargoFormModal({
   onClearFieldError,
   freightLocked = false,
 }: CargoFormModalProps) {
-  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
   const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
   const canSubmit = hasRequiredFieldsFilled(formData, ['freightId', 'companyId', 'description', 'cargoType', 'origin', 'destination', 'status']);
   const { formRef, alertRef } = useFormErrorFocus({

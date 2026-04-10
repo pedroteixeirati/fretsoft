@@ -260,7 +260,13 @@ export default function CargasPage() {
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}
-        onClearFieldError={(field) => setFieldErrors((current) => ({ ...current, [field]: undefined }))}
+        onClearFieldError={(field) =>
+          setFieldErrors((current) => {
+            const next = { ...current };
+            delete next[field];
+            return next;
+          })
+        }
       />
     </div>
   );
