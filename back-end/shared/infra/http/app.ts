@@ -6,6 +6,7 @@ import cargasRouter from '../../../modules/cargas/controllers/cargas.controller'
 import expensesRouter from '../../../modules/expenses/controllers/expenses.controller';
 import freightsRouter from '../../../modules/freights/controllers/freights.controller';
 import payablesRouter from '../../../modules/payables/controllers/payables.controller';
+import providersRouter from '../../../modules/providers/controllers/providers.controller';
 import revenuesRouter from '../../../modules/revenues/controllers/revenues.controller';
 import resourcesRouter from '../../../modules/resources/controllers/resources.controller';
 import { errorHandler } from '../../http/error-handler';
@@ -28,6 +29,7 @@ app.use('/api', cargasRouter);
 app.use('/api', freightsRouter);
 app.use('/api', expensesRouter);
 app.use('/api', payablesRouter);
+app.use('/api', providersRouter);
 app.use('/api/revenues', revenuesRouter);
 app.use('/api', resourcesRouter);
 
