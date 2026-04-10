@@ -16,6 +16,7 @@ export async function validateFreightPayload(body: FreightInput, tenantId: strin
   const date = normalizeRequiredText(body.date);
   const route = normalizeRequiredText(body.route);
   const rawAmount = body.amount === '' || body.amount === null || body.amount === undefined ? 0 : Number(body.amount);
+  const hasCargo = body.hasCargo === undefined ? true : body.hasCargo === true || body.hasCargo === 'true';
 
   if (!isValidUuid(vehicleId)) throw freightErrors.invalidVehicle();
   if (contractIdInput && !isValidUuid(contractIdInput)) throw freightErrors.invalidContract();
@@ -61,5 +62,6 @@ export async function validateFreightPayload(body: FreightInput, tenantId: strin
     date,
     route,
     amount,
+    hasCargo,
   };
 }

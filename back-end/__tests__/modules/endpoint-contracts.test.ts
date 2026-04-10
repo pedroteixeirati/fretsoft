@@ -8,6 +8,7 @@ function readModule(relativePath: string) {
 }
 
 const authControllerSource = readModule('back-end/modules/auth/controllers/auth.controller.ts');
+const cargasControllerSource = readModule('back-end/modules/cargas/controllers/cargas.controller.ts');
 const contractsControllerSource = readModule('back-end/modules/contracts/controllers/contracts.controller.ts');
 const expensesControllerSource = readModule('back-end/modules/expenses/controllers/expenses.controller.ts');
 const freightsControllerSource = readModule('back-end/modules/freights/controllers/freights.controller.ts');
@@ -26,6 +27,7 @@ test('app HTTP registra todos os routers principais da API', () => {
   assert.match(appSource, /app\.use\('\/api', tenantsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', usersRouter\)/);
   assert.match(appSource, /app\.use\('\/api', contractsRouter\)/);
+  assert.match(appSource, /app\.use\('\/api', cargasRouter\)/);
   assert.match(appSource, /app\.use\('\/api', freightsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', expensesRouter\)/);
   assert.match(appSource, /app\.use\('\/api', payablesRouter\)/);
@@ -71,6 +73,19 @@ test('freights expoe CRUD completo com serializer e guardas de recurso', () => {
   assert.match(freightsControllerSource, /serializeFreights\(await listResourcesByConfig\(freightsResource, req\.auth\)\)/);
   assert.match(freightsControllerSource, /serializeFreight\(await createResourceByConfig\('freights'/);
   assert.match(freightsControllerSource, /const deleted = await removeResourceByConfig\('freights'/);
+});
+
+test('cargas expoe CRUD proprio e listagem por frete com guardas consistentes', () => {
+  assert.match(cargasControllerSource, /router\.get\('\/cargas'/);
+  assert.match(cargasControllerSource, /router\.get\('\/freights\/:id\/cargas'/);
+  assert.match(cargasControllerSource, /router\.post\('\/cargas'/);
+  assert.match(cargasControllerSource, /router\.put\('\/cargas\/:id'/);
+  assert.match(cargasControllerSource, /router\.delete\('\/cargas\/:id'/);
+  assert.match(cargasControllerSource, /Sem permissao para visualizar cargas\./);
+  assert.match(cargasControllerSource, /Sem permissao para criar cargas\./);
+  assert.match(cargasControllerSource, /Sem permissao para editar cargas\./);
+  assert.match(cargasControllerSource, /Sem permissao para excluir cargas\./);
+  assert.match(cargasControllerSource, /Carga nao encontrada\./);
 });
 
 test('expenses expoe CRUD completo com serializer e not found consistente', () => {

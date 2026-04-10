@@ -195,6 +195,35 @@ create table if not exists freights (
   date text not null,
   route text not null,
   amount numeric not null default 0,
+  has_carga boolean not null default true,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists cargas (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  freight_id uuid not null references freights(id) on delete cascade,
+  freight_display_id bigint,
+  freight_route text not null,
+  company_id uuid not null references companies(id) on delete restrict,
+  company_name text not null,
+  cargo_number text,
+  description text not null,
+  cargo_type text not null,
+  weight numeric not null default 0,
+  volume numeric not null default 0,
+  unit_count numeric not null default 0,
+  merchandise_value numeric not null default 0,
+  origin text not null,
+  destination text not null,
+  status text not null default 'planned' check (status in ('planned', 'loading', 'in_transit', 'delivered', 'cancelled')),
+  scheduled_date text,
+  delivered_at text,
+  notes text,
   created_by_user_id uuid references users(id) on delete set null,
   updated_by_user_id uuid references users(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -336,10 +365,43 @@ alter table if exists freights add column if not exists updated_by_user_id uuid 
 alter table if exists freights add column if not exists contract_id uuid references contracts(id) on delete set null;
 alter table if exists freights add column if not exists contract_name text;
 alter table if exists freights add column if not exists billing_type text not null default 'standalone';
+alter table if exists freights add column if not exists has_carga boolean not null default true;
 alter table if exists freights drop constraint if exists freights_billing_type_check;
 alter table if exists freights
   add constraint freights_billing_type_check check (billing_type in ('standalone', 'contract_recurring', 'contract_per_trip'));
 alter table if exists freights drop column if exists owner_uid;
+alter table if exists cargas add column if not exists display_id bigint;
+alter table if exists cargas add column if not exists tenant_id uuid references tenants(id) on delete cascade;
+alter table if exists cargas add column if not exists freight_id uuid references freights(id) on delete cascade;
+alter table if exists cargas add column if not exists freight_display_id bigint;
+alter table if exists cargas add column if not exists freight_route text;
+alter table if exists cargas add column if not exists company_id uuid references companies(id) on delete restrict;
+alter table if exists cargas add column if not exists company_name text;
+alter table if exists cargas add column if not exists cargo_number text;
+alter table if exists cargas add column if not exists description text;
+alter table if exists cargas add column if not exists cargo_type text;
+alter table if exists cargas add column if not exists weight numeric not null default 0;
+alter table if exists cargas add column if not exists volume numeric not null default 0;
+alter table if exists cargas add column if not exists unit_count numeric not null default 0;
+alter table if exists cargas add column if not exists merchandise_value numeric not null default 0;
+alter table if exists cargas add column if not exists origin text;
+alter table if exists cargas add column if not exists destination text;
+alter table if exists cargas add column if not exists status text not null default 'planned';
+alter table if exists cargas add column if not exists scheduled_date text;
+alter table if exists cargas add column if not exists delivered_at text;
+alter table if exists cargas add column if not exists notes text;
+alter table if exists cargas add column if not exists created_by_user_id uuid references users(id) on delete set null;
+alter table if exists cargas add column if not exists updated_by_user_id uuid references users(id) on delete set null;
+update cargas set freight_route = '' where freight_route is null;
+update cargas set company_name = '' where company_name is null;
+update cargas set description = '' where description is null;
+update cargas set cargo_type = '' where cargo_type is null;
+update cargas set origin = '' where origin is null;
+update cargas set destination = '' where destination is null;
+alter table if exists cargas drop constraint if exists cargas_status_check;
+alter table if exists cargas
+  add constraint cargas_status_check
+  check (status in ('planned', 'loading', 'in_transit', 'delivered', 'cancelled'));
 alter table if exists expenses add column if not exists tenant_id uuid references tenants(id) on delete cascade;
 alter table if exists expenses add column if not exists display_id bigint;
 alter table if exists expenses add column if not exists cost_date text;
@@ -523,6 +585,16 @@ where f.id = numbered.id;
 
 with numbered as (
   select id, row_number() over (partition by tenant_id order by created_at asc, id asc) as next_display_id
+  from cargas
+  where display_id is null
+)
+update cargas c
+set display_id = numbered.next_display_id
+from numbered
+where c.id = numbered.id;
+
+with numbered as (
+  select id, row_number() over (partition by tenant_id order by created_at asc, id asc) as next_display_id
   from expenses
   where display_id is null
 )
@@ -599,6 +671,12 @@ before insert on freights
 for each row
 execute function assign_tenant_display_id();
 
+drop trigger if exists trg_cargas_display_id on cargas;
+create trigger trg_cargas_display_id
+before insert on cargas
+for each row
+execute function assign_tenant_display_id();
+
 drop trigger if exists trg_expenses_display_id on expenses;
 create trigger trg_expenses_display_id
 before insert on expenses
@@ -641,6 +719,10 @@ create unique index if not exists idx_contracts_tenant_display_id on contracts(t
 create index if not exists idx_contracts_tenant_id on contracts(tenant_id);
 create unique index if not exists idx_freights_tenant_display_id on freights(tenant_id, display_id) where display_id is not null;
 create index if not exists idx_freights_tenant_id on freights(tenant_id);
+create unique index if not exists idx_cargas_tenant_display_id on cargas(tenant_id, display_id) where display_id is not null;
+create index if not exists idx_cargas_tenant_id on cargas(tenant_id);
+create index if not exists idx_cargas_freight_id on cargas(tenant_id, freight_id);
+create index if not exists idx_cargas_company_id on cargas(tenant_id, company_id);
 create unique index if not exists idx_expenses_tenant_display_id on expenses(tenant_id, display_id) where display_id is not null;
 create index if not exists idx_expenses_tenant_id on expenses(tenant_id);
 create unique index if not exists idx_revenues_tenant_display_id on revenues(tenant_id, display_id) where display_id is not null;

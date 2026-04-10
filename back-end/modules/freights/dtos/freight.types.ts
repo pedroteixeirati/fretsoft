@@ -4,6 +4,7 @@ export type FreightInput = {
   date: string;
   route: string;
   amount?: number | string | null;
+  hasCargo?: boolean | 'true' | 'false';
 };
 
 export type FreightPayload = {
@@ -16,4 +17,5 @@ export type FreightPayload = {
   date: string;
   route: string;
   amount: number;
+  hasCargo: boolean;
 };

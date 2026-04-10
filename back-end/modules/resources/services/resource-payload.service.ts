@@ -4,6 +4,8 @@ import type { ExpenseInput } from '../../expenses/dtos/expense.types';
 import { validateExpensePayload } from '../../expenses/services/expenses.service';
 import type { FreightInput } from '../../freights/dtos/freight.types';
 import { validateFreightPayload } from '../../freights/services/freights.service';
+import type { CargoInput } from '../../cargas/dtos/carga.types';
+import { validateCargoPayload } from '../../cargas/services/cargas.service';
 import { validateCompanyPayload } from '../../companies/services/companies.service';
 import { validateProviderPayload } from '../../providers/services/providers.service';
 import { validateVehiclePayload } from '../../vehicles/services/vehicles.service';
@@ -28,6 +30,8 @@ export async function validateSimpleResourcePayload(
       return validateFreightPayload(body as unknown as FreightInput, tenantId);
     case 'expenses':
       return validateExpensePayload(body as unknown as ExpenseInput, tenantId);
+    case 'cargas':
+      return validateCargoPayload(body as unknown as CargoInput, tenantId);
     default:
       return null;
   }

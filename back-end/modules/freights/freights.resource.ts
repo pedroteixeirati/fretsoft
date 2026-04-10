@@ -18,5 +18,6 @@ export const freightsResource: ResourceConfig = {
     { api: 'date', db: 'date' },
     { api: 'route', db: 'route' },
     { api: 'amount', db: 'amount', type: 'number' },
+    { api: 'hasCargo', db: 'has_carga' },
   ],
 };
