@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Edit2, Filter, Loader2, MapPinned, PackagePlus, Route, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Edit2, Filter, Loader2, MapPinned, PackagePlus, Plus, Route, Search, Trash2 } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
@@ -70,12 +69,10 @@ function getFreightFormErrors(
 }
 
 export default function Freights() {
-  const navigate = useNavigate();
   const { userProfile } = useFirebase();
   const canCreate = canAccess(userProfile, 'freights', 'create');
   const canUpdate = canAccess(userProfile, 'freights', 'update');
   const canDelete = canAccess(userProfile, 'freights', 'delete');
-  const canReadCargas = canAccess(userProfile, 'cargas', 'read');
   const canCreateCargas = canAccess(userProfile, 'cargas', 'create');
   const [freights, setFreights] = useState<Freight[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -522,18 +519,8 @@ export default function Freights() {
                         {freight.billingType === 'contract_recurring' ? 'Sem receita por viagem' : 'Receita no frete'}
                       </p>
                     </div>
-                    {(canUpdate || canDelete || canReadCargas || canCreateCargas) && (
+                    {(canUpdate || canDelete || canCreateCargas) && (
                       <div className="flex items-center gap-2">
-                        {canReadCargas && freight.hasCargo !== false ? (
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/cargas?freightId=${freight.id}`)}
-                            className="rounded-full p-2 text-outline transition-colors hover:bg-surface-container hover:text-on-surface"
-                            aria-label={`Ver cargas do frete ${freight.route}`}
-                          >
-                            <Search className="h-5 w-5" />
-                          </button>
-                        ) : null}
                         {canCreateCargas && freight.hasCargo !== false ? (
                           <button
                             type="button"
@@ -571,7 +558,7 @@ export default function Freights() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <FieldLabel required>Tipo de frete</FieldLabel>
               <CustomSelect
                 value={formData.freightType}
@@ -592,6 +579,21 @@ export default function Freights() {
                 ]}
               />
             </div>
+
+            {showOperationalFields && (
+              <div className="space-y-2">
+                <FieldLabel required>Possui cargas?</FieldLabel>
+                <CustomSelect
+                  value={formData.hasCargo}
+                  onChange={(value) => updateField('hasCargo', value)}
+                  error={fieldErrors.hasCargo}
+                  options={[
+                    { value: 'true', label: 'Sim' },
+                    { value: 'false', label: 'Nao' },
+                  ]}
+                />
+              </div>
+            )}
 
             {formData.freightType === 'contract' && (
               <div className="space-y-2 md:col-span-2">
@@ -622,19 +624,6 @@ export default function Freights() {
 
             {showOperationalFields && (
               <>
-                <div className="space-y-2 md:col-span-2">
-                  <FieldLabel required>Possui cargas?</FieldLabel>
-                  <CustomSelect
-                    value={formData.hasCargo}
-                    onChange={(value) => updateField('hasCargo', value)}
-                    error={fieldErrors.hasCargo}
-                    options={[
-                      { value: 'true', label: 'Sim' },
-                      { value: 'false', label: 'Nao' },
-                    ]}
-                  />
-                </div>
-
                 <div className="space-y-2">
                   <FieldLabel required>Placa</FieldLabel>
                   <CustomSelect
@@ -774,7 +763,7 @@ function Field({
       error={error}
       onChange={(event) => onChange(event.target.value)}
       containerClassName={containerClassName}
-      className="rounded-xl bg-surface-container"
+      className="rounded-xl"
     />
   );
 }

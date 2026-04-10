@@ -49,10 +49,7 @@ export default function FormDatePicker({
 
   return (
     <div ref={rootRef} className="space-y-2">
-      <FieldLabel required={required} className="flex items-center gap-2">
-        <Icon className="h-3 w-3" />
-        {label}
-      </FieldLabel>
+      <FieldLabel required={required}>{label}</FieldLabel>
 
       <div className="relative">
         <button
