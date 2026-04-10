@@ -70,9 +70,9 @@ test('freights expoe CRUD completo com serializer e guardas de recurso', () => {
   assert.match(freightsControllerSource, /router\.post\('\/freights'/);
   assert.match(freightsControllerSource, /router\.put\('\/freights\/:id'/);
   assert.match(freightsControllerSource, /router\.delete\('\/freights\/:id'/);
-  assert.match(freightsControllerSource, /serializeFreights\(await listResourcesByConfig\(freightsResource, req\.auth\)\)/);
-  assert.match(freightsControllerSource, /serializeFreight\(await createResourceByConfig\('freights'/);
-  assert.match(freightsControllerSource, /const deleted = await removeResourceByConfig\('freights'/);
+  assert.match(freightsControllerSource, /serializeFreights\(await listFreights\(req\.auth\)\)/);
+  assert.match(freightsControllerSource, /serializeFreight\(await createFreight\(req\.auth, req\.body\)\)/);
+  assert.match(freightsControllerSource, /const deleted = await deleteFreight\(req\.auth, req\.params\.id\)/);
 });
 
 test('cargas expoe CRUD proprio e listagem por frete com guardas consistentes', () => {
