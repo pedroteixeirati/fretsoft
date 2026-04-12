@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, Bell, ChevronDown, LogOut, Settings, User as UserIcon } from 'lucide-react';
+import { Search, Bell, ChevronDown, LogOut, Menu, Settings, User as UserIcon } from 'lucide-react';
 import { NavItem } from '../types';
 import { useAuth } from '../features/auth/hooks/useAuth';
 import { logout } from '../firebase';
@@ -7,9 +7,10 @@ import { canAccess } from '../lib/permissions';
 
 interface TopBarProps {
   onNavigate: (item: NavItem) => void;
+  onToggleSidebar: () => void;
 }
 
-export default function TopBar({ onNavigate }: TopBarProps) {
+export default function TopBar({ onNavigate, onToggleSidebar }: TopBarProps) {
   const { user, userProfile } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
@@ -66,19 +67,27 @@ export default function TopBar({ onNavigate }: TopBarProps) {
   };
 
   return (
-    <header className="fixed top-0 right-0 left-64 h-16 z-40 bg-surface/80 backdrop-blur-md flex items-center justify-between px-8 border-none">
-      <div className="flex items-center gap-8">
+    <header className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-none bg-surface/80 px-4 backdrop-blur-md sm:px-6 lg:left-64 lg:px-8">
+      <div className="flex items-center gap-3 sm:gap-6 lg:gap-8">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container lg:hidden"
+          aria-label="Abrir menu de navegacao"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <input 
             type="text" 
             placeholder="Buscar frota..." 
-            className="bg-surface-container rounded-full py-1.5 pl-10 pr-4 text-xs focus:ring-2 focus:ring-primary outline-none w-64 transition-all border-none"
+            className="w-40 rounded-full border-none bg-surface-container py-1.5 pl-10 pr-4 text-xs outline-none transition-all focus:ring-2 focus:ring-primary sm:w-56 lg:w-64"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {user && (
           <div className="relative" ref={userMenuRef}>
             <button
@@ -86,7 +95,7 @@ export default function TopBar({ onNavigate }: TopBarProps) {
               onClick={() => setIsUserMenuOpen((current) => !current)}
               className="flex items-center gap-3 rounded-full border border-outline-variant/60 bg-surface-container-lowest px-2.5 py-1.5 shadow-sm transition-colors hover:bg-surface-container"
             >
-              <div className="hidden text-right lg:block">
+              <div className="hidden text-right xl:block">
                 <p className="text-xs font-bold leading-none text-on-surface">{displayName}</p>
                 <p className="mt-1 text-[10px] uppercase tracking-wider text-on-surface-variant">
                   {userProfile?.tenantName || 'Conta da plataforma'}
@@ -174,7 +183,7 @@ export default function TopBar({ onNavigate }: TopBarProps) {
             )}
           </div>
         )}
-        <button className="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+        <button className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container">
           <Bell className="w-5 h-5" />
         </button>
       </div>

@@ -38,27 +38,27 @@ function getValuePresentation(value: string | number) {
 
   if (isCurrency) {
     return {
-      sizeClass: 'text-[1.85rem] xl:text-[2rem]',
+      sizeClass: 'text-[1.45rem] sm:text-[1.65rem] xl:text-[2rem]',
       trackingClass: 'tracking-[-0.035em]',
     };
   }
 
   if (isDateLike) {
     return {
-      sizeClass: 'text-[1.45rem] xl:text-[1.55rem]',
+      sizeClass: 'text-[1.1rem] sm:text-[1.25rem] xl:text-[1.55rem]',
       trackingClass: 'tracking-[-0.02em]',
     };
   }
 
   if (isShortNumeric) {
     return {
-      sizeClass: 'text-[2.5rem] xl:text-[2.7rem]',
+      sizeClass: 'text-[2rem] sm:text-[2.2rem] xl:text-[2.7rem]',
       trackingClass: 'tracking-[-0.05em]',
     };
   }
 
   return {
-    sizeClass: 'text-[1.7rem] xl:text-[1.85rem]',
+    sizeClass: 'text-[1.35rem] sm:text-[1.5rem] xl:text-[1.85rem]',
     trackingClass: 'tracking-[-0.03em]',
   };
 }
@@ -175,24 +175,24 @@ export default function KpiCard({
   const styles = toneStyles[resolvedTone];
   const valuePresentation = getValuePresentation(value);
   const currencyParts = getCurrencyParts(value);
-  const cardHeightClass = currencyParts ? 'min-h-[138px]' : 'min-h-[128px]';
+  const cardHeightClass = currencyParts ? 'min-h-[118px] sm:min-h-[126px] xl:min-h-[138px]' : 'min-h-[108px] sm:min-h-[118px] xl:min-h-[128px]';
   const iconSizeClass = getKpiIconSizeClass(label);
 
   return (
-    <article className={cn('flex flex-col rounded-[1.75rem] border px-6 py-4 shadow-sm', cardHeightClass, styles.card, className)}>
-      <div className="mb-2.5 flex items-center justify-between gap-4">
-        <h3 className="min-w-0 flex-1 truncate text-[1rem] font-medium leading-none text-on-surface">{label}</h3>
-        <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl', styles.iconBox)}>
+    <article className={cn('flex flex-col rounded-[1.5rem] border px-4 py-3 shadow-sm sm:px-5 sm:py-4 xl:rounded-[1.75rem] xl:px-6', cardHeightClass, styles.card, className)}>
+      <div className="mb-2 flex items-center justify-between gap-3 sm:mb-2.5 sm:gap-4">
+        <h3 className="min-w-0 flex-1 truncate text-[0.9rem] font-medium leading-none text-on-surface sm:text-[1rem]">{label}</h3>
+        <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl sm:h-10 sm:w-10', styles.iconBox)}>
           <Icon className={cn(iconSizeClass, styles.icon)} />
         </span>
       </div>
-      <div className="mt-0.5">
+      <div className="mt-0.5 min-w-0">
         {currencyParts ? (
-          <div className="flex min-w-0 items-baseline gap-2">
-            <span className="shrink-0 text-[0.95rem] font-bold text-on-surface-variant">{currencyParts.prefix}</span>
+          <div className="flex min-w-0 items-baseline gap-1.5 sm:gap-2">
+            <span className="shrink-0 text-[0.82rem] font-bold text-on-surface-variant sm:text-[0.95rem]">{currencyParts.prefix}</span>
             <p
               className={cn(
-                'min-w-0 whitespace-nowrap font-black leading-[0.92] text-on-surface',
+                'min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-black leading-[0.92] text-on-surface',
                 valuePresentation.sizeClass,
                 valuePresentation.trackingClass,
                 valueClassName,
@@ -204,7 +204,7 @@ export default function KpiCard({
         ) : (
           <p
             className={cn(
-              'whitespace-nowrap font-black leading-[0.92] text-on-surface',
+              'overflow-hidden text-ellipsis whitespace-nowrap font-black leading-[0.92] text-on-surface',
               valuePresentation.sizeClass,
               valuePresentation.trackingClass,
               valueClassName,
@@ -213,7 +213,7 @@ export default function KpiCard({
             {value}
           </p>
         )}
-        {helperText && <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-on-surface-variant">{helperText}</p>}
+        {helperText && <p className="mt-1 text-[10px] font-medium leading-relaxed text-on-surface-variant sm:mt-1.5 sm:text-[11px]">{helperText}</p>}
       </div>
     </article>
   );

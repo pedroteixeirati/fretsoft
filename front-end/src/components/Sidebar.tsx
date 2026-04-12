@@ -15,6 +15,7 @@ import {
   BriefcaseBusiness,
   FolderKanban,
   WalletCards,
+  X,
 } from 'lucide-react';
 import { NavItem } from '../types';
 import { cn } from '../lib/utils';
@@ -24,9 +25,11 @@ import { canAccess } from '../lib/permissions';
 interface SidebarProps {
   activeItem: NavItem;
   onNavigate: (item: NavItem) => void;
+  isMobileOpen: boolean;
+  onRequestClose: () => void;
 }
 
-export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
+export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onRequestClose }: SidebarProps) {
   const { userProfile } = useFirebase();
 
   const sections = [
@@ -112,8 +115,47 @@ export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
     }));
   };
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    if (isMobileOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+
+    document.body.style.overflow = '';
+    return undefined;
+  }, [isMobileOpen]);
+
   return (
-    <aside className="h-screen w-64 fixed left-0 top-0 sidebar-glass flex flex-col py-8 px-4 z-50 shadow-[32px_0_32px_rgba(26,28,21,0.06)] overflow-hidden">
+    <>
+      <button
+        type="button"
+        aria-label="Fechar menu de navegacao"
+        onClick={onRequestClose}
+        className={cn(
+          'fixed inset-0 z-40 bg-[rgba(26,28,21,0.28)] backdrop-blur-[1px] transition-opacity lg:hidden',
+          isMobileOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+        )}
+      />
+      <aside
+        className={cn(
+          'fixed left-0 top-0 z-50 flex h-screen w-[18rem] flex-col overflow-hidden sidebar-glass px-4 py-6 shadow-[32px_0_32px_rgba(26,28,21,0.06)] transition-transform duration-300 ease-out lg:w-64 lg:py-8',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        )}
+      >
+      <div className="mb-4 flex items-center justify-end lg:hidden">
+        <button
+          type="button"
+          onClick={onRequestClose}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container"
+          aria-label="Fechar menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
       <div className="px-4 mb-10 shrink-0">
         {userProfile?.tenantLogoUrl ? (
           <div className="flex h-28 items-center justify-start px-1">
@@ -170,7 +212,10 @@ export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
                         {section.items.map((item) => (
                           <button
                             key={item.id}
-                            onClick={() => onNavigate(item.id as NavItem)}
+                            onClick={() => {
+                              onNavigate(item.id as NavItem);
+                              onRequestClose();
+                            }}
                             className={cn(
                               'flex min-h-9 w-full items-center gap-2.5 rounded-full px-3.5 py-2 transition-all duration-300',
                               activeItem === item.id
@@ -193,6 +238,7 @@ export default function Sidebar({ activeItem, onNavigate }: SidebarProps) {
 
         <div className="mt-4 border-t border-outline-variant/10 pt-4 shrink-0" />
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

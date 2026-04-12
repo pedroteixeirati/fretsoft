@@ -52,10 +52,10 @@ describe('PayablesTable', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pagar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Em atraso' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Excluir' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Pagar' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Em atraso' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Excluir' })[0]);
 
     expect(onPay).toHaveBeenCalledWith('payable-1');
     expect(onMarkOverdue).toHaveBeenCalledWith('payable-1');
