@@ -13,6 +13,7 @@ const contractsControllerSource = readModule('back-end/modules/contracts/control
 const expensesControllerSource = readModule('back-end/modules/expenses/controllers/expenses.controller.ts');
 const freightsControllerSource = readModule('back-end/modules/freights/controllers/freights.controller.ts');
 const payablesControllerSource = readModule('back-end/modules/payables/controllers/payables.controller.ts');
+const providersControllerSource = readModule('back-end/modules/providers/controllers/providers.controller.ts');
 const resourcesControllerSource = readModule('back-end/modules/resources/controllers/resources.controller.ts');
 const revenuesControllerSource = readModule('back-end/modules/revenues/controllers/revenues.controller.ts');
 const tenantsControllerSource = readModule('back-end/modules/tenants/controllers/tenants.controller.ts');
@@ -31,6 +32,7 @@ test('app HTTP registra todos os routers principais da API', () => {
   assert.match(appSource, /app\.use\('\/api', freightsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', expensesRouter\)/);
   assert.match(appSource, /app\.use\('\/api', payablesRouter\)/);
+  assert.match(appSource, /app\.use\('\/api', providersRouter\)/);
   assert.match(appSource, /app\.use\('\/api\/revenues', revenuesRouter\)/);
   assert.match(appSource, /app\.use\('\/api', resourcesRouter\)/);
 });
@@ -114,8 +116,18 @@ test('payables expoe CRUD e acoes financeiras minimas com guardas consistentes',
   assert.match(payablesControllerSource, /Conta a pagar nao encontrada\./);
 });
 
-test('resources genericos cobrem vehicles providers e companies com CRUD seguro', () => {
-  assert.match(resourcesControllerSource, /new Set\(\['vehicles', 'providers', 'companies'\]\)/);
+test('providers expoe CRUD proprio com serializer e guardas consistentes', () => {
+  assert.match(providersControllerSource, /router\.get\('\/providers'/);
+  assert.match(providersControllerSource, /router\.post\('\/providers'/);
+  assert.match(providersControllerSource, /router\.put\('\/providers\/:id'/);
+  assert.match(providersControllerSource, /router\.delete\('\/providers\/:id'/);
+  assert.match(providersControllerSource, /serializeProviders\(await listProviders\(req\.auth\)\)/);
+  assert.match(providersControllerSource, /serializeProvider\(await createProvider\(req\.auth, req\.body as Record<string, unknown>\)\)/);
+  assert.match(providersControllerSource, /sendErrorResponse\(res, notFoundError\('Registro nao encontrado\.', 'provider_not_found'\)\)/);
+});
+
+test('resources genericos cobrem vehicles e companies com CRUD seguro', () => {
+  assert.match(resourcesControllerSource, /new Set\(\['vehicles', 'companies'\]\)/);
   assert.match(resourcesControllerSource, /router\.get\('\/:resourceName'/);
   assert.match(resourcesControllerSource, /router\.post\('\/:resourceName'/);
   assert.match(resourcesControllerSource, /router\.put\('\/:resourceName\/:id'/);
