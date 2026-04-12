@@ -1,4 +1,6 @@
 import type { FreightInput, FreightPayload } from '../dtos/freight.types';
+import type { AuthContext } from '../../auth/dtos/auth-context';
+import type { ResourcePermissions } from '../../../shared/authorization/permissions';
 import {
   isNonNegativeNumber,
   isPositiveNumber,
@@ -7,8 +9,40 @@ import {
   normalizeOptionalText,
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
-import { findTenantContractForFreight, findTenantVehicleForFreight } from '../repositories/freights.repository';
+import {
+  deleteTenantFreight,
+  findTenantContractForFreight,
+  findTenantVehicleForFreight,
+  insertTenantFreight,
+  listTenantFreights,
+  type FreightRow,
+  updateTenantFreight,
+} from '../repositories/freights.repository';
 import { freightErrors } from '../errors/freights.errors';
+import { deleteFreightRevenue, syncFreightRevenue } from '../../revenues/services/revenues.service';
+
+export const freightsPermissions: ResourcePermissions = {
+  read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],
+  create: ['dev', 'owner', 'admin', 'operational', 'driver'],
+  update: ['dev', 'owner', 'admin', 'operational', 'driver'],
+  delete: ['dev', 'owner', 'admin', 'operational'],
+};
+
+function mapFreightRow(row: FreightRow) {
+  return {
+    id: row.id,
+    displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
+    vehicleId: row.vehicle_id,
+    plate: row.plate,
+    contractId: row.contract_id,
+    contractName: row.contract_name || '',
+    billingType: row.billing_type,
+    date: row.date,
+    route: row.route,
+    amount: Number(row.amount || 0),
+    hasCargo: row.has_carga,
+  };
+}
 
 export async function validateFreightPayload(body: FreightInput, tenantId: string): Promise<FreightPayload> {
   const vehicleId = normalizeRequiredText(body.vehicleId);
@@ -64,4 +98,37 @@ export async function validateFreightPayload(body: FreightInput, tenantId: strin
     amount,
     hasCargo,
   };
+}
+
+export async function listFreights(auth?: AuthContext) {
+  if (!auth?.tenantId) return [];
+  const rows = await listTenantFreights(auth.tenantId);
+  return rows.map(mapFreightRow);
+}
+
+export async function createFreight(auth: AuthContext | undefined, body: FreightInput) {
+  const tenantId = auth?.tenantId || '';
+  const payload = await validateFreightPayload(body, tenantId);
+  const row = await insertTenantFreight(payload, tenantId, auth?.userId);
+  if (!row) return null;
+
+  await syncFreightRevenue(tenantId, row, auth?.userId);
+  return mapFreightRow(row);
+}
+
+export async function updateFreight(auth: AuthContext | undefined, id: string, body: FreightInput) {
+  const tenantId = auth?.tenantId || '';
+  const payload = await validateFreightPayload(body, tenantId);
+  const row = await updateTenantFreight(id, payload, tenantId, auth?.userId);
+  if (!row) return undefined;
+
+  await syncFreightRevenue(tenantId, row, auth?.userId);
+  return mapFreightRow(row);
+}
+
+export async function deleteFreight(auth: AuthContext | undefined, id: string) {
+  const tenantId = auth?.tenantId || '';
+  await deleteFreightRevenue(tenantId, id);
+  const deleted = await deleteTenantFreight(id, tenantId);
+  return Boolean(deleted);
 }

@@ -5,24 +5,24 @@ import { ensureAllowed } from '../../../shared/http/ensure-allowed';
 import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
-import { freightsResource } from '../freights.resource';
 import { serializeFreight, serializeFreights } from '../serializers/freights.serializer';
 import {
-  createResourceByConfig,
-  listResourcesByConfig,
-  removeResourceByConfig,
-  updateResourceByConfig,
-} from '../../resources/services/resources.service';
+  createFreight,
+  deleteFreight,
+  freightsPermissions,
+  listFreights,
+  updateFreight,
+} from '../services/freights.service';
 
 const router = express.Router();
 
 router.get('/freights', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('read', freightsResource.permissions, req.auth?.role), 'Sem permissao para visualizar este recurso.')) {
+    if (!ensureAllowed(res, canPerform('read', freightsPermissions, req.auth?.role), 'Sem permissao para visualizar este recurso.')) {
       return;
     }
 
-    res.json(serializeFreights(await listResourcesByConfig(freightsResource, req.auth)));
+    res.json(serializeFreights(await listFreights(req.auth)));
   } catch (error) {
     next(error);
   }
@@ -30,11 +30,11 @@ router.get('/freights', loadAuthContext, async (req: AuthenticatedRequest, res, 
 
 router.post('/freights', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('create', freightsResource.permissions, req.auth?.role), 'Sem permissao para criar neste recurso.')) {
+    if (!ensureAllowed(res, canPerform('create', freightsPermissions, req.auth?.role), 'Sem permissao para criar neste recurso.')) {
       return;
     }
 
-    res.status(201).json(serializeFreight(await createResourceByConfig('freights', freightsResource, req.auth, req.body as Record<string, unknown>) as Record<string, unknown>));
+    res.status(201).json(serializeFreight(await createFreight(req.auth, req.body)));
   } catch (error) {
     next(error);
   }
@@ -42,11 +42,11 @@ router.post('/freights', loadAuthContext, async (req: AuthenticatedRequest, res,
 
 router.put('/freights/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('update', freightsResource.permissions, req.auth?.role), 'Sem permissao para editar este recurso.')) {
+    if (!ensureAllowed(res, canPerform('update', freightsPermissions, req.auth?.role), 'Sem permissao para editar este recurso.')) {
       return;
     }
 
-    const updated = await updateResourceByConfig('freights', freightsResource, req.auth, req.params.id, req.body as Record<string, unknown>);
+    const updated = await updateFreight(req.auth, req.params.id, req.body);
     if (updated === undefined) {
       sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'freight_not_found'));
       return;
@@ -60,11 +60,11 @@ router.put('/freights/:id', loadAuthContext, async (req: AuthenticatedRequest, r
 
 router.delete('/freights/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (!ensureAllowed(res, canPerform('delete', freightsResource.permissions, req.auth?.role), 'Sem permissao para excluir este recurso.')) {
+    if (!ensureAllowed(res, canPerform('delete', freightsPermissions, req.auth?.role), 'Sem permissao para excluir este recurso.')) {
       return;
     }
 
-    const deleted = await removeResourceByConfig('freights', freightsResource, req.auth, req.params.id);
+    const deleted = await deleteFreight(req.auth, req.params.id);
     if (!deleted) {
       sendErrorResponse(res, notFoundError('Registro nao encontrado.', 'freight_not_found'));
       return;
