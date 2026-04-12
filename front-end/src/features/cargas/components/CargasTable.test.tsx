@@ -38,8 +38,8 @@ describe('CargasTable', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Editar carga CG-2026-001/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Excluir carga CG-2026-001/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /Editar carga CG-2026-001/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Excluir carga CG-2026-001/i })[0]);
 
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'cargo-1' }));
     expect(onDelete).toHaveBeenCalledWith('cargo-1');

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 import Sidebar from '../../components/Sidebar';
@@ -9,6 +9,7 @@ export default function PrivateLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { userProfile } = useAuth();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const activeItem = useMemo(() => getNavItemFromPath(location.pathname), [location.pathname]);
   const effectiveItem = useMemo(() => {
@@ -24,11 +25,28 @@ export default function PrivateLayout() {
     return <Navigate to={getFirstAllowedPath(userProfile)} replace />;
   }
 
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [location.pathname]);
+
+  const handleNavigate = (item: Parameters<typeof getPathFromNavItem>[0]) => {
+    setIsMobileSidebarOpen(false);
+    navigate(getPathFromNavItem(item));
+  };
+
   return (
     <div className="min-h-screen bg-surface">
-      <Sidebar activeItem={effectiveItem} onNavigate={(item) => navigate(getPathFromNavItem(item))} />
-      <TopBar onNavigate={(item) => navigate(getPathFromNavItem(item))} />
-      <main className="ml-64 px-10 pb-12 pt-24">
+      <Sidebar
+        activeItem={effectiveItem}
+        onNavigate={handleNavigate}
+        isMobileOpen={isMobileSidebarOpen}
+        onRequestClose={() => setIsMobileSidebarOpen(false)}
+      />
+      <TopBar
+        onNavigate={handleNavigate}
+        onToggleSidebar={() => setIsMobileSidebarOpen((current) => !current)}
+      />
+      <main className="px-4 pb-10 pt-20 sm:px-6 md:px-8 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-24">
         <div className="mx-auto max-w-7xl">
           <Outlet />
         </div>

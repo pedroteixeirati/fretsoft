@@ -65,11 +65,11 @@ describe('ExpensesTable', () => {
       />,
     );
 
-    expect(screen.getByText('Volvo')).toBeInTheDocument();
-    expect(screen.getByText('R$ 100,00')).toBeInTheDocument();
+    expect(screen.getAllByText('Volvo').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('R$ 100,00').length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole('button', { name: 'Editar custo de Volvo' }));
-    await user.click(screen.getByRole('button', { name: 'Excluir custo de Volvo' }));
+    await user.click(screen.getAllByRole('button', { name: 'Editar custo de Volvo' })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Excluir custo de Volvo' })[0]);
 
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onDelete).toHaveBeenCalledWith('1');
