@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Edit2, Loader2, Trash2 } from 'lucide-react';
 import { Expense } from '../types/expense.types';
+import { formatDateOnlyPtBr } from '../../../lib/date';
 import { cn } from '../../../lib/utils';
 
 interface ExpensesTableProps {
@@ -55,7 +56,7 @@ export default function ExpensesTable({
               expenses.map((expense) => (
                 <tr key={expense.id} className="group transition-colors hover:bg-primary-fixed-dim/5">
                   <td className="px-6 py-5">
-                    <div className="text-sm font-semibold text-on-surface">{new Date(expense.date).toLocaleDateString('pt-BR')}</div>
+                    <div className="text-sm font-semibold text-on-surface">{formatDateOnlyPtBr(expense.date)}</div>
                     <div className="text-xs text-on-surface-variant">{expense.time}</div>
                   </td>
                   <td className="px-6 py-5">

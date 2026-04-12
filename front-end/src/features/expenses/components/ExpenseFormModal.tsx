@@ -4,7 +4,7 @@ import Modal from '../../../components/Modal';
 import CustomSelect from '../../../components/CustomSelect';
 import { cn } from '../../../lib/utils';
 import { FormFieldErrors } from '../../../lib/errors';
-import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
+import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRenderableFieldErrors, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
 import { Vehicle } from '../../vehicles/types/vehicle.types';
 import { Provider } from '../../providers/types/provider.types';
 import { expenseCategoryOptions } from '../constants/expense-options';
@@ -202,7 +202,7 @@ export default function ExpenseFormModal({
   onChange,
   onClearFieldError,
 }: ExpenseFormModalProps) {
-  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const hasFieldErrors = hasRenderableFieldErrors(fieldErrors);
   const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
   const canSubmit = hasRequiredFieldsFilled(formData, [
     'date',

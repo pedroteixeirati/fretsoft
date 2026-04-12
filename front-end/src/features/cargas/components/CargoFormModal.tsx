@@ -2,7 +2,7 @@ import React from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import Modal from '../../../components/Modal';
-import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
+import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRenderableFieldErrors, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
 import Input from '../../../shared/ui/Input';
 import { Company } from '../../companies/types/company.types';
 import { Freight } from '../../freights/types/freight.types';
@@ -20,7 +20,7 @@ interface CargoFormModalProps {
   companies: Company[];
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
-  onChange: (next: CargoFormData) => void;
+  onChange: React.Dispatch<React.SetStateAction<CargoFormData>>;
   onClearFieldError: (field: CargoFormField) => void;
   freightLocked?: boolean;
 }
@@ -48,7 +48,7 @@ export default function CargoFormModal({
   onClearFieldError,
   freightLocked = false,
 }: CargoFormModalProps) {
-  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
+  const hasFieldErrors = hasRenderableFieldErrors(fieldErrors);
   const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
   const canSubmit = hasRequiredFieldsFilled(formData, ['freightId', 'companyId', 'description', 'cargoType', 'origin', 'destination', 'status']);
   const { formRef, alertRef } = useFormErrorFocus({
@@ -71,7 +71,7 @@ export default function CargoFormModal({
               value={formData.freightId}
               onChange={(value) => {
                 onClearFieldError('freightId');
-                onChange({ ...formData, freightId: value });
+                onChange((current) => ({ ...current, freightId: value }));
               }}
               error={fieldErrors.freightId}
               disabled={freightLocked}
@@ -89,7 +89,7 @@ export default function CargoFormModal({
               value={formData.companyId}
               onChange={(value) => {
                 onClearFieldError('companyId');
-                onChange({ ...formData, companyId: value });
+                onChange((current) => ({ ...current, companyId: value }));
               }}
               error={fieldErrors.companyId}
               placeholder="Selecione um cliente"
@@ -107,7 +107,7 @@ export default function CargoFormModal({
             error={fieldErrors.cargoNumber}
             onChange={(event) => {
               onClearFieldError('cargoNumber');
-              onChange({ ...formData, cargoNumber: event.target.value });
+              onChange((current) => ({ ...current, cargoNumber: event.target.value }));
             }}
             placeholder="Ex: CG-2026-001"
           />
@@ -120,7 +120,7 @@ export default function CargoFormModal({
             error={fieldErrors.cargoType}
             onChange={(event) => {
               onClearFieldError('cargoType');
-              onChange({ ...formData, cargoType: event.target.value });
+              onChange((current) => ({ ...current, cargoType: event.target.value }));
             }}
             placeholder="Ex: Alimentos refrigerados"
           />
@@ -134,7 +134,7 @@ export default function CargoFormModal({
             error={fieldErrors.description}
             onChange={(event) => {
               onClearFieldError('description');
-              onChange({ ...formData, description: event.target.value });
+              onChange((current) => ({ ...current, description: event.target.value }));
             }}
             placeholder="Resumo da mercadoria transportada"
           />
@@ -147,7 +147,7 @@ export default function CargoFormModal({
             error={fieldErrors.origin}
             onChange={(event) => {
               onClearFieldError('origin');
-              onChange({ ...formData, origin: event.target.value });
+              onChange((current) => ({ ...current, origin: event.target.value }));
             }}
             placeholder="Cidade/UF de origem"
           />
@@ -160,7 +160,7 @@ export default function CargoFormModal({
             error={fieldErrors.destination}
             onChange={(event) => {
               onClearFieldError('destination');
-              onChange({ ...formData, destination: event.target.value });
+              onChange((current) => ({ ...current, destination: event.target.value }));
             }}
             placeholder="Cidade/UF de destino"
           />
@@ -175,7 +175,7 @@ export default function CargoFormModal({
             error={fieldErrors.weight}
             onChange={(event) => {
               onClearFieldError('weight');
-              onChange({ ...formData, weight: event.target.value });
+              onChange((current) => ({ ...current, weight: event.target.value }));
             }}
           />
 
@@ -189,7 +189,7 @@ export default function CargoFormModal({
             error={fieldErrors.volume}
             onChange={(event) => {
               onClearFieldError('volume');
-              onChange({ ...formData, volume: event.target.value });
+              onChange((current) => ({ ...current, volume: event.target.value }));
             }}
           />
 
@@ -203,7 +203,7 @@ export default function CargoFormModal({
             error={fieldErrors.unitCount}
             onChange={(event) => {
               onClearFieldError('unitCount');
-              onChange({ ...formData, unitCount: event.target.value });
+              onChange((current) => ({ ...current, unitCount: event.target.value }));
             }}
           />
 
@@ -217,7 +217,7 @@ export default function CargoFormModal({
             error={fieldErrors.merchandiseValue}
             onChange={(event) => {
               onClearFieldError('merchandiseValue');
-              onChange({ ...formData, merchandiseValue: event.target.value });
+              onChange((current) => ({ ...current, merchandiseValue: event.target.value }));
             }}
           />
 
@@ -227,7 +227,7 @@ export default function CargoFormModal({
               value={formData.status}
               onChange={(value) => {
                 onClearFieldError('status');
-                onChange({ ...formData, status: value as CargoFormData['status'] });
+                onChange((current) => ({ ...current, status: value as CargoFormData['status'] }));
               }}
               error={fieldErrors.status}
               options={cargoStatusOptions}
@@ -240,7 +240,7 @@ export default function CargoFormModal({
             error={fieldErrors.scheduledDate}
             onChange={(value) => {
               onClearFieldError('scheduledDate');
-              onChange({ ...formData, scheduledDate: value });
+              onChange((current) => ({ ...current, scheduledDate: value }));
             }}
           />
 
@@ -250,7 +250,7 @@ export default function CargoFormModal({
             error={fieldErrors.deliveredAt}
             onChange={(value) => {
               onClearFieldError('deliveredAt');
-              onChange({ ...formData, deliveredAt: value });
+              onChange((current) => ({ ...current, deliveredAt: value }));
             }}
           />
 
@@ -264,7 +264,7 @@ export default function CargoFormModal({
               aria-invalid={Boolean(fieldErrors.notes)}
               onChange={(event) => {
                 onClearFieldError('notes');
-                onChange({ ...formData, notes: event.target.value });
+                onChange((current) => ({ ...current, notes: event.target.value }));
               }}
               className={`w-full rounded-2xl bg-surface px-4 py-3.5 text-on-surface outline-none ring-1 transition-all placeholder:text-on-surface-variant/65 ${
                 fieldErrors.notes ? 'ring-error/35 focus:ring-error/20' : 'ring-primary/5 focus:ring-2 focus:ring-primary/20'

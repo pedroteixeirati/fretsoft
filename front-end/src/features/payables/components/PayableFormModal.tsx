@@ -2,7 +2,7 @@ import React from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import Modal from '../../../components/Modal';
-import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
+import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRenderableFieldErrors, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
 import Input from '../../../shared/ui/Input';
 import { FormFieldErrors } from '../../../lib/errors';
 import { Company } from '../../companies/types/company.types';
@@ -39,7 +39,7 @@ export default function PayableFormModal({
   onChange,
   onClearFieldError,
 }: PayableFormModalProps) {
-  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const hasFieldErrors = hasRenderableFieldErrors(fieldErrors);
   const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
   const canSubmit = hasRequiredFieldsFilled(formData, [
     'description',

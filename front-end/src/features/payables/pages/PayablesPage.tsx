@@ -3,6 +3,7 @@ import { NavItem } from '../../../shared/types/common.types';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { canAccess } from '../../../lib/permissions';
 import { getErrorMessage } from '../../../lib/errors';
+import { clearFieldError } from '../../../shared/forms';
 import { usePayablesQuery } from '../hooks/usePayablesQuery';
 import { usePayableMutations } from '../hooks/usePayableMutations';
 import { usePayableForm } from '../hooks/usePayableForm';
@@ -239,7 +240,7 @@ export default function PayablesPage({ onNavigate }: PayablesPageProps) {
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}
-        onClearFieldError={(field) => setFieldErrors((current) => ({ ...current, [field]: undefined }))}
+        onClearFieldError={(field) => setFieldErrors((current) => clearFieldError(current, field))}
       />
     </div>
   );

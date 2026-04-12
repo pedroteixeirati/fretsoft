@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import authRouter from '../../../modules/auth/controllers/auth.controller';
+import companiesRouter from '../../../modules/companies/controllers/companies.controller';
 import contractsRouter from '../../../modules/contracts/controllers/contracts.controller';
 import cargasRouter from '../../../modules/cargas/controllers/cargas.controller';
 import expensesRouter from '../../../modules/expenses/controllers/expenses.controller';
@@ -26,6 +27,7 @@ app.use('/api', authRouter);
 app.use('/api', tenantsRouter);
 app.use('/api', usersRouter);
 app.use('/api', vehiclesRouter);
+app.use('/api', companiesRouter);
 app.use('/api', contractsRouter);
 app.use('/api', cargasRouter);
 app.use('/api', freightsRouter);

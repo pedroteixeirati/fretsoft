@@ -3,6 +3,7 @@ import { Building2, ChevronLeft, ChevronRight, FileText, Filter, Loader2, MoreVe
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import { revenuesApi } from '../lib/api';
+import { formatDateOnlyPtBr } from '../lib/date';
 import { Revenue } from '../types';
 
 function currency(value: number) {
@@ -215,7 +216,7 @@ export default function Revenues() {
                   <tr key={revenue.id} className="hover:bg-primary-fixed-dim/5 transition-colors">
                     <td className="px-6 py-5">
                       <div className="text-sm font-semibold text-on-surface">
-                        {new Date(`${revenue.dueDate}T00:00:00`).toLocaleDateString('pt-BR')}
+                        {formatDateOnlyPtBr(revenue.dueDate)}
                       </div>
                       <div className="text-xs text-on-surface-variant">
                         {revenue.chargeReference ? `Ref: ${revenue.chargeReference}` : revenue.competenceLabel}

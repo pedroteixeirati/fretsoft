@@ -9,7 +9,7 @@ import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/erro
 import { canAccess } from '../lib/permissions';
 import { formatPhone, isValidEmail } from '../lib/validation';
 import { Provider } from '../types';
-import { FieldLabel, FormAlert, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import { clearFieldError, FieldLabel, FormAlert, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
 import Input from '../shared/ui/Input';
 
 const initialFormData = {
@@ -106,10 +106,7 @@ export default function Suppliers() {
   const updateField = (field: SupplierFormField, value: string) => {
     setFieldErrors((current) => {
       if (!current[field]) return current;
-      return {
-        ...current,
-        [field]: undefined,
-      };
+      return clearFieldError(current, field);
     });
     setFormData((current) => ({ ...current, [field]: value }));
   };

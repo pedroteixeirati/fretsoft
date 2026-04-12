@@ -5,6 +5,7 @@ import { canAccess } from '../../../lib/permissions';
 import { getErrorMessage } from '../../../lib/errors';
 import { NavItem } from '../../../shared/types/common.types';
 import { useFirebase } from '../../../context/FirebaseContext';
+import { clearFieldError } from '../../../shared/forms';
 import { useExpenseMutations } from '../hooks/useExpenseMutations';
 import { useExpensesQuery } from '../hooks/useExpensesQuery';
 import { ExpenseFormField, useExpenseForm } from '../hooks/useExpenseForm';
@@ -212,7 +213,7 @@ export default function ExpensesPage({ onNavigate }: ExpensesPageProps) {
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}
-        onClearFieldError={(field) => setFieldErrors((current) => ({ ...current, [field]: undefined }))}
+        onClearFieldError={(field) => setFieldErrors((current) => clearFieldError(current, field))}
       />
 
       <ExpensesInsights aiLoading={aiLoading} aiSummary={aiSummary} onNavigate={onNavigate} />

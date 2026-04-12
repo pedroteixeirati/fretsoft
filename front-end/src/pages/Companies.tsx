@@ -9,7 +9,7 @@ import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/erro
 import { canAccess } from '../lib/permissions';
 import { formatCnpj, formatCpf, formatPhone, isValidCnpj, isValidCpf, isValidEmail, isValidStateCode } from '../lib/validation';
 import { Company } from '../types';
-import { FieldLabel, FormAlert, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import { clearFieldError, FieldLabel, FormAlert, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
 import Input from '../shared/ui/Input';
 
 const initialFormData = {
@@ -170,10 +170,7 @@ export default function Companies() {
   const updateField = (field: CompanyFormField, value: string) => {
     setFieldErrors((current) => {
       if (!current[field]) return current;
-      return {
-        ...current,
-        [field]: undefined,
-      };
+      return clearFieldError(current, field);
     });
     setFormData((current) => ({ ...current, [field]: value }));
   };

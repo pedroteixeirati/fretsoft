@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Edit2, Filter, Loader2, MapPinned, PackagePlus, Route, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Edit2, Filter, Loader2, MapPinned, PackagePlus, Plus, Route, Search, Trash2 } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
@@ -9,11 +9,12 @@ import CargoFormModal from '../features/cargas/components/CargoFormModal';
 import { useCargoForm } from '../features/cargas/hooks/useCargoForm';
 import { useCargoMutations } from '../features/cargas/hooks/useCargoMutations';
 import { contractsApi, freightsApi, vehiclesApi, cargasApi, companiesApi } from '../lib/api';
+import { formatDateOnlyPtBr } from '../lib/date';
 import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
 import { isValidDateInput } from '../lib/validation';
 import { Cargo, Company, Contract, Freight, Vehicle } from '../types';
-import { FieldLabel, FormAlert, FormDatePicker, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import { clearFieldError, FieldLabel, FormAlert, FormDatePicker, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
 import Input from '../shared/ui/Input';
 
 const initialFormData = {
@@ -211,10 +212,7 @@ export default function Freights() {
   const updateField = (field: FreightFormField, value: string) => {
     setFieldErrors((current) => {
       if (!current[field]) return current;
-      return {
-        ...current,
-        [field]: undefined,
-      };
+      return clearFieldError(current, field);
     });
     setFormData((current) => ({ ...current, [field]: value }));
   };
@@ -446,7 +444,7 @@ export default function Freights() {
         <KpiCard label="Fretes lancados" value={freights.length.toString()} />
         <KpiCard label="Receita no frete" value={`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
         <KpiCard label="Viagens de contrato recorrente" value={recurringOperationalTrips.toString()} />
-        <KpiCard label="Ultimo frete" value={freights[0]?.date ? new Date(freights[0].date).toLocaleDateString('pt-BR') : '-'} />
+        <KpiCard label="Ultimo frete" value={freights[0]?.date ? formatDateOnlyPtBr(freights[0].date) : '-'} />
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -497,7 +495,7 @@ export default function Freights() {
                       </div>
                       <p className="text-xs text-on-secondary-container flex items-center gap-1 mt-1">
                         <CalendarDays className="w-3.5 h-3.5" />
-                        {new Date(freight.date).toLocaleDateString('pt-BR')}
+                        {formatDateOnlyPtBr(freight.date)}
                       </p>
                       <p className="text-[11px] text-on-surface-variant mt-1 inline-flex items-center gap-1">
                         <MapPinned className="w-3.5 h-3.5" />
@@ -709,9 +707,7 @@ export default function Freights() {
         onChange={setCargoFormData}
         onClearFieldError={(field) =>
           setCargoFieldErrors((current) => {
-            const next = { ...current };
-            delete next[field];
-            return next;
+            return clearFieldError(current, field);
           })
         }
       />

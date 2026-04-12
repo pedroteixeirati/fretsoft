@@ -3,6 +3,7 @@ import { getErrorMessage, resolveFieldError } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
 import { isValidDateInput, isValidPlate } from '../../../lib/validation';
 import { useFirebase } from '../../../context/FirebaseContext';
+import { clearFieldError } from '../../../shared/forms';
 import { useVehiclesQuery } from '../hooks/useVehiclesQuery';
 import { useVehicleMutations } from '../hooks/useVehicleMutations';
 import { useVehicleForm } from '../hooks/useVehicleForm';
@@ -180,7 +181,7 @@ export default function VehiclesPage() {
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}
-        onClearFieldError={(field) => setFieldErrors((current) => ({ ...current, [field]: undefined }))}
+        onClearFieldError={(field) => setFieldErrors((current) => clearFieldError(current, field))}
       />
     </div>
   );

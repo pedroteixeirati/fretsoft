@@ -35,6 +35,7 @@ test('repositorio de expenses consulta e persiste metadados financeiros na tabel
   assert.match(expensesRepositorySource, /insert into expenses[\s\S]*payment_required[\s\S]*financial_status[\s\S]*linked_payable_id/i);
   assert.match(expensesRepositorySource, /update expenses[\s\S]*payment_required = \$12[\s\S]*linked_payable_id = \$16/i);
   assert.match(expensesRepositorySource, /select id,[\s\S]*linked_payable_id,[\s\S]*receipt_url,[\s\S]*observations/i);
+  assert.doesNotMatch(expensesRepositorySource, /payload\.observations \|\| null/i);
 });
 
 test('custos operacionais agora orquestram payables diretamente no service do dominio', () => {

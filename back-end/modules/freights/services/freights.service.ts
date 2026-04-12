@@ -19,7 +19,8 @@ import {
   updateTenantFreight,
 } from '../repositories/freights.repository';
 import { freightErrors } from '../errors/freights.errors';
-import { deleteFreightRevenue, syncFreightRevenue } from '../../revenues/services/revenues.service';
+import { syncFreightRevenue } from '../../revenues/services/revenues.service';
+import { deleteFreightRevenue } from '../../revenues/repositories/revenues.repository';
 
 export const freightsPermissions: ResourcePermissions = {
   read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],

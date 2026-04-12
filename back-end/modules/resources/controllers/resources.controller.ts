@@ -14,7 +14,7 @@ import {
 } from '../services/resources.service';
 
 const router = express.Router();
-const supportedResources = new Set(['companies']);
+const supportedResources = new Set<string>([]);
 
 router.get('/:resourceName', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {

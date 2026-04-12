@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Payable } from '../types/payable.types';
+import { formatDateOnlyPtBr } from '../../../lib/date';
 
 interface PayablesTableProps {
   payables: Payable[];
@@ -103,11 +104,11 @@ export default function PayablesTable({
                   <tr key={payable.id} className="transition-colors hover:bg-primary-fixed-dim/5">
                     <td className="px-6 py-5">
                       <div className="text-sm font-semibold text-on-surface">
-                        {new Date(`${payable.dueDate}T00:00:00`).toLocaleDateString('pt-BR')}
+                        {formatDateOnlyPtBr(payable.dueDate)}
                       </div>
                       <div className="text-xs text-on-surface-variant">
                         {payable.paidAt
-                          ? `Pago em ${new Date(`${payable.paidAt}T00:00:00`).toLocaleDateString('pt-BR')}`
+                          ? `Pago em ${formatDateOnlyPtBr(payable.paidAt)}`
                           : 'Aguardando baixa'}
                       </div>
                     </td>

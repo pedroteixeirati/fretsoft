@@ -207,7 +207,7 @@ export async function insertTenantExpense(
       payload.contractId,
       payload.freightId,
       payload.receiptUrl || null,
-      payload.observations || null,
+      payload.observations,
     ]
   );
 
@@ -310,7 +310,7 @@ export async function updateTenantExpense(
       payload.contractId,
       payload.freightId,
       payload.receiptUrl || null,
-      payload.observations || null,
+      payload.observations,
       userId || null,
       id,
       tenantId,

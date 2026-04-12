@@ -7,7 +7,7 @@ import { useFirebase } from '../context/FirebaseContext';
 import { FormFieldErrors, resolveFieldError } from '../lib/errors';
 import { platformTenantsApi } from '../lib/api';
 import { canAccess } from '../lib/permissions';
-import { FieldLabel, FormAlert, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import { clearFieldError, FieldLabel, FormAlert, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
 import Input from '../shared/ui/Input';
 import { PlatformTenant } from '../types';
 
@@ -166,10 +166,7 @@ export default function PlatformTenants() {
   const updateField = (field: keyof typeof initialForm, value: string) => {
     setFieldErrors((current) => {
       if (!current[field as TenantFormField]) return current;
-      return {
-        ...current,
-        [field]: undefined,
-      };
+      return clearFieldError(current, field as TenantFormField);
     });
     setFormData((current) => ({ ...current, [field]: value }));
   };

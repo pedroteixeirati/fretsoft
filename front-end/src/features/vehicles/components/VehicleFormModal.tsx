@@ -3,7 +3,7 @@ import { Loader2, Plus } from 'lucide-react';
 import CustomSelect from '../../../components/CustomSelect';
 import Modal from '../../../components/Modal';
 import Input from '../../../shared/ui/Input';
-import { FieldLabel, FormAlert, FormDatePicker, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
+import { FieldLabel, FormAlert, FormDatePicker, hasRenderableFieldErrors, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
 import { VehicleFormData, VehicleFormField } from '../hooks/useVehicleForm';
 import { FormFieldErrors } from '../../../lib/errors';
 
@@ -32,7 +32,7 @@ export default function VehicleFormModal({
   onChange,
   onClearFieldError,
 }: VehicleFormModalProps) {
-  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const hasFieldErrors = hasRenderableFieldErrors(fieldErrors);
   const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
   const canSubmit = hasRequiredFieldsFilled(formData, ['name', 'plate', 'driver']);
   const { formRef, alertRef } = useFormErrorFocus({

@@ -7,3 +7,4 @@ export { default as FormFieldError } from './FormFieldError';
 export { default as FormDatePicker } from './FormDatePicker';
 export { default as FormInput } from './FormInput';
 export { default as FormSelect } from './FormSelect';
+export { hasRenderableFieldErrors, clearFieldError } from './fieldErrors';
