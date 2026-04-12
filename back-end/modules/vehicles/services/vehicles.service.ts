@@ -1,5 +1,14 @@
+import type { ResourcePermissions } from '../../../shared/authorization/permissions';
+import type { AuthContext } from '../../auth/dtos/auth-context';
 import { conflictError, validationError } from '../../../shared/errors/app-error';
 import { pool } from '../../../shared/infra/database/pool';
+import {
+  deleteTenantVehicle,
+  insertTenantVehicle,
+  listTenantVehicles,
+  type VehicleRow,
+  updateTenantVehicle,
+} from '../repositories/vehicles.repository';
 import {
   isNonNegativeNumber,
   isValidDate,
@@ -8,6 +17,27 @@ import {
   normalizePlate,
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
+
+export const vehiclesPermissions: ResourcePermissions = {
+  read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],
+  create: ['dev', 'owner', 'admin', 'operational'],
+  update: ['dev', 'owner', 'admin', 'operational'],
+  delete: ['dev', 'owner', 'admin', 'operational'],
+};
+
+function mapVehicleRow(row: VehicleRow) {
+  return {
+    id: row.id,
+    displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
+    name: row.name,
+    plate: row.plate,
+    driver: row.driver,
+    type: row.type,
+    km: Number(row.km || 0),
+    nextMaintenance: row.next_maintenance || '',
+    status: row.status,
+  };
+}
 
 export async function validateVehiclePayload(
   body: Record<string, unknown>,
@@ -43,4 +73,26 @@ export async function validateVehiclePayload(
   if (duplicate.rows[0]) throw conflictError('Ja existe um veiculo cadastrado com essa placa.', 'vehicle_plate_conflict', 'plate');
 
   return { name, plate, driver, type, km, nextMaintenance: nextMaintenance || '', status };
+}
+
+export async function listVehicles(auth?: AuthContext) {
+  const rows = await listTenantVehicles(auth?.tenantId);
+  return rows.map(mapVehicleRow);
+}
+
+export async function createVehicle(auth: AuthContext | undefined, body: Record<string, unknown>) {
+  const payload = await validateVehiclePayload(body, auth?.tenantId || '');
+  const row = await insertTenantVehicle(payload as Record<string, unknown>, auth?.tenantId, auth?.userId);
+  return row ? mapVehicleRow(row) : null;
+}
+
+export async function updateVehicle(auth: AuthContext | undefined, id: string, body: Record<string, unknown>) {
+  const payload = await validateVehiclePayload(body, auth?.tenantId || '', id);
+  const row = await updateTenantVehicle(id, payload as Record<string, unknown>, auth?.tenantId, auth?.userId);
+  return row ? mapVehicleRow(row) : undefined;
+}
+
+export async function deleteVehicle(auth: AuthContext | undefined, id: string) {
+  const row = await deleteTenantVehicle(id, auth?.tenantId);
+  return Boolean(row);
 }
