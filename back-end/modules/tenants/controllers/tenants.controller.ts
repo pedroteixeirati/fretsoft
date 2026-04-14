@@ -23,7 +23,8 @@ router.get('/tenant-profile', loadAuthContext, async (req: AuthenticatedRequest,
       return;
     }
 
-    const profile = await getTenantProfile(req.auth);
+    const tenantId = typeof req.query.tenantId === 'string' ? req.query.tenantId : undefined;
+    const profile = await getTenantProfile(req.auth, tenantId);
     if (!profile) {
       sendErrorResponse(res, notFoundError('Transportadora nao encontrada.', 'tenant_not_found'));
       return;
@@ -41,7 +42,8 @@ router.put('/tenant-profile', loadAuthContext, async (req: AuthenticatedRequest,
       return;
     }
 
-    const updated = await updateTenantProfile(req.auth, req.body as Record<string, string>);
+    const tenantId = typeof req.query.tenantId === 'string' ? req.query.tenantId : undefined;
+    const updated = await updateTenantProfile(req.auth, req.body as Record<string, string>, tenantId);
     if (!updated) {
       sendErrorResponse(res, notFoundError('Transportadora nao encontrada.', 'tenant_not_found'));
       return;

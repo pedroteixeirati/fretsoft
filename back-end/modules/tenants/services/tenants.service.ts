@@ -1,5 +1,5 @@
 import { adminAuth } from '../../../shared/infra/firebase/firebaseAdmin';
-import { conflictError, validationError } from '../../../shared/errors/app-error';
+import { conflictError, forbiddenError, validationError } from '../../../shared/errors/app-error';
 import { pool } from '../../../shared/infra/database/pool';
 import type { AppRole } from '../../../shared/authorization/permissions';
 import {
@@ -119,12 +119,36 @@ export function canCreatePlatformTenants(role?: AppRole) {
   return canManagePlatformTenants(role);
 }
 
-export async function getTenantProfile(auth?: AuthContext) {
-  const profile = await findTenantProfileById(auth?.tenantId);
+function resolveTenantProfileTarget(auth?: AuthContext, requestedTenantId?: string) {
+  const normalizedRequestedTenantId = requestedTenantId?.trim() || undefined;
+
+  if (!normalizedRequestedTenantId) {
+    return auth?.tenantId;
+  }
+
+  if (normalizedRequestedTenantId === auth?.tenantId) {
+    return normalizedRequestedTenantId;
+  }
+
+  if (auth?.role === 'dev') {
+    return normalizedRequestedTenantId;
+  }
+
+  throw forbiddenError('Sem permissao para acessar o perfil de outra transportadora.', 'tenant_profile_scope_forbidden');
+}
+
+export async function getTenantProfile(auth?: AuthContext, requestedTenantId?: string) {
+  const targetTenantId = resolveTenantProfileTarget(auth, requestedTenantId);
+  const profile = await findTenantProfileById(targetTenantId);
   return profile ? mapTenantProfile(profile) : null;
 }
 
-export async function updateTenantProfile(auth: AuthContext | undefined, body: Record<string, string>) {
+export async function updateTenantProfile(
+  auth: AuthContext | undefined,
+  body: Record<string, string>,
+  requestedTenantId?: string,
+) {
+  const targetTenantId = resolveTenantProfileTarget(auth, requestedTenantId);
   const {
     name,
     tradeName,
@@ -204,7 +228,7 @@ export async function updateTenantProfile(auth: AuthContext | undefined, body: R
     }
   }
 
-  const duplicateTenant = await findDuplicateTenantForUpdate(auth?.tenantId, normalizedSlug, normalizedCnpj);
+  const duplicateTenant = await findDuplicateTenantForUpdate(targetTenantId, normalizedSlug, normalizedCnpj);
   if (duplicateTenant) {
     throw conflictError(
       normalizedCnpj ? 'Ja existe outra transportadora com esse slug ou CNPJ.' : 'Ja existe outra transportadora com esse slug.',
@@ -244,7 +268,7 @@ export async function updateTenantProfile(auth: AuthContext | undefined, body: R
     city: normalizeOptionalText(city),
   };
 
-  const updated = await updateTenantProfileById(auth?.tenantId, auth?.userId, payload);
+  const updated = await updateTenantProfileById(targetTenantId, auth?.userId, payload);
   return updated ? mapTenantProfile(updated) : null;
 }
 

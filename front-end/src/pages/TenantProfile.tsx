@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Building2, ImagePlus, Loader2, MapPin, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import CustomSelect from '../components/CustomSelect';
 import { useFirebase } from '../context/FirebaseContext';
 import { tenantProfileApi } from '../lib/api';
 import { canAccess } from '../lib/permissions';
+import { lookupAddressByZipCode, normalizeZipCode } from '../shared/lib/cep';
 import { TenantProfile } from '../types';
 
 const emptyProfile: TenantProfile = {
@@ -40,8 +42,11 @@ const emptyProfile: TenantProfile = {
 
 export default function TenantProfilePage() {
   const { userProfile, refreshProfile } = useFirebase();
+  const [searchParams] = useSearchParams();
   const canUpdate = canAccess(userProfile, 'tenantProfile', 'update');
   const canManageBilling = userProfile?.role === 'dev';
+  const managedTenantId = canManageBilling ? searchParams.get('tenantId')?.trim() || '' : '';
+  const isManagingAnotherTenant = !!managedTenantId && managedTenantId !== userProfile?.tenantId;
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,6 +54,9 @@ export default function TenantProfilePage() {
   const [draft, setDraft] = useState<TenantProfile>(emptyProfile);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
+  const [zipCodeError, setZipCodeError] = useState('');
+  const [isLookingUpZipCode, setIsLookingUpZipCode] = useState(false);
+  const lastZipCodeLookupRef = useRef('');
 
   const isDirty = useMemo(() => JSON.stringify(profile) !== JSON.stringify(draft), [profile, draft]);
   const validationMessage = useMemo(() => {
@@ -71,22 +79,56 @@ export default function TenantProfilePage() {
     const loadProfile = async () => {
       setLoading(true);
       try {
-        const data = await tenantProfileApi.get();
+        const data = await tenantProfileApi.get(managedTenantId || undefined);
         setProfile(data);
         setDraft(data);
         setSubmitError('');
+        setZipCodeError('');
+        lastZipCodeLookupRef.current = normalizeZipCode(data.zipCode);
       } finally {
         setLoading(false);
       }
     };
 
     loadProfile();
-  }, []);
-
+  }, [managedTenantId]);
   const handleChange = (field: keyof TenantProfile, value: string) => {
     setSubmitError('');
     setSubmitSuccess('');
+    if (field === 'zipCode') {
+      setZipCodeError('');
+    }
     setDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleZipCodeLookup = async (rawZipCode: string) => {
+    const normalizedZipCode = normalizeZipCode(rawZipCode);
+
+    if (normalizedZipCode.length !== 8 || lastZipCodeLookupRef.current === normalizedZipCode) {
+      return;
+    }
+
+    lastZipCodeLookupRef.current = normalizedZipCode;
+    setZipCodeError('');
+    setIsLookingUpZipCode(true);
+
+    try {
+      const address = await lookupAddressByZipCode(normalizedZipCode);
+      setDraft((current) => ({
+        ...current,
+        zipCode: formatZipCode(address.zipCode),
+        ibgeCode: address.ibgeCode || current.ibgeCode,
+        addressLine: address.addressLine || current.addressLine,
+        district: address.district || current.district,
+        city: address.city || current.city,
+        state: address.state || current.state,
+      }));
+    } catch (error) {
+      lastZipCodeLookupRef.current = '';
+      setZipCodeError(error instanceof Error ? error.message : 'Nao foi possivel consultar o CEP informado.');
+    } finally {
+      setIsLookingUpZipCode(false);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -130,10 +172,12 @@ export default function TenantProfilePage() {
         state: draft.state,
         plan: draft.plan,
         status: draft.status,
-      });
+      }, managedTenantId || undefined);
       setProfile(updated);
       setDraft(updated);
-      await refreshProfile();
+      if (!isManagingAnotherTenant) {
+        await refreshProfile();
+      }
       setSubmitSuccess('Perfil da transportadora atualizado com sucesso.');
     } catch (error: any) {
       setSubmitError(extractErrorMessage(error));
@@ -146,6 +190,8 @@ export default function TenantProfilePage() {
     setDraft(profile);
     setSubmitError('');
     setSubmitSuccess('');
+    setZipCodeError('');
+    lastZipCodeLookupRef.current = normalizeZipCode(profile.zipCode);
   };
 
   const handleLogoUpload = async (file?: File | null) => {
@@ -197,6 +243,11 @@ export default function TenantProfilePage() {
             <p className="mt-2 max-w-3xl text-on-surface-variant">
               Gerencie os dados institucionais, fiscais e de localizacao da transportadora cliente que opera neste ambiente.
             </p>
+            {isManagingAnotherTenant && (
+              <p className="mt-3 inline-flex rounded-full bg-secondary-container px-3 py-1 text-xs font-bold uppercase tracking-wider text-on-secondary-container">
+                Modo plataforma: editando uma transportadora da lista
+              </p>
+            )}
             {submitSuccess && <p className="mt-3 text-sm font-bold text-primary">{submitSuccess}</p>}
             {!submitSuccess && submitError && <p className="mt-3 text-sm font-bold text-error">{submitError}</p>}
           </div>
@@ -318,7 +369,28 @@ export default function TenantProfilePage() {
                   </p>
                 </div>
               </div>
-              <Field label="CEP" value={draft.zipCode} onChange={(value) => handleChange('zipCode', formatZipCode(value))} disabled={!canUpdate} placeholder="00000-000" />
+              <Field
+                label="CEP"
+                value={draft.zipCode}
+                onChange={(value) => {
+                  const formattedValue = formatZipCode(value);
+                  handleChange('zipCode', formattedValue);
+                  const normalizedZipCode = normalizeZipCode(formattedValue);
+
+                  if (normalizedZipCode.length < 8) {
+                    lastZipCodeLookupRef.current = '';
+                  }
+
+                  if (normalizedZipCode.length === 8) {
+                    void handleZipCodeLookup(formattedValue);
+                  }
+                }}
+                onBlur={() => void handleZipCodeLookup(draft.zipCode)}
+                disabled={!canUpdate}
+                placeholder="00000-000"
+                helpText={zipCodeError || (isLookingUpZipCode ? 'Buscando endereco pelo CEP...' : '')}
+                helpTone={zipCodeError ? 'error' : 'default'}
+              />
               <Field label="Codigo IBGE" value={draft.ibgeCode} onChange={(value) => handleChange('ibgeCode', value)} disabled={!canUpdate} />
               <div className="md:col-span-2">
                 <Field label="Logradouro" value={draft.addressLine} onChange={(value) => handleChange('addressLine', value)} disabled={!canUpdate} />
@@ -393,18 +465,24 @@ function Field({
   label,
   value,
   onChange,
+  onBlur,
   disabled,
   type = 'text',
   placeholder,
   maxLength,
+  helpText,
+  helpTone = 'default',
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   disabled?: boolean;
   type?: string;
   placeholder?: string;
   maxLength?: number;
+  helpText?: string;
+  helpTone?: 'default' | 'error';
 }) {
   return (
     <div className="space-y-2">
@@ -413,11 +491,15 @@ function Field({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         disabled={disabled}
         placeholder={placeholder}
         maxLength={maxLength}
         className="w-full rounded-xl border border-outline-variant bg-surface-container px-4 py-3 outline-none transition-all focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
       />
+      {helpText ? (
+        <p className={`text-xs ${helpTone === 'error' ? 'font-semibold text-error' : 'text-on-surface-variant'}`}>{helpText}</p>
+      ) : null}
     </div>
   );
 }

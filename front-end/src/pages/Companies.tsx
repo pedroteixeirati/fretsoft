@@ -10,6 +10,7 @@ import { canAccess } from '../lib/permissions';
 import { formatCnpj, formatCpf, formatPhone, isValidCnpj, isValidCpf, isValidEmail, isValidStateCode } from '../lib/validation';
 import { Company } from '../types';
 import { clearFieldError, FieldLabel, FormAlert, FormFieldError, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
+import { lookupAddressByZipCode, normalizeZipCode } from '../shared/lib/cep';
 import Input from '../shared/ui/Input';
 
 const initialFormData = {
@@ -112,6 +113,8 @@ export default function Companies() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [formData, setFormData] = useState(initialFormData);
   const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<CompanyFormField>>({});
+  const [zipCodeError, setZipCodeError] = useState('');
+  const [isLookingUpZipCode, setIsLookingUpZipCode] = useState(false);
 
   const loadCompanies = async () => {
     setLoading(true);
@@ -164,6 +167,7 @@ export default function Companies() {
     setEditingCompany(null);
     setSubmitError('');
     setFieldErrors({});
+    setZipCodeError('');
     setIsModalOpen(false);
   };
 
@@ -172,7 +176,36 @@ export default function Companies() {
       if (!current[field]) return current;
       return clearFieldError(current, field);
     });
+    if (field === 'zipCode') {
+      setZipCodeError('');
+    }
     setFormData((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleZipCodeLookup = async (rawZipCode: string) => {
+    const normalizedZipCode = normalizeZipCode(rawZipCode);
+
+    if (normalizedZipCode.length !== 8) {
+      return;
+    }
+
+    setZipCodeError('');
+    setIsLookingUpZipCode(true);
+
+    try {
+      const address = await lookupAddressByZipCode(normalizedZipCode);
+      setFormData((current) => ({
+        ...current,
+        zipCode: formatZipCode(address.zipCode),
+        address: address.addressLine || current.address,
+        city: address.city || current.city,
+        state: address.state || current.state,
+      }));
+    } catch (error) {
+      setZipCodeError(error instanceof Error ? error.message : 'Nao foi possivel consultar o CEP informado.');
+    } finally {
+      setIsLookingUpZipCode(false);
+    }
   };
 
   const handleOpenCreate = () => {
@@ -421,7 +454,21 @@ export default function Companies() {
             <Field label="Endereco" value={formData.address} onChange={(value) => updateField('address', value)} containerClassName="md:col-span-2" error={fieldErrors.address} />
             <Field label="Cidade" value={formData.city} onChange={(value) => updateField('city', value)} error={fieldErrors.city} />
             <Field label="UF" value={formData.state} onChange={(value) => updateField('state', value.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase())} placeholder="SP" maxLength={2} error={fieldErrors.state} />
-            <Field label="CEP" value={formData.zipCode} onChange={(value) => updateField('zipCode', value)} required={false} error={fieldErrors.zipCode} />
+            <Field
+              label="CEP"
+              value={formData.zipCode}
+              onChange={(value) => {
+                const formattedValue = formatZipCode(value);
+                updateField('zipCode', formattedValue);
+                if (normalizeZipCode(formattedValue).length === 8) {
+                  void handleZipCodeLookup(formattedValue);
+                }
+              }}
+              onBlur={() => void handleZipCodeLookup(formData.zipCode)}
+              required={false}
+              error={fieldErrors.zipCode || zipCodeError}
+              hint={isLookingUpZipCode ? 'Buscando endereco pelo CEP...' : undefined}
+            />
             <div className="space-y-2">
               <FieldLabel>Status</FieldLabel>
               <CustomSelect
@@ -459,22 +506,26 @@ function Field({
   label,
   value,
   onChange,
+  onBlur,
   type = 'text',
   required = true,
   placeholder,
   maxLength,
   error,
   containerClassName,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   type?: string;
   required?: boolean;
   placeholder?: string;
   maxLength?: number;
   error?: string;
   containerClassName?: string;
+  hint?: string;
 }) {
   return (
     <Input
@@ -485,9 +536,16 @@ function Field({
       maxLength={maxLength}
       value={value}
       error={error}
+      hint={hint}
       onChange={(event) => onChange(event.target.value)}
+      onBlur={onBlur}
       containerClassName={containerClassName}
       className="rounded-xl bg-surface-container"
     />
   );
+}
+
+function formatZipCode(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  return digits.replace(/(\d{5})(\d)/, '$1-$2');
 }

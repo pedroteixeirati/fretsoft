@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, Filter, Loader2, Plus, Search, ShieldCheck, UserRoundPlus } from 'lucide-react';
+import { ArrowRight, Building2, Filter, Loader2, Plus, Search, ShieldCheck, UserRoundPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
@@ -91,6 +92,7 @@ function getTenantFormErrors(formData: typeof initialForm): FormFieldErrors<Tena
 
 export default function PlatformTenants() {
   const { userProfile } = useFirebase();
+  const navigate = useNavigate();
   const canCreate = canAccess(userProfile, 'platformTenants', 'create');
   const [tenants, setTenants] = useState<PlatformTenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,6 +326,17 @@ export default function PlatformTenants() {
                     <div className="hidden sm:block text-right mr-6">
                       <span className="text-sm font-bold text-on-surface inline-flex items-center gap-1"><UserRoundPlus className="w-4 h-4 text-primary" />{tenant.ownerName || 'Sem owner'}</span>
                       <p className="text-[10px] text-on-secondary-container uppercase">{tenant.ownerEmail || 'owner nao informado'}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/transportadora?tenantId=${tenant.id}`)}
+                        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-primary shadow-sm transition-all hover:scale-[1.02] hover:shadow-md"
+                        aria-label={`Gerenciar transportadora ${tenant.name}`}
+                      >
+                        Gerenciar
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 ))}
