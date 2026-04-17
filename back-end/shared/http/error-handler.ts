@@ -23,6 +23,28 @@ export function errorHandler(
     return;
   }
 
+  if (error.code === '23502') {
+    sendErrorResponse(
+      res,
+      new AppError('Um campo obrigatorio do banco nao estava alinhado com o payload enviado.', {
+        statusCode: 400,
+        code: 'database_not_null_violation',
+      })
+    );
+    return;
+  }
+
+  if (error.code === '23503') {
+    sendErrorResponse(
+      res,
+      new AppError('O lancamento depende de um registro relacionado que nao foi encontrado no banco.', {
+        statusCode: 409,
+        code: 'database_foreign_key_violation',
+      })
+    );
+    return;
+  }
+
   if (error instanceof AppError) {
     sendErrorResponse(res, error);
     return;
