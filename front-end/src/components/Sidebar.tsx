@@ -17,6 +17,7 @@ import {
   WalletCards,
   X,
   Pickaxe,
+  Layers3,
 } from 'lucide-react';
 import { NavItem } from '../types';
 import { cn } from '../lib/utils';
@@ -34,7 +35,23 @@ interface SidebarProps {
 export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onRequestClose }: SidebarProps) {
   const { userProfile } = useFirebase();
 
-  const sections = [
+  const allSections = [
+    {
+      id: 'novalog',
+      label: 'Novalog',
+      icon: Pickaxe,
+      items: [{ id: 'novalogOperations', label: 'Lan\u00e7amentos', icon: Layers3, allowed: canAccessNovalogOperations(userProfile) }],
+    },
+    {
+      id: 'registry',
+      label: 'Cadastros',
+      icon: FolderKanban,
+      items: [
+        { id: 'vehicles', label: 'Veiculos', icon: Truck, allowed: canAccess(userProfile, 'vehicles', 'read') },
+        { id: 'suppliers', label: 'Fornecedores', icon: Users, allowed: canAccess(userProfile, 'providers', 'read') },
+        { id: 'companies', label: 'Empresas', icon: Building2, allowed: canAccess(userProfile, 'companies', 'read') },
+      ],
+    },
     {
       id: 'overview',
       label: 'Visao geral',
@@ -48,22 +65,11 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       items: [{ id: 'platformTenants', label: 'Transportadoras', icon: ShieldCheck, allowed: canAccess(userProfile, 'platformTenants', 'read') }],
     },
     {
-      id: 'registry',
-      label: 'Cadastros',
-      icon: FolderKanban,
-      items: [
-        { id: 'vehicles', label: 'Veiculos', icon: Truck, allowed: canAccess(userProfile, 'vehicles', 'read') },
-        { id: 'suppliers', label: 'Fornecedores', icon: Users, allowed: canAccess(userProfile, 'providers', 'read') },
-        { id: 'companies', label: 'Empresas', icon: Building2, allowed: canAccess(userProfile, 'companies', 'read') },
-      ],
-    },
-    {
       id: 'operations',
       label: 'Operacao',
       icon: BriefcaseBusiness,
       items: [
         { id: 'freights', label: 'Fretes', icon: Route, allowed: canAccess(userProfile, 'freights', 'read') },
-        { id: 'novalogOperations', label: 'Operacao Novalog', icon: Pickaxe, allowed: canAccessNovalogOperations(userProfile) },
         { id: 'cargas', label: 'Cargas', icon: Package, allowed: canAccess(userProfile, 'cargas', 'read') },
         { id: 'contracts', label: 'Contratos', icon: FileText, allowed: canAccess(userProfile, 'contracts', 'read') },
         { id: 'expenses', label: 'Custos operacionais', icon: CreditCard, allowed: canAccess(userProfile, 'expenses', 'read') },
@@ -89,7 +95,12 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
         { id: 'support', label: 'Suporte', icon: ShieldCheck, allowed: true },
       ],
     },
-  ]
+  ];
+
+  const sections = allSections
+    // TEMPORARIO: durante a operacao atual vamos manter no menu apenas Novalog e Cadastros.
+    // Quando reabrirmos a navegacao completa, basta ajustar/remover este filtro centralizado.
+    .filter((section) => ['registry', 'novalog'].includes(section.id))
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => item.allowed),

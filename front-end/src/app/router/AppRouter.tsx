@@ -63,7 +63,7 @@ export default function AppRouter() {
             <Route path="/empresas" element={<Companies />} />
             <Route path="/contratos" element={<Contracts />} />
             <Route path="/fretes" element={<Freights />} />
-            <Route path="/operacao-novalog" element={<NovalogOperations />} />
+            <Route path="/novalog/lancamentos" element={<NovalogOperations />} />
             <Route path="/cargas" element={<Cargas />} />
             <Route path="/relatorios" element={<Reports />} />
             <Route path="/configuracoes" element={<Settings />} />

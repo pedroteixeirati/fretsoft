@@ -103,13 +103,6 @@ export const novalogMockEntries: NovalogEntry[] = [
   },
 ];
 
-export const novalogOriginOptions: NovalogOption[] = [
-  { value: 'Minerbrasil', label: 'Minerbrasil' },
-  { value: 'Cedro', label: 'Cedro' },
-  { value: 'Extrativa', label: 'Extrativa' },
-  { value: 'Wave', label: 'Wave' },
-];
-
 export const novalogDestinationOptions: NovalogOption[] = [
   { value: 'Gerdau', label: 'Gerdau' },
   { value: 'Viena', label: 'Viena' },
@@ -121,6 +114,8 @@ export const novalogDestinationOptions: NovalogOption[] = [
 export const novalogFuelStationOptions: NovalogOption[] = [
   { value: 'Campeao', label: 'Posto Campeao' },
   { value: 'Santa Helena', label: 'Posto Santa Helena' },
+  { value: 'Gauchao', label: 'Posto Gauchao' },
+
 ];
 
 export function getTodayInputDate() {

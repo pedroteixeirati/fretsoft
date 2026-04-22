@@ -25,6 +25,7 @@ describe('NovalogStandardEntryModal', () => {
       <NovalogStandardEntryModal
         isOpen
         weekNumber={1}
+        originOptions={[{ value: 'Minerbrasil', label: 'Minerbrasil' }]}
         draftEntry={baseEntry}
         mode="edit"
         onClose={() => undefined}
@@ -43,6 +44,7 @@ describe('NovalogStandardEntryModal', () => {
       <NovalogStandardEntryModal
         isOpen
         weekNumber={1}
+        originOptions={[{ value: 'Minerbrasil', label: 'Minerbrasil' }]}
         draftEntry={baseEntry}
         mode="duplicate"
         onClose={() => undefined}

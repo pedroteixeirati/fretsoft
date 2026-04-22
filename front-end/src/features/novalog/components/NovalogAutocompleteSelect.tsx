@@ -27,34 +27,48 @@ export default function NovalogAutocompleteSelect({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const selectedOption = options.find((option) => option.value === value) || null;
+  const normalizedQuery = query.trim().toLowerCase();
 
   useEffect(() => {
-    setQuery(selectedOption?.label || '');
-  }, [selectedOption]);
+    if (isFocused) return;
+    setQuery(selectedOption?.label || value || '');
+  }, [isFocused, selectedOption, value]);
+
+  const commitFreeText = (nextValue: string) => {
+    const trimmed = nextValue.trim();
+    onChange(trimmed);
+    setQuery(trimmed);
+    setIsFocused(false);
+  };
 
   useEffect(() => {
     if (!isFocused) return undefined;
 
     const handlePointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) {
-        setIsFocused(false);
-        setQuery(selectedOption?.label || '');
+        commitFreeText(query);
       }
     };
 
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [isFocused, selectedOption]);
+  }, [isFocused, query]);
 
   useEffect(() => {
     setActiveIndex(0);
   }, [query]);
 
   const filteredOptions = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(normalized));
-  }, [options, query]);
+    if (!normalizedQuery) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+  }, [normalizedQuery, options]);
+
+  const exactMatch = useMemo(
+    () =>
+      options.find((option) =>
+        option.label.trim().toLowerCase() === normalizedQuery || option.value.trim().toLowerCase() === normalizedQuery),
+    [normalizedQuery, options],
+  );
 
   const applyOption = (option: CustomSelectOption | undefined) => {
     if (!option) return;
@@ -84,6 +98,13 @@ export default function NovalogAutocompleteSelect({
             onChange('');
           }}
           aria-invalid={Boolean(error)}
+          onBlur={(event) => {
+            if (rootRef.current?.contains(event.relatedTarget as Node | null)) {
+              return;
+            }
+
+            commitFreeText(event.target.value);
+          }}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
               event.preventDefault();
@@ -99,17 +120,24 @@ export default function NovalogAutocompleteSelect({
             }
 
             if (event.key === 'Enter') {
-              if (filteredOptions.length > 0) {
-                event.preventDefault();
-                applyOption(filteredOptions[activeIndex] || filteredOptions[0]);
+              event.preventDefault();
+
+              if (exactMatch) {
+                applyOption(exactMatch);
+                return;
               }
+
+              commitFreeText(query);
               return;
             }
 
             if (event.key === 'Tab') {
-              if (filteredOptions.length > 0) {
-                applyOption(filteredOptions[activeIndex] || filteredOptions[0]);
+              if (exactMatch) {
+                applyOption(exactMatch);
+                return;
               }
+
+              commitFreeText(query);
             }
           }}
           placeholder={placeholder}

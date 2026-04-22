@@ -1,7 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Layers3, PackagePlus, Pickaxe } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import KpiCard from '../../../components/KpiCard';
 import { useFirebase } from '../../../context/FirebaseContext';
+import { canAccess } from '../../../lib/permissions';
+import { queryKeys } from '../../../shared/lib/query-keys';
+import { providersApi } from '../../providers/services/providers.api';
 import { canAccessNovalogOperations } from '../utils/novalog.visibility';
 import { novalogInitialKpis, novalogKpiIcons, novalogWeekOptions } from '../constants/novalog.constants';
 import NovalogEntriesTable from '../components/NovalogEntriesTable';
@@ -25,8 +29,14 @@ export default function NovalogOperationsPage() {
   const [originFilter, setOriginFilter] = useState('');
   const [destinationFilter, setDestinationFilter] = useState('');
 
-  const canAccess = canAccessNovalogOperations(userProfile);
-  const { entries, isLoading, error } = useNovalogQuery(canAccess);
+  const canAccessNovalogModule = canAccessNovalogOperations(userProfile);
+  const canReadProviders = canAccessNovalogModule && canAccess(userProfile, 'providers', 'read');
+  const { entries, isLoading, error } = useNovalogQuery(canAccessNovalogModule);
+  const providersQuery = useQuery({
+    queryKey: queryKeys.providers.list(),
+    queryFn: providersApi.list,
+    enabled: canReadProviders,
+  });
   const { createEntry, createBatch, updateEntry, deleteEntry, isSubmitting } = useNovalogMutations();
   const mutationError = createEntry.error ?? createBatch.error ?? updateEntry.error ?? deleteEntry.error ?? null;
 
@@ -113,6 +123,24 @@ export default function NovalogOperationsPage() {
     [destinationFilter, originFilter, searchTerm, weekEntries],
   );
 
+  const originOptions = useMemo(() => {
+    const optionMap = new Map<string, { value: string; label: string }>();
+
+    (providersQuery.data ?? [])
+      .slice()
+      .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
+      .forEach((provider) => {
+        const normalized = provider.name.trim();
+        if (!normalized) return;
+        optionMap.set(normalized.toLocaleLowerCase('pt-BR'), {
+          value: normalized,
+          label: normalized,
+        });
+      });
+
+    return Array.from(optionMap.values()).sort((left, right) => left.label.localeCompare(right.label, 'pt-BR'));
+  }, [providersQuery.data]);
+
   const dynamicKpis = useMemo(() => {
     const totalWeight = filteredEntries.reduce((sum, entry) => sum + entry.weight, 0);
     const totalCompanyGross = filteredEntries.reduce((sum, entry) => sum + entry.companyGrossAmount, 0);
@@ -144,7 +172,7 @@ export default function NovalogOperationsPage() {
     });
   }, [filteredEntries]);
 
-  if (!canAccess) {
+  if (!canAccessNovalogModule) {
     return (
       <div className="rounded-[2rem] border border-error/15 bg-error/5 px-6 py-5 text-sm font-medium text-error">
         Este modulo esta disponivel apenas para a operacao Novalog e para usuarios de desenvolvimento.
@@ -257,6 +285,7 @@ export default function NovalogOperationsPage() {
       <NovalogStandardEntryModal
         isOpen={isStandardModalOpen}
         weekNumber={selectedWeek}
+        originOptions={originOptions}
         draftEntry={draftEntry}
         mode={standardModalMode}
         isSubmitting={isSubmitting}
@@ -267,6 +296,7 @@ export default function NovalogOperationsPage() {
       <NovalogBatchEntryModal
         isOpen={isBatchModalOpen}
         weekNumber={selectedWeek}
+        originOptions={originOptions}
         isSubmitting={isSubmitting}
         onClose={() => setIsBatchModalOpen(false)}
         onSubmit={handleBatchSubmit}

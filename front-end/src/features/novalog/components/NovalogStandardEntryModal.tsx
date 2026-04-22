@@ -5,13 +5,13 @@ import CustomSelect from '../../../components/CustomSelect';
 import Input from '../../../shared/ui/Input';
 import { FieldLabel, FormAlert, FormDatePicker, clearFieldError } from '../../../shared/forms';
 import { FormFieldErrors } from '../../../lib/errors';
+import NovalogAutocompleteSelect from './NovalogAutocompleteSelect';
 import {
   defaultNovalogStandardEntryFormData,
   novalogDestinationOptions,
   novalogFuelStationOptions,
-  novalogOriginOptions,
 } from '../constants/novalog.constants';
-import { NovalogEntry, NovalogEntryMode, NovalogStandardEntryField, NovalogStandardEntryFormData } from '../types/novalog.types';
+import { NovalogEntry, NovalogEntryMode, NovalogOption, NovalogStandardEntryField, NovalogStandardEntryFormData } from '../types/novalog.types';
 import {
   calculateNovalogEntryAmounts,
   formatNovalogCurrency,
@@ -22,6 +22,7 @@ import {
 interface NovalogStandardEntryModalProps {
   isOpen: boolean;
   weekNumber: number;
+  originOptions: NovalogOption[];
   draftEntry?: NovalogEntry | null;
   mode?: 'create' | 'edit' | 'duplicate';
   isSubmitting?: boolean;
@@ -68,6 +69,7 @@ function getFormErrors(formData: NovalogStandardEntryFormData): FormFieldErrors<
 export default function NovalogStandardEntryModal({
   isOpen,
   weekNumber,
+  originOptions,
   draftEntry,
   mode = 'create',
   isSubmitting = false,
@@ -87,6 +89,21 @@ export default function NovalogStandardEntryModal({
     () => calculateNovalogEntryAmounts(parseNovalogDecimal(formData.weight), parseNovalogDecimal(formData.companyRatePerTon), parseNovalogDecimal(formData.aggregatedRatePerTon)),
     [formData.aggregatedRatePerTon, formData.companyRatePerTon, formData.weight],
   );
+
+  const resolvedOriginOptions = useMemo(() => {
+    if (!draftEntry?.originName?.trim()) {
+      return originOptions;
+    }
+
+    const normalizedOrigin = draftEntry.originName.trim();
+    const alreadyExists = originOptions.some((option) => option.value === normalizedOrigin);
+
+    if (alreadyExists) {
+      return originOptions;
+    }
+
+    return [{ value: normalizedOrigin, label: normalizedOrigin }, ...originOptions];
+  }, [draftEntry?.originName, originOptions]);
 
   const formMessage = Object.values(fieldErrors).some(Boolean) ? 'Revise os campos destacados antes de salvar.' : '';
 
@@ -161,14 +178,14 @@ export default function NovalogStandardEntryModal({
               <CustomSelect
                 value={formData.originName}
                 onChange={(value) => updateField('originName', value)}
-                options={novalogOriginOptions}
+                options={resolvedOriginOptions}
                 placeholder="Selecione a origem"
                 error={fieldErrors.originName}
               />
             </div>
             <div className="space-y-2">
               <FieldLabel required>Destino (siderurgica)</FieldLabel>
-              <CustomSelect
+              <NovalogAutocompleteSelect
                 value={formData.destinationName}
                 onChange={(value) => updateField('destinationName', value)}
                 options={novalogDestinationOptions}

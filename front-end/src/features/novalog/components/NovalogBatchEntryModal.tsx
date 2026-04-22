@@ -9,9 +9,8 @@ import {
   getTodayInputDate,
   novalogDestinationOptions,
   novalogFuelStationOptions,
-  novalogOriginOptions,
 } from '../constants/novalog.constants';
-import { NovalogBatchEntryRow, NovalogEntry } from '../types/novalog.types';
+import { NovalogBatchEntryRow, NovalogEntry, NovalogOption } from '../types/novalog.types';
 import {
   calculateNovalogEntryAmounts,
   formatNovalogCurrency,
@@ -29,6 +28,7 @@ type BatchRowErrors = Partial<Record<BatchRowField, string>>;
 interface NovalogBatchEntryModalProps {
   isOpen: boolean;
   weekNumber: number;
+  originOptions: NovalogOption[];
   isSubmitting?: boolean;
   onClose: () => void;
   onSubmit: (entries: NovalogEntry[]) => void;
@@ -53,6 +53,7 @@ function getInitialRows() {
 export default function NovalogBatchEntryModal({
   isOpen,
   weekNumber,
+  originOptions,
   isSubmitting = false,
   onClose,
   onSubmit,
@@ -238,7 +239,7 @@ export default function NovalogBatchEntryModal({
             <CustomSelect value={originName} onChange={(value) => {
               setOriginName(value);
               setOriginNameError('');
-            }} options={novalogOriginOptions} placeholder="Selecione a mineradora" error={originNameError} />
+            }} options={originOptions} placeholder="Selecione a mineradora" error={originNameError} />
           </div>
         </section>
 

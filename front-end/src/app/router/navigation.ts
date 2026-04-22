@@ -14,7 +14,7 @@ export const navItemToPath: Record<NavItem, string> = {
   companies: '/empresas',
   contracts: '/contratos',
   freights: '/fretes',
-  novalogOperations: '/operacao-novalog',
+  novalogOperations: '/novalog/lancamentos',
   cargas: '/cargas',
   reports: '/relatorios',
   settings: '/configuracoes',
