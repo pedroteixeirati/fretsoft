@@ -20,7 +20,7 @@ import {
 
 type BatchRowField = keyof Pick<
   NovalogBatchEntryRow,
-  'destinationName' | 'weight' | 'companyRatePerTon' | 'aggregatedRatePerTon' | 'ticketNumber' | 'fuelStationName'
+  'destinationName' | 'weight' | 'companyRatePerTon' | 'aggregatedRatePerTon' | 'ticketNumber'
 >;
 
 type BatchRowErrors = Partial<Record<BatchRowField, string>>;
@@ -42,7 +42,6 @@ function createBatchRow(): NovalogBatchEntryRow {
     companyRatePerTon: '',
     aggregatedRatePerTon: '',
     ticketNumber: '',
-    fuelStationName: '',
   };
 }
 
@@ -60,10 +59,12 @@ export default function NovalogBatchEntryModal({
 }: NovalogBatchEntryModalProps) {
   const [operationDate, setOperationDate] = useState(getTodayInputDate());
   const [originName, setOriginName] = useState('');
+  const [fuelStationName, setFuelStationName] = useState('');
   const [rows, setRows] = useState<NovalogBatchEntryRow[]>(getInitialRows());
   const [submitError, setSubmitError] = useState('');
   const [operationDateError, setOperationDateError] = useState('');
   const [originNameError, setOriginNameError] = useState('');
+  const [fuelStationNameError, setFuelStationNameError] = useState('');
   const [rowErrors, setRowErrors] = useState<Record<string, BatchRowErrors>>({});
 
   const lotSummary = useMemo(
@@ -96,10 +97,12 @@ export default function NovalogBatchEntryModal({
   const resetForm = () => {
     setOperationDate(getTodayInputDate());
     setOriginName('');
+    setFuelStationName('');
     setRows(getInitialRows());
     setSubmitError('');
     setOperationDateError('');
     setOriginNameError('');
+    setFuelStationNameError('');
     setRowErrors({});
   };
 
@@ -168,6 +171,13 @@ export default function NovalogBatchEntryModal({
       setOriginNameError('');
     }
 
+    if (fuelStationName.trim().length < 2) {
+      setFuelStationNameError('Selecione o posto.');
+      hasErrors = true;
+    } else {
+      setFuelStationNameError('');
+    }
+
     rows.forEach((row) => {
       const errors: BatchRowErrors = {};
 
@@ -176,7 +186,6 @@ export default function NovalogBatchEntryModal({
       if (row.ticketNumber.trim().length === 0) errors.ticketNumber = 'Informe o ticket.';
       if (parseNovalogDecimal(row.companyRatePerTon) <= 0) errors.companyRatePerTon = 'Informe o valor empresa.';
       if (parseNovalogDecimal(row.aggregatedRatePerTon) <= 0) errors.aggregatedRatePerTon = 'Informe o valor terceiro.';
-      if (row.fuelStationName.trim().length < 2) errors.fuelStationName = 'Selecione o posto.';
 
       if (Object.keys(errors).length > 0) {
         nextRowErrors[row.id] = errors;
@@ -207,7 +216,7 @@ export default function NovalogBatchEntryModal({
         aggregatedRatePerTon: parseNovalogDecimal(row.aggregatedRatePerTon),
         aggregatedGrossAmount: amounts.aggregatedGrossAmount,
         ticketNumber: row.ticketNumber.trim(),
-        fuelStationName: row.fuelStationName.trim(),
+        fuelStationName: fuelStationName.trim(),
         entryMode: 'batch',
       };
     });
@@ -227,7 +236,7 @@ export default function NovalogBatchEntryModal({
       <form onSubmit={handleSubmit} className="space-y-6">
         <FormAlert message={submitError} variant="error" />
 
-        <section className="grid gap-4 md:grid-cols-2 xl:max-w-[860px]">
+        <section className="grid gap-4 md:grid-cols-2 xl:max-w-[1280px] xl:grid-cols-3">
           <div className="max-w-[420px]">
             <FormDatePicker label="Data do lote" value={operationDate} onChange={(value) => {
               setOperationDate(value);
@@ -235,11 +244,18 @@ export default function NovalogBatchEntryModal({
             }} error={operationDateError} />
           </div>
           <div className="max-w-[420px] space-y-2">
-            <FieldLabel required>Origem (mineradora)</FieldLabel>
+            <FieldLabel required>Origem</FieldLabel>
             <CustomSelect value={originName} onChange={(value) => {
               setOriginName(value);
               setOriginNameError('');
             }} options={originOptions} placeholder="Selecione a mineradora" error={originNameError} />
+          </div>
+          <div className="max-w-[420px] space-y-2">
+            <FieldLabel required>Posto</FieldLabel>
+            <NovalogAutocompleteSelect value={fuelStationName} onChange={(value) => {
+              setFuelStationName(value);
+              setFuelStationNameError('');
+            }} options={novalogFuelStationOptions} placeholder="Posto" error={fuelStationNameError} />
           </div>
         </section>
 
@@ -288,10 +304,6 @@ export default function NovalogBatchEntryModal({
                   <Input label="Ticket" value={row.ticketNumber} onChange={(event) => updateRow(row.id, 'ticketNumber', event.target.value)} placeholder="Ex: 154230" error={rowErrors[row.id]?.ticketNumber} />
                   <Input label="Valor frete empresa" type="text" inputMode="numeric" value={row.companyRatePerTon} onChange={(event) => updateRow(row.id, 'companyRatePerTon', formatNovalogDecimalInput(event.target.value))} placeholder="0,00" error={rowErrors[row.id]?.companyRatePerTon} />
                   <Input label="Valor frete terceiro" type="text" inputMode="numeric" value={row.aggregatedRatePerTon} onChange={(event) => updateRow(row.id, 'aggregatedRatePerTon', formatNovalogDecimalInput(event.target.value))} placeholder="0,00" error={rowErrors[row.id]?.aggregatedRatePerTon} />
-                  <div className="space-y-2">
-                    <FieldLabel required>Posto</FieldLabel>
-                    <NovalogAutocompleteSelect value={row.fuelStationName} onChange={(value) => updateRow(row.id, 'fuelStationName', value)} options={novalogFuelStationOptions} placeholder="Posto" error={rowErrors[row.id]?.fuelStationName} />
-                  </div>
                 </div>
               </article>
             ))}
@@ -307,7 +319,6 @@ export default function NovalogBatchEntryModal({
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Ticket</th>
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Valor frete empresa</th>
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Valor frete terceiro</th>
-                    <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Posto</th>
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Acoes</th>
                   </tr>
                 </thead>
@@ -328,9 +339,6 @@ export default function NovalogBatchEntryModal({
                       </td>
                       <td className="px-4 py-4 min-w-[180px]">
                         <Input type="text" inputMode="numeric" value={row.aggregatedRatePerTon} onChange={(event) => updateRow(row.id, 'aggregatedRatePerTon', formatNovalogDecimalInput(event.target.value))} placeholder="0,00" containerClassName="min-w-0" error={rowErrors[row.id]?.aggregatedRatePerTon} />
-                      </td>
-                      <td className="px-4 py-4 min-w-[190px]">
-                        <NovalogAutocompleteSelect value={row.fuelStationName} onChange={(value) => updateRow(row.id, 'fuelStationName', value)} options={novalogFuelStationOptions} placeholder="Posto" error={rowErrors[row.id]?.fuelStationName} />
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex min-w-[170px] items-center justify-center gap-2">

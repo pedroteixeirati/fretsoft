@@ -64,5 +64,4 @@ export interface NovalogBatchEntryRow {
   companyRatePerTon: string;
   aggregatedRatePerTon: string;
   ticketNumber: string;
-  fuelStationName: string;
 }
