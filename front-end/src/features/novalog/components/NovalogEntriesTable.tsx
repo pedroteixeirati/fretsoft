@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Layers3, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit2, Layers3, Trash2 } from 'lucide-react';
 import { NovalogEntry } from '../types/novalog.types';
 import { formatDateOnlyPtBr } from '../../../lib/date';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
@@ -12,9 +12,13 @@ interface NovalogEntriesTableProps {
   destinationFilter: string;
   filteredCount: number;
   totalCount: number;
+  currentPage: number;
+  totalPages: number;
   onSearchChange: (value: string) => void;
   onOriginFilterChange: (value: string) => void;
   onDestinationFilterChange: (value: string) => void;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
   onEdit: (entry: NovalogEntry) => void;
   onDelete: (entry: NovalogEntry) => void;
 }
@@ -30,13 +34,46 @@ export default function NovalogEntriesTable({
   destinationFilter,
   filteredCount,
   totalCount,
+  currentPage,
+  totalPages,
   onSearchChange,
   onOriginFilterChange,
   onDestinationFilterChange,
+  onPreviousPage,
+  onNextPage,
   onEdit,
   onDelete,
 }: NovalogEntriesTableProps) {
-  const summaryText = `Mostrando ${entries.length} resultado(s)`;
+  const summaryText = `Mostrando ${entries.length} de ${filteredCount} resultado(s)`;
+  const pagination = (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        aria-label="Pagina anterior"
+        onClick={onPreviousPage}
+        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-container disabled:opacity-30"
+        disabled={currentPage === 1}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        aria-label={`Pagina ${currentPage}`}
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-on-primary"
+      >
+        {currentPage}
+      </button>
+      <button
+        type="button"
+        aria-label="Proxima pagina"
+        onClick={onNextPage}
+        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-container disabled:opacity-30"
+        disabled={currentPage === totalPages}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
 
   return (
     <section className="overflow-hidden rounded-[2rem] border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
@@ -173,9 +210,12 @@ export default function NovalogEntriesTable({
 
       <div className="flex items-center justify-between border-t border-outline-variant/10 bg-surface-container-low/30 px-4 py-4 sm:px-6">
         <p className="text-xs text-on-surface-variant">{summaryText}</p>
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
-          <Layers3 className="h-3.5 w-3.5" />
-          Preparado para lote
+        <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-primary sm:inline-flex">
+            <Layers3 className="h-3.5 w-3.5" />
+            Preparado para lote
+          </div>
+          {pagination}
         </div>
       </div>
     </section>

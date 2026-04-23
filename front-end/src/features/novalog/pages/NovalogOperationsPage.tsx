@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Layers3, PackagePlus, Pickaxe } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import KpiCard from '../../../components/KpiCard';
@@ -17,6 +17,7 @@ import { useNovalogQuery } from '../hooks/useNovalogQuery';
 import { useNovalogMutations } from '../hooks/useNovalogMutations';
 
 type StandardModalMode = 'create' | 'edit' | 'duplicate';
+const itemsPerPage = 20;
 
 export default function NovalogOperationsPage() {
   const { userProfile } = useFirebase();
@@ -28,6 +29,7 @@ export default function NovalogOperationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [originFilter, setOriginFilter] = useState('');
   const [destinationFilter, setDestinationFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const canAccessNovalogModule = canAccessNovalogOperations(userProfile);
   const canReadProviders = canAccessNovalogModule && canAccess(userProfile, 'providers', 'read');
@@ -121,6 +123,17 @@ export default function NovalogOperationsPage() {
         );
       }),
     [destinationFilter, originFilter, searchTerm, weekEntries],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedWeek, searchTerm, originFilter, destinationFilter, entries.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / itemsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedEntries = filteredEntries.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage,
   );
 
   const originOptions = useMemo(() => {
@@ -268,15 +281,19 @@ export default function NovalogOperationsPage() {
         </div>
       ) : (
         <NovalogEntriesTable
-          entries={filteredEntries}
+          entries={paginatedEntries}
           searchTerm={searchTerm}
           originFilter={originFilter}
           destinationFilter={destinationFilter}
           filteredCount={filteredEntries.length}
           totalCount={weekEntries.length}
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
           onSearchChange={setSearchTerm}
           onOriginFilterChange={setOriginFilter}
           onDestinationFilterChange={setDestinationFilter}
+          onPreviousPage={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          onNextPage={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
           onEdit={openEditModal}
           onDelete={handleDeleteEntry}
         />
