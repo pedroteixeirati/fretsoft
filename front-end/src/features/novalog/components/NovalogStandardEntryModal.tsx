@@ -174,7 +174,7 @@ export default function NovalogStandardEntryModal({
               error={fieldErrors.operationDate}
             />
             <div className="space-y-2">
-              <FieldLabel required>Origem (mineradora)</FieldLabel>
+              <FieldLabel required>Origem</FieldLabel>
               <CustomSelect
                 value={formData.originName}
                 onChange={(value) => updateField('originName', value)}

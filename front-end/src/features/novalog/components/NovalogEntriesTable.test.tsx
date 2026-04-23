@@ -34,9 +34,13 @@ describe('NovalogEntriesTable', () => {
         destinationFilter=""
         filteredCount={1}
         totalCount={1}
+        currentPage={1}
+        totalPages={1}
         onSearchChange={() => undefined}
         onOriginFilterChange={() => undefined}
         onDestinationFilterChange={() => undefined}
+        onPreviousPage={() => undefined}
+        onNextPage={() => undefined}
         onEdit={onEdit}
         onDelete={onDelete}
       />,
