@@ -21,8 +21,11 @@ describe('canAccess', () => {
     expect(canAccess(makeProfile('operational'), 'expenses', 'read')).toBe(true);
   });
 
-  it('nega relatorios para perfil viewer', () => {
-    expect(canAccess(makeProfile('viewer'), 'reports', 'read')).toBe(false);
+  it('permite leitura financeira para perfis sem acao financeira', () => {
+    expect(canAccess(makeProfile('operational'), 'revenues', 'read')).toBe(true);
+    expect(canAccess(makeProfile('operational'), 'payables', 'read')).toBe(true);
+    expect(canAccess(makeProfile('viewer'), 'reports', 'read')).toBe(true);
+    expect(canAccess(makeProfile('operational'), 'payables', 'update')).toBe(false);
   });
 
   it('permite plataforma apenas para dev', () => {

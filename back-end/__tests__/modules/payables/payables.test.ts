@@ -8,8 +8,8 @@ const payablesServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modu
 const payablesRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/payables/repositories/payables.repository.ts'), 'utf8');
 const payablesResourceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/payables/payables.resource.ts'), 'utf8');
 
-test('payables ficam restritos ao financeiro na camada de permissao do modulo', () => {
-  assert.match(payablesResourceSource, /read: \['dev', 'owner', 'admin', 'financial'\]/);
+test('payables permitem leitura ampla e restringem acoes ao financeiro', () => {
+  assert.match(payablesResourceSource, /read: \['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'\]/);
   assert.match(payablesResourceSource, /create: \['dev', 'owner', 'admin', 'financial'\]/);
   assert.match(payablesResourceSource, /update: \['dev', 'owner', 'admin', 'financial'\]/);
   assert.match(payablesResourceSource, /delete: \['dev', 'owner', 'admin', 'financial'\]/);
