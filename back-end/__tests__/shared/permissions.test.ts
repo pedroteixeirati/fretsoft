@@ -37,17 +37,17 @@ test('custos operacionais ficam com a equipe operacional, mantendo leitura para 
   assert.equal(canPerform('update', resources.vehicles.permissions, 'financial'), false);
 });
 
-test('contas a pagar ficam restritas ao financeiro e administracao do tenant', () => {
+test('contas a pagar permitem leitura ampla e restringem acoes ao financeiro', () => {
   assert.equal(canPerform('read', payablesPermissions, 'financial'), true);
   assert.equal(canPerform('create', payablesPermissions, 'financial'), true);
   assert.equal(canPerform('update', payablesPermissions, 'financial'), true);
   assert.equal(canPerform('delete', payablesPermissions, 'financial'), true);
 
-  assert.equal(canPerform('read', payablesPermissions, 'operational'), false);
+  assert.equal(canPerform('read', payablesPermissions, 'operational'), true);
   assert.equal(canPerform('create', payablesPermissions, 'operational'), false);
   assert.equal(canPerform('update', payablesPermissions, 'operational'), false);
   assert.equal(canPerform('delete', payablesPermissions, 'operational'), false);
 
-  assert.equal(canPerform('read', payablesPermissions, 'viewer'), false);
-  assert.equal(canPerform('read', payablesPermissions, 'driver'), false);
+  assert.equal(canPerform('read', payablesPermissions, 'viewer'), true);
+  assert.equal(canPerform('read', payablesPermissions, 'driver'), true);
 });

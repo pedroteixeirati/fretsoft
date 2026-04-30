@@ -60,7 +60,8 @@ describe('NovalogBillingDetailsModal', () => {
     const user = userEvent.setup();
     const onReceiveItem = vi.fn();
     const onOverdueItem = vi.fn();
-    const onCancelItem = vi.fn();
+    const onEditItem = vi.fn();
+    const onDeleteItem = vi.fn();
     const onOpenRevenue = vi.fn();
 
     render(
@@ -72,7 +73,8 @@ describe('NovalogBillingDetailsModal', () => {
         onEdit={vi.fn()}
         onReceiveItem={onReceiveItem}
         onOverdueItem={onOverdueItem}
-        onCancelItem={onCancelItem}
+        onEditItem={onEditItem}
+        onDeleteItem={onDeleteItem}
         onOpenRevenue={onOpenRevenue}
       />,
     );
@@ -81,15 +83,23 @@ describe('NovalogBillingDetailsModal', () => {
     expect(screen.getByText('Gerdau')).toBeInTheDocument();
     expect(screen.getByText('1001')).toBeInTheDocument();
     expect(screen.getByText('1002')).toBeInTheDocument();
+    expect(screen.getByText('Recebimento')).toBeInTheDocument();
+    expect(screen.getByText('12/04/2026')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Recebida' }));
+    await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1002' }));
     await user.click(screen.getByRole('button', { name: 'Em atraso' }));
-    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
-    await user.click(screen.getAllByRole('button', { name: 'Recebivel' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1002' }));
+    await user.click(screen.getByRole('button', { name: 'Editar' }));
+    await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1002' }));
+    await user.click(screen.getByRole('button', { name: 'Excluir' }));
+    await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1001' }));
+    await user.click(screen.getByRole('button', { name: 'Recebivel' }));
 
     expect(onReceiveItem).toHaveBeenCalledWith('item-2');
     expect(onOverdueItem).toHaveBeenCalledWith('item-2');
-    expect(onCancelItem).toHaveBeenCalledWith('item-2');
+    expect(onEditItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-2' }));
+    expect(onDeleteItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-2' }));
     expect(onOpenRevenue).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-1', linkedRevenueId: 'revenue-1' }));
   });
 
@@ -103,11 +113,12 @@ describe('NovalogBillingDetailsModal', () => {
         onEdit={vi.fn()}
         onReceiveItem={vi.fn()}
         onOverdueItem={vi.fn()}
-        onCancelItem={vi.fn()}
+        onEditItem={vi.fn()}
+        onDeleteItem={vi.fn()}
       />,
     );
 
-    expect(screen.getAllByText('Feche para baixar').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Feche para baixar')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Recebida' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fechar e gerar recebiveis' })).toBeInTheDocument();
   });
@@ -124,10 +135,48 @@ describe('NovalogBillingDetailsModal', () => {
         onEdit={onEdit}
         onReceiveItem={vi.fn()}
         onOverdueItem={vi.fn()}
-        onCancelItem={vi.fn()}
+        onEditItem={vi.fn()}
+        onDeleteItem={vi.fn()}
       />,
     );
 
     expect(screen.getByRole('button', { name: 'Editar' })).toBeDisabled();
+  });
+
+  it('nao permite editar ou excluir CT-e recebida', () => {
+    render(
+      <NovalogBillingDetailsModal
+        isOpen
+        billing={makeBilling({
+          items: [
+            {
+              id: 'item-received',
+              billingId: 'billing-1',
+              cteNumber: '1001',
+              cteKey: '',
+              issueDate: '2026-04-01',
+              originName: '',
+              destinationName: '',
+              amount: 2000,
+              status: 'received',
+              receivedAt: '2026-04-12T00:00:00.000Z',
+              notes: '',
+              linkedRevenueId: 'revenue-1',
+              createdAt: '2026-04-10T00:00:00.000Z',
+            },
+          ],
+        })}
+        onClose={vi.fn()}
+        onCloseBilling={vi.fn()}
+        onEdit={vi.fn()}
+        onReceiveItem={vi.fn()}
+        onOverdueItem={vi.fn()}
+        onEditItem={vi.fn()}
+        onDeleteItem={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument();
   });
 });

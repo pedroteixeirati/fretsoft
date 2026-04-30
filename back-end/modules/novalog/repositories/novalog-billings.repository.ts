@@ -53,8 +53,8 @@ const billingAggregateSelect = `select b.id,
        b.status,
        b.notes,
        b.created_at,
-       count(i.id) as cte_count,
-       coalesce(sum(i.amount), 0) as total_amount,
+       count(i.id) filter (where i.status <> 'canceled') as cte_count,
+       coalesce(sum(i.amount) filter (where i.status <> 'canceled'), 0) as total_amount,
        coalesce(sum(i.amount) filter (where i.status = 'received'), 0) as received_amount,
        coalesce(sum(i.amount) filter (where i.status in ('pending', 'billed')), 0) as open_amount,
        coalesce(sum(i.amount) filter (where i.status = 'overdue'), 0) as overdue_amount
@@ -137,6 +137,7 @@ export async function listTenantNovalogBillingItems(billingId: string, tenantId:
      from novalog_billing_items
      where billing_id = $1
        and tenant_id = $2
+       and status <> 'canceled'
      order by display_id asc, created_at asc`,
     [billingId, tenantId],
   );
@@ -320,6 +321,50 @@ export function updateTenantNovalogBillingItemStatus(id: string, tenantId: strin
      returning ${itemColumns}`,
     [status, userId || null, id, tenantId],
   );
+}
+
+export function updateTenantNovalogBillingItem(id: string, tenantId: string, item: NovalogBillingItemPayload, userId?: string, client?: PoolClient) {
+  return db(client).query<NovalogBillingItemRow>(
+    `update novalog_billing_items
+     set cte_number = $1,
+         cte_key = $2,
+         issue_date = $3,
+         origin_name = $4,
+         destination_name = $5,
+         amount = $6,
+         notes = $7,
+         updated_by_user_id = $8,
+         updated_at = now()
+     where id = $9
+       and tenant_id = $10
+       and status not in ('received', 'canceled')
+     returning ${itemColumns}`,
+    [
+      item.cteNumber,
+      item.cteKey,
+      item.issueDate,
+      item.originName,
+      item.destinationName,
+      item.amount,
+      item.notes,
+      userId || null,
+      id,
+      tenantId,
+    ],
+  );
+}
+
+export async function countActiveTenantNovalogBillingItems(billingId: string, tenantId: string, client?: PoolClient) {
+  const result = await db(client).query<{ total: string }>(
+    `select count(*)::text as total
+     from novalog_billing_items
+     where billing_id = $1
+       and tenant_id = $2
+       and status <> 'canceled'`,
+    [billingId, tenantId],
+  );
+
+  return Number(result.rows[0]?.total || 0);
 }
 
 export function linkRevenueToNovalogBillingItem(itemId: string, tenantId: string, revenueId: string, userId?: string, client?: PoolClient) {

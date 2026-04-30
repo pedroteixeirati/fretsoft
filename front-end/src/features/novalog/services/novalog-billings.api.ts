@@ -1,5 +1,5 @@
 import { apiRequest } from '../../../shared/lib/api-client';
-import { NovalogBilling, NovalogBillingPayload } from '../types/novalog-billing.types';
+import { NovalogBilling, NovalogBillingItemUpdatePayload, NovalogBillingPayload } from '../types/novalog-billing.types';
 
 export const novalogBillingsApi = {
   list: () => apiRequest<NovalogBilling[]>('/api/novalog/billings'),
@@ -13,6 +13,15 @@ export const novalogBillingsApi = {
     apiRequest<NovalogBilling>(`/api/novalog/billings/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
+    }),
+  updateItem: (id: string, payload: NovalogBillingItemUpdatePayload) =>
+    apiRequest<NovalogBilling>(`/api/novalog/billing-items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteItem: (id: string) =>
+    apiRequest<NovalogBilling>(`/api/novalog/billing-items/${id}`, {
+      method: 'DELETE',
     }),
   close: (id: string) =>
     apiRequest<NovalogBilling>(`/api/novalog/billings/${id}/close`, {
