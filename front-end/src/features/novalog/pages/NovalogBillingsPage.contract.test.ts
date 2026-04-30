@@ -34,6 +34,6 @@ describe('NovalogBillingsPage contract', () => {
     expect(pageSource).toMatch(/closeBilling\.mutateAsync\(billing\.id\)/);
     expect(pageSource).toMatch(/markItemReceived\.mutateAsync\(itemId\)/);
     expect(pageSource).toMatch(/markItemOverdue\.mutateAsync\(itemId\)/);
-    expect(pageSource).toMatch(/cancelItem\.mutateAsync\(itemId\)/);
+    expect(pageSource).toMatch(/deleteItem\.mutateAsync\(deletingItem\.id\)/);
   });
 });

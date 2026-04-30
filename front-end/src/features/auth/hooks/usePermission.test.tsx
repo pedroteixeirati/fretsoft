@@ -38,6 +38,6 @@ describe('usePermission', () => {
     const { result } = renderHook(() => usePermission());
 
     expect(result.current.check('vehicles', 'read')).toBe(true);
-    expect(result.current.check('reports', 'read')).toBe(false);
+    expect(result.current.check('settings', 'read')).toBe(false);
   });
 });
