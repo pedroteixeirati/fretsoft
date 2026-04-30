@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../../shared/lib/query-keys';
 import { novalogBillingsApi } from '../services/novalog-billings.api';
-import { NovalogBillingPayload } from '../types/novalog-billing.types';
+import { NovalogBillingItemUpdatePayload, NovalogBillingPayload } from '../types/novalog-billing.types';
 
 export function useNovalogBillingsMutations() {
   const queryClient = useQueryClient();
@@ -18,6 +18,16 @@ export function useNovalogBillingsMutations() {
 
   const updateBilling = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: NovalogBillingPayload }) => novalogBillingsApi.update(id, payload),
+    onSuccess: invalidateBillings,
+  });
+
+  const updateItem = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: NovalogBillingItemUpdatePayload }) => novalogBillingsApi.updateItem(id, payload),
+    onSuccess: invalidateBillings,
+  });
+
+  const deleteItem = useMutation({
+    mutationFn: (id: string) => novalogBillingsApi.deleteItem(id),
     onSuccess: invalidateBillings,
   });
 
@@ -44,6 +54,8 @@ export function useNovalogBillingsMutations() {
   return {
     createBilling,
     updateBilling,
+    updateItem,
+    deleteItem,
     closeBilling,
     markItemReceived,
     markItemOverdue,
@@ -51,6 +63,8 @@ export function useNovalogBillingsMutations() {
     isSubmitting:
       createBilling.isPending ||
       updateBilling.isPending ||
+      updateItem.isPending ||
+      deleteItem.isPending ||
       closeBilling.isPending ||
       markItemReceived.isPending ||
       markItemOverdue.isPending ||

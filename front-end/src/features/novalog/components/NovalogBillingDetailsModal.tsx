@@ -1,7 +1,9 @@
-import React from 'react';
-import { AlertTriangle, CheckCircle2, Clock, ExternalLink, FileText } from 'lucide-react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertTriangle, CheckCircle2, Clock, Edit2, ExternalLink, FileText, MoreVertical, Trash2 } from 'lucide-react';
 import Modal from '../../../components/Modal';
-import { formatDateOnlyPtBr } from '../../../lib/date';
+import { formatDateOnlyPtBr, formatDateTimePtBr } from '../../../lib/date';
+import { cn } from '../../../lib/utils';
 import { NovalogBilling, NovalogBillingItem } from '../types/novalog-billing.types';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
 import { novalogBillingItemStatusLabel, novalogBillingStatusClass, novalogBillingStatusLabel } from '../utils/novalog-billing-status';
@@ -15,7 +17,8 @@ interface NovalogBillingDetailsModalProps {
   onEdit: (billing: NovalogBilling) => void;
   onReceiveItem: (itemId: string) => void;
   onOverdueItem: (itemId: string) => void;
-  onCancelItem: (itemId: string) => void;
+  onEditItem: (item: NovalogBillingItem) => void;
+  onDeleteItem: (item: NovalogBillingItem) => void;
   onOpenRevenue?: (item: NovalogBillingItem) => void;
 }
 
@@ -28,7 +31,8 @@ export default function NovalogBillingDetailsModal({
   onEdit,
   onReceiveItem,
   onOverdueItem,
-  onCancelItem,
+  onEditItem,
+  onDeleteItem,
   onOpenRevenue,
 }: NovalogBillingDetailsModalProps) {
   if (!billing) return null;
@@ -105,6 +109,7 @@ export default function NovalogBillingDetailsModal({
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Emissao</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Valor</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Status</th>
+                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Recebimento</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Acoes</th>
                 </tr>
               </thead>
@@ -119,37 +124,27 @@ export default function NovalogBillingDetailsModal({
                         {novalogBillingItemStatusLabel(item.status)}
                       </span>
                     </td>
+                    <td className="px-5 py-4 text-center text-sm font-semibold text-on-surface-variant">
+                      {item.status === 'received' ? formatDateTimePtBr(item.receivedAt) : '-'}
+                    </td>
                     <td className="px-5 py-4">
-                      <div className="flex min-w-[260px] items-center justify-center gap-2">
+                      <div className="grid min-w-[148px] grid-cols-[6rem_2.25rem] items-center justify-center gap-2">
                         {canOperateItems && item.status !== 'received' && item.status !== 'canceled' ? (
                           <button type="button" disabled={isSubmitting} onClick={() => onReceiveItem(item.id)} className="rounded-full bg-secondary-container px-3 py-2 text-[11px] font-bold text-on-secondary-container disabled:opacity-60">
                             Recebida
                           </button>
-                        ) : null}
-                        {canOperateItems && item.status !== 'overdue' && item.status !== 'received' && item.status !== 'canceled' ? (
-                          <button type="button" disabled={isSubmitting} onClick={() => onOverdueItem(item.id)} className="rounded-full bg-error/10 px-3 py-2 text-[11px] font-bold text-error disabled:opacity-60">
-                            Em atraso
-                          </button>
-                        ) : null}
-                        {canOperateItems && item.status !== 'canceled' && item.status !== 'received' ? (
-                          <button type="button" disabled={isSubmitting} onClick={() => onCancelItem(item.id)} className="rounded-full border border-outline-variant bg-surface px-3 py-2 text-[11px] font-bold text-on-surface-variant disabled:opacity-60">
-                            Cancelar
-                          </button>
-                        ) : null}
-                        {item.linkedRevenueId ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenRevenue?.(item)}
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={!onOpenRevenue}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            Recebivel
-                          </button>
-                        ) : null}
-                        {!canOperateItems ? (
-                          <span className="text-xs font-medium text-on-surface-variant">Feche para baixar</span>
-                        ) : null}
+                        ) : (
+                          <span aria-hidden="true" />
+                        )}
+                        <NovalogBillingItemActionsMenu
+                          item={item}
+                          canOperateItems={canOperateItems}
+                          isSubmitting={isSubmitting}
+                          onOverdueItem={onOverdueItem}
+                          onEditItem={onEditItem}
+                          onDeleteItem={onDeleteItem}
+                          onOpenRevenue={onOpenRevenue}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -176,5 +171,166 @@ export default function NovalogBillingDetailsModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+interface NovalogBillingItemActionsMenuProps {
+  item: NovalogBillingItem;
+  canOperateItems: boolean;
+  isSubmitting: boolean;
+  onOverdueItem: (itemId: string) => void;
+  onEditItem: (item: NovalogBillingItem) => void;
+  onDeleteItem: (item: NovalogBillingItem) => void;
+  onOpenRevenue?: (item: NovalogBillingItem) => void;
+}
+
+function NovalogBillingItemActionsMenu({
+  item,
+  canOperateItems,
+  isSubmitting,
+  onOverdueItem,
+  onEditItem,
+  onDeleteItem,
+  onOpenRevenue,
+}: NovalogBillingItemActionsMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const canEditItem = item.status !== 'received' && item.status !== 'canceled';
+  const canMarkOverdue = canOperateItems && item.status !== 'overdue' && canEditItem;
+  const canOpenRevenue = Boolean(item.linkedRevenueId && onOpenRevenue);
+  const hasActions = canMarkOverdue || canEditItem || canOpenRevenue;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !dropdownRef.current?.contains(target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [isOpen]);
+
+  const updateDropdownPosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const buttonRect = button.getBoundingClientRect();
+    const dropdownWidth = dropdownRef.current?.offsetWidth || 176;
+    const dropdownHeight = dropdownRef.current?.offsetHeight || 150;
+    const viewportPadding = 12;
+    const gap = 8;
+    const top = Math.min(buttonRect.bottom + gap, window.innerHeight - dropdownHeight - viewportPadding);
+    const left = Math.min(
+      Math.max(viewportPadding, buttonRect.right - dropdownWidth),
+      window.innerWidth - dropdownWidth - viewportPadding,
+    );
+
+    setDropdownStyle({
+      position: 'fixed',
+      top,
+      left,
+      zIndex: 140,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+
+    const frameId = window.requestAnimationFrame(updateDropdownPosition);
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [isOpen, updateDropdownPosition]);
+
+  if (!hasActions) return null;
+
+  const runAction = (action: () => void) => {
+    action();
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={`Acoes do CT-e ${item.cteNumber}`}
+        disabled={isSubmitting}
+        onClick={() => setIsOpen((current) => !current)}
+        className="grid h-9 w-9 place-items-center rounded-full p-0 text-on-surface-variant transition hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <MoreVertical className="block h-4 w-4" />
+      </button>
+
+      {isOpen ? createPortal(
+        <div ref={dropdownRef} style={dropdownStyle} className="w-[11rem] overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-2 text-left shadow-[0_24px_60px_rgba(26,28,21,0.12)]">
+          {canMarkOverdue ? (
+            <ActionMenuItem
+              icon={AlertTriangle}
+              label="Em atraso"
+              tone="danger"
+              onClick={() => runAction(() => onOverdueItem(item.id))}
+            />
+          ) : null}
+          {canEditItem ? (
+            <ActionMenuItem
+              icon={Edit2}
+              label="Editar"
+              onClick={() => runAction(() => onEditItem(item))}
+            />
+          ) : null}
+          {canEditItem ? (
+            <ActionMenuItem
+              icon={Trash2}
+              label="Excluir"
+              tone="danger"
+              onClick={() => runAction(() => onDeleteItem(item))}
+            />
+          ) : null}
+          {canOpenRevenue ? (
+            <ActionMenuItem
+              icon={ExternalLink}
+              label="Recebivel"
+              onClick={() => runAction(() => onOpenRevenue?.(item))}
+            />
+          ) : null}
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  );
+}
+
+function ActionMenuItem({
+  icon: Icon,
+  label,
+  tone = 'default',
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  tone?: 'default' | 'danger';
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition',
+        tone === 'danger' ? 'text-error hover:bg-error/10' : 'text-on-surface hover:bg-primary/10',
+      )}
+    >
+      <Icon className={cn('h-4 w-4', tone === 'danger' ? 'text-error' : 'text-primary')} />
+      {label}
+    </button>
   );
 }

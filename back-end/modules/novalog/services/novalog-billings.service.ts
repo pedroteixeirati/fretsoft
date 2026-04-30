@@ -3,7 +3,7 @@ import type { ResourcePermissions } from '../../../shared/authorization/permissi
 import { conflictError, forbiddenError, notFoundError, validationError } from '../../../shared/errors/app-error';
 import { isPositiveNumber, isValidDate, isValidUuid, normalizeOptionalText, normalizeRequiredText } from '../../../shared/validation/validation';
 import type { AuthContext } from '../../auth/dtos/auth-context';
-import { updateNovalogBillingRevenueStatus } from '../../revenues/repositories/revenues.repository';
+import { updateNovalogBillingRevenueFromItem, updateNovalogBillingRevenueStatus } from '../../revenues/repositories/revenues.repository';
 import { formatCompetenceLabel, parseDateInput } from '../../revenues/services/revenues-domain';
 import type { NovalogBillingInput, NovalogBillingItemInput, NovalogBillingItemPayload, NovalogBillingItemStatus, NovalogBillingPayload, NovalogBillingStatus } from '../dtos/novalog-billing.types';
 import {
@@ -16,6 +16,8 @@ import {
   listTenantNovalogBillingItems,
   listTenantNovalogBillings,
   replaceTenantNovalogBillingItems,
+  countActiveTenantNovalogBillingItems,
+  updateTenantNovalogBillingItem,
   updateTenantNovalogBillingDraft,
   updateTenantNovalogBillingItemStatus,
   updateTenantNovalogBillingStatus,
@@ -250,6 +252,31 @@ async function createRevenueForBillingItem(billing: NovalogBillingRow, item: Nov
   }
 }
 
+async function syncRevenueFromBillingItem(billing: NovalogBillingRow, item: NovalogBillingItemRow, userId: string | undefined, client: PoolClient) {
+  if (!item.linked_revenue_id) return;
+
+  const competence = buildCompetence(billing.due_date);
+  const result = await updateNovalogBillingRevenueFromItem({
+    revenueId: item.linked_revenue_id,
+    tenantId: billing.tenant_id,
+    companyId: billing.company_id,
+    companyName: billing.company_name,
+    billingId: billing.id,
+    billingItemId: item.id,
+    competenceMonth: competence.month,
+    competenceYear: competence.year,
+    competenceLabel: competence.label,
+    description: `CT-e ${item.cte_number} - Faturamento Novalog ${billing.display_id ? `#${billing.display_id}` : billing.company_name}`,
+    amount: Number(item.amount || 0),
+    dueDate: billing.due_date,
+    actorUserId: userId || null,
+  }, client);
+
+  if (result.rowCount === 0) {
+    throw validationError('Recebivel vinculado ja foi recebido e nao pode ser alterado.', 'novalog_billing_revenue_not_editable');
+  }
+}
+
 export async function listNovalogBillings(auth?: AuthContext) {
   ensureNovalogContext(auth);
   const rows = await listTenantNovalogBillings(auth?.tenantId || '');
@@ -320,6 +347,101 @@ export async function closeNovalogBilling(auth: AuthContext | undefined, id: str
     await updateTenantNovalogBillingStatus(id, tenantId, deriveBillingStatus(items, 'open'), auth?.userId, client);
     await client.query('commit');
     return getBillingDetail(id, tenantId);
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateNovalogBillingItem(auth: AuthContext | undefined, itemId: string, body: NovalogBillingItemInput) {
+  ensureNovalogContext(auth);
+  const tenantId = auth?.tenantId || '';
+  const payload = normalizeBillingItem(body, 0);
+  const client = await getPoolClient();
+
+  try {
+    await client.query('begin');
+    const item = await findTenantNovalogBillingItem(itemId, tenantId, client);
+    if (!item) {
+      await client.query('rollback');
+      return null;
+    }
+    if (item.status === 'received') {
+      throw validationError('CT-e recebido nao pode ser editado.', 'novalog_billing_item_received_not_editable');
+    }
+    if (item.status === 'canceled') {
+      throw validationError('CT-e cancelado nao pode ser editado.', 'novalog_billing_item_canceled_not_editable');
+    }
+
+    const billing = await findTenantNovalogBilling(item.billing_id, tenantId, client);
+    if (!billing) {
+      await client.query('rollback');
+      return null;
+    }
+
+    const result = await updateTenantNovalogBillingItem(itemId, tenantId, payload, auth?.userId, client);
+    const updatedItem = result.rows[0];
+    if (!updatedItem) {
+      throw validationError('CT-e nao pode ser editado no status atual.', 'novalog_billing_item_not_editable');
+    }
+
+    await syncRevenueFromBillingItem(billing, updatedItem, auth?.userId, client);
+    await refreshBillingStatus(updatedItem.billing_id, tenantId, auth?.userId, client);
+    await client.query('commit');
+    return getBillingDetail(updatedItem.billing_id, tenantId);
+  } catch (error) {
+    await client.query('rollback');
+    if ((error as { code?: string }).code === '23505') {
+      throw conflictError('Este CT-e ja existe em outro faturamento Novalog.', 'duplicated_novalog_billing_cte', 'cteNumber');
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteNovalogBillingItem(auth: AuthContext | undefined, itemId: string) {
+  ensureNovalogContext(auth);
+  const tenantId = auth?.tenantId || '';
+  const client = await getPoolClient();
+
+  try {
+    await client.query('begin');
+    const item = await findTenantNovalogBillingItem(itemId, tenantId, client);
+    if (!item) {
+      await client.query('rollback');
+      return null;
+    }
+    if (item.status === 'received') {
+      throw validationError('CT-e recebido nao pode ser excluido.', 'novalog_billing_item_received_not_deletable');
+    }
+    if (item.status === 'canceled') {
+      throw validationError('CT-e ja esta cancelado.', 'novalog_billing_item_already_canceled');
+    }
+
+    const activeItems = await countActiveTenantNovalogBillingItems(item.billing_id, tenantId, client);
+    if (activeItems <= 1) {
+      throw validationError('Faturamento deve manter ao menos um CT-e.', 'novalog_billing_requires_item');
+    }
+
+    const result = await updateTenantNovalogBillingItemStatus(itemId, tenantId, 'canceled', auth?.userId, client);
+    const updatedItem = result.rows[0];
+    if (!updatedItem) {
+      throw validationError('CT-e nao pode ser excluido no status atual.', 'novalog_billing_item_not_deletable');
+    }
+
+    if (updatedItem.linked_revenue_id) {
+      const revenueResult = await updateNovalogBillingRevenueStatus(updatedItem.linked_revenue_id, tenantId, 'canceled', auth?.userId, client);
+      if (revenueResult.rowCount === 0) {
+        throw validationError('Recebivel vinculado nao pode ser cancelado.', 'novalog_billing_revenue_not_cancelable');
+      }
+    }
+
+    await refreshBillingStatus(updatedItem.billing_id, tenantId, auth?.userId, client);
+    await client.query('commit');
+    return getBillingDetail(updatedItem.billing_id, tenantId);
   } catch (error) {
     await client.query('rollback');
     throw error;

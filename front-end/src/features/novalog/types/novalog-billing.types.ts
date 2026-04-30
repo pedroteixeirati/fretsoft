@@ -62,3 +62,13 @@ export interface NovalogBillingPayload {
     notes?: string;
   }>;
 }
+
+export interface NovalogBillingItemUpdatePayload {
+  cteNumber: string;
+  cteKey?: string;
+  issueDate?: string;
+  originName?: string;
+  destinationName?: string;
+  amount: number;
+  notes?: string;
+}

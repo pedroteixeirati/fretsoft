@@ -5,7 +5,7 @@ import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import { revenuesApi } from '../lib/api';
 import { canAccess } from '../lib/permissions';
-import { formatDateOnlyPtBr } from '../lib/date';
+import { formatDateOnlyPtBr, formatDateTimePtBr } from '../lib/date';
 import { Revenue } from '../types';
 import DataTable, { DataTableColumn } from '../shared/ui/DataTable';
 import FormDatePicker from '../shared/forms/FormDatePicker';
@@ -271,6 +271,17 @@ export default function Revenues() {
       ),
     },
     {
+      id: 'receivedAt',
+      header: 'Recebimento',
+      headerClassName: 'text-center',
+      className: 'text-center',
+      cell: (revenue) => (
+        <span className="whitespace-nowrap text-sm font-semibold text-on-surface-variant">
+          {revenue.status === 'received' ? formatDateTimePtBr(revenue.receivedAt) : '-'}
+        </span>
+      ),
+    },
+    {
       id: 'actions',
       header: 'Acoes',
       headerClassName: 'text-right',
@@ -359,6 +370,12 @@ export default function Revenues() {
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Vencimento</p>
           <p className="mt-1 font-semibold text-on-surface">{formatDateOnlyPtBr(revenue.dueDate)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Recebimento</p>
+          <p className="mt-1 font-semibold text-on-surface-variant">
+            {revenue.status === 'received' ? formatDateTimePtBr(revenue.receivedAt) : '-'}
+          </p>
         </div>
         <div className="text-right">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Valor</p>

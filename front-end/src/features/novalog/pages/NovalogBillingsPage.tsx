@@ -7,14 +7,16 @@ import KpiCard from '../../../components/KpiCard';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { canAccess } from '../../../lib/permissions';
 import { formatDateOnlyPtBr } from '../../../lib/date';
+import { ConfirmDialog } from '../../../shared/ui';
 import { queryKeys } from '../../../shared/lib/query-keys';
 import { companiesApi } from '../../companies/services/companies.api';
 import NovalogBillingDetailsModal from '../components/NovalogBillingDetailsModal';
 import NovalogBillingFormModal from '../components/NovalogBillingFormModal';
+import NovalogBillingItemEditModal from '../components/NovalogBillingItemEditModal';
 import { useNovalogBillingsMutations } from '../hooks/useNovalogBillingsMutations';
 import { useNovalogBillingsQuery } from '../hooks/useNovalogBillingsQuery';
 import { novalogBillingsApi } from '../services/novalog-billings.api';
-import { NovalogBilling, NovalogBillingItem, NovalogBillingPayload } from '../types/novalog-billing.types';
+import { NovalogBilling, NovalogBillingItem, NovalogBillingItemUpdatePayload, NovalogBillingPayload } from '../types/novalog-billing.types';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
 import { novalogBillingStatusClass, novalogBillingStatusLabel } from '../utils/novalog-billing-status';
 import { canAccessNovalogOperations } from '../utils/novalog.visibility';
@@ -43,10 +45,11 @@ export default function NovalogBillingsPage() {
   const {
     createBilling,
     updateBilling,
+    updateItem,
+    deleteItem,
     closeBilling,
     markItemReceived,
     markItemOverdue,
-    cancelItem,
     isSubmitting,
   } = useNovalogBillingsMutations();
 
@@ -55,6 +58,8 @@ export default function NovalogBillingsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingBilling, setEditingBilling] = useState<NovalogBilling | null>(null);
+  const [editingItem, setEditingItem] = useState<NovalogBillingItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<NovalogBillingItem | null>(null);
   const [selectedBilling, setSelectedBilling] = useState<NovalogBilling | null>(null);
   const [detailsError, setDetailsError] = useState('');
 
@@ -144,9 +149,17 @@ export default function NovalogBillingsPage() {
     await refreshSelectedBilling(billing.id);
   };
 
-  const handleCancelItem = async (itemId: string) => {
-    const billing = await cancelItem.mutateAsync(itemId);
-    await refreshSelectedBilling(billing.id);
+  const handleUpdateItem = async (itemId: string, payload: NovalogBillingItemUpdatePayload) => {
+    const billing = await updateItem.mutateAsync({ id: itemId, payload });
+    setEditingItem(null);
+    setSelectedBilling(billing);
+  };
+
+  const handleConfirmDeleteItem = async () => {
+    if (!deletingItem) return;
+    const billing = await deleteItem.mutateAsync(deletingItem.id);
+    setDeletingItem(null);
+    setSelectedBilling(billing);
   };
 
   const handleOpenRevenue = (item: NovalogBillingItem) => {
@@ -317,8 +330,33 @@ export default function NovalogBillingsPage() {
         onEdit={handleEdit}
         onReceiveItem={handleReceiveItem}
         onOverdueItem={handleOverdueItem}
-        onCancelItem={handleCancelItem}
+        onEditItem={setEditingItem}
+        onDeleteItem={setDeletingItem}
         onOpenRevenue={handleOpenRevenue}
+      />
+
+      <NovalogBillingItemEditModal
+        isOpen={Boolean(editingItem)}
+        item={editingItem}
+        isSubmitting={isSubmitting}
+        onClose={() => setEditingItem(null)}
+        onSubmit={handleUpdateItem}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deletingItem)}
+        title="Excluir CT-e"
+        description={(
+          <>
+            Deseja excluir o CT-e <strong className="font-bold text-on-surface">{deletingItem?.cteNumber}</strong>? O recebivel vinculado sera cancelado se ainda nao estiver recebido.
+          </>
+        )}
+        confirmLabel="Excluir"
+        cancelLabel="Cancelar"
+        tone="danger"
+        isLoading={deleteItem.isPending}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={handleConfirmDeleteItem}
       />
     </div>
   );

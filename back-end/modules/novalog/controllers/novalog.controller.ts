@@ -18,10 +18,12 @@ import {
   changeNovalogBillingItemStatus,
   closeNovalogBilling,
   createNovalogBilling,
+  deleteNovalogBillingItem,
   getNovalogBilling,
   listNovalogBillings,
   novalogBillingPermissions,
   updateNovalogBilling,
+  updateNovalogBillingItem,
 } from '../services/novalog-billings.service';
 
 const router = express.Router();
@@ -111,6 +113,42 @@ router.post('/novalog/billing-items/:id/receive', loadAuthContext, async (req: A
     }
 
     const billing = await changeNovalogBillingItemStatus(req.auth, req.params.id, 'received');
+    if (!billing) {
+      sendErrorResponse(res, notFoundError('CT-e nao encontrado.', 'novalog_billing_item_not_found'));
+      return;
+    }
+
+    res.json(billing);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/novalog/billing-items/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', novalogBillingPermissions, req.auth?.role), 'Sem permissao para editar CT-es Novalog.')) {
+      return;
+    }
+
+    const billing = await updateNovalogBillingItem(req.auth, req.params.id, req.body as Record<string, unknown>);
+    if (!billing) {
+      sendErrorResponse(res, notFoundError('CT-e nao encontrado.', 'novalog_billing_item_not_found'));
+      return;
+    }
+
+    res.json(billing);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/novalog/billing-items/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', novalogBillingPermissions, req.auth?.role), 'Sem permissao para excluir CT-es Novalog.')) {
+      return;
+    }
+
+    const billing = await deleteNovalogBillingItem(req.auth, req.params.id);
     if (!billing) {
       sendErrorResponse(res, notFoundError('CT-e nao encontrado.', 'novalog_billing_item_not_found'));
       return;

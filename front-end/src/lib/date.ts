@@ -12,3 +12,12 @@ export function formatDateOnlyPtBr(value: string, fallback = '-') {
   if (!parsed) return fallback;
   return parsed.toLocaleDateString('pt-BR');
 }
+
+export function formatDateTimePtBr(value?: string, fallback = '-') {
+  if (!value) return fallback;
+
+  const parsed = parseDateOnly(value.slice(0, 10));
+  if (!parsed || Number.isNaN(parsed.getTime())) return fallback;
+
+  return parsed.toLocaleDateString('pt-BR');
+}

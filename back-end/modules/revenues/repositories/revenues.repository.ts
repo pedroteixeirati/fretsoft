@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { pool } from '../../../shared/infra/database/pool';
 import type {
   ContractRevenueSeedRow,
@@ -5,6 +6,10 @@ import type {
   FreightRevenueSeedRow,
   RevenueRow,
 } from '../dtos/revenue.types';
+
+function db(client?: PoolClient) {
+  return client || pool;
+}
 
 export function listContractsForRevenueGeneration(tenantId: string) {
   return pool.query<ContractRevenueSeedRow>(
@@ -389,8 +394,8 @@ export function markRevenueAsOverdue(actorUserId: string | undefined, revenueId:
   );
 }
 
-export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: string, status: 'pending' | 'billed' | 'received' | 'overdue' | 'canceled', actorUserId?: string) {
-  return pool.query<RevenueRow>(
+export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: string, status: 'pending' | 'billed' | 'received' | 'overdue' | 'canceled', actorUserId?: string, client?: PoolClient) {
+  return db(client).query<RevenueRow>(
     `update revenues
      set status = $1,
          received_at = case when $1 = 'received' then coalesce(received_at, now()) else received_at end,
@@ -399,6 +404,7 @@ export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: s
      where id = $3
        and tenant_id = $4
        and source_type = 'novalog_billing_item'
+       and ($1 <> 'canceled' or status <> 'received')
      returning id,
                display_id,
                company_id,
@@ -421,5 +427,77 @@ export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: s
                received_at,
                created_at`,
     [status, actorUserId || null, revenueId, tenantId]
+  );
+}
+
+export function updateNovalogBillingRevenueFromItem(params: {
+  revenueId: string;
+  tenantId: string;
+  companyId: string;
+  companyName: string;
+  billingId: string;
+  billingItemId: string;
+  competenceMonth: number;
+  competenceYear: number;
+  competenceLabel: string;
+  description: string;
+  amount: number;
+  dueDate: string;
+  actorUserId?: string | null;
+}, client?: PoolClient) {
+  return db(client).query<RevenueRow>(
+    `update revenues
+     set company_id = $1,
+         company_name = $2,
+         novalog_billing_id = $3,
+         novalog_billing_item_id = $4,
+         competence_month = $5,
+         competence_year = $6,
+         competence_label = $7,
+         description = $8,
+         amount = $9,
+         due_date = $10,
+         updated_by_user_id = $11,
+         updated_at = now()
+     where id = $12
+       and tenant_id = $13
+       and source_type = 'novalog_billing_item'
+       and status <> 'received'
+     returning id,
+               display_id,
+               company_id,
+               company_name,
+               contract_id,
+               contract_name,
+               freight_id,
+               novalog_billing_id,
+               novalog_billing_item_id,
+               competence_month,
+               competence_year,
+               competence_label,
+               description,
+               amount,
+               due_date,
+               status,
+               source_type,
+               charge_reference,
+               charge_generated_at,
+               received_at,
+               created_at`,
+    [
+      params.companyId,
+      params.companyName,
+      params.billingId,
+      params.billingItemId,
+      params.competenceMonth,
+      params.competenceYear,
+      params.competenceLabel,
+      params.description,
+      params.amount,
+      params.dueDate,
+      params.actorUserId || null,
+      params.revenueId,
+      params.tenantId,
+    ],
   );
 }
