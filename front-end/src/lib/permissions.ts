@@ -18,13 +18,13 @@ const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
     delete: [],
   },
   revenues: {
-    read: ['dev', 'owner', 'admin', 'financial'],
+    read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],
     create: ['dev', 'owner', 'admin', 'financial'],
     update: [],
     delete: [],
   },
   payables: {
-    read: ['dev', 'owner', 'admin', 'financial'],
+    read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],
     create: ['dev', 'owner', 'admin', 'financial'],
     update: ['dev', 'owner', 'admin', 'financial'],
     delete: ['dev', 'owner', 'admin', 'financial'],
@@ -72,7 +72,7 @@ const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
     delete: ['dev', 'owner', 'admin', 'operational'],
   },
   reports: {
-    read: ['dev', 'owner', 'admin', 'financial'],
+    read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],
     create: [],
     update: [],
     delete: [],

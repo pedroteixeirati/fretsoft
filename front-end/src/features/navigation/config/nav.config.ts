@@ -42,6 +42,8 @@ function navItem(id: NavItem, label: string, icon: ElementType): NavigationItem 
 }
 
 export function buildNavigationSections(userProfile: UserProfile | null): NavigationSection[] {
+  const canSeeAdminMenu = userProfile?.role === 'dev';
+
   return [
     {
       id: 'overview',
@@ -56,16 +58,6 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       items: canAccess(userProfile, 'platformTenants', 'read')
         ? [navItem('platformTenants', 'Transportadoras', ShieldCheck)]
         : [],
-    },
-    {
-      id: 'registry',
-      label: 'Cadastros',
-      icon: FolderKanban,
-      items: compactItems([
-        canAccess(userProfile, 'vehicles', 'read') ? navItem('vehicles', 'Veiculos', Truck) : null,
-        canAccess(userProfile, 'providers', 'read') ? navItem('suppliers', 'Fornecedores', Users) : null,
-        canAccess(userProfile, 'companies', 'read') ? navItem('companies', 'Empresas', Building2) : null,
-      ]),
     },
     {
       id: 'operations',
@@ -97,13 +89,23 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       ],
     },
     {
+      id: 'registry',
+      label: 'Cadastros',
+      icon: FolderKanban,
+      items: compactItems([
+        canAccess(userProfile, 'vehicles', 'read') ? navItem('vehicles', 'Veiculos', Truck) : null,
+        canAccess(userProfile, 'providers', 'read') ? navItem('suppliers', 'Fornecedores', Users) : null,
+        canAccess(userProfile, 'companies', 'read') ? navItem('companies', 'Empresas', Building2) : null,
+      ]),
+    },
+    {
       id: 'admin',
       label: 'Administracao',
       icon: Settings,
       items: compactItems([
-        canAccess(userProfile, 'tenantProfile', 'read') ? navItem('tenantProfile', 'Transportadora', Building2) : null,
-        canAccess(userProfile, 'settings', 'read') ? navItem('settings', 'Configuracoes', Settings) : null,
-        navItem('support', 'Suporte', ShieldCheck),
+        canSeeAdminMenu && canAccess(userProfile, 'tenantProfile', 'read') ? navItem('tenantProfile', 'Transportadora', Building2) : null,
+        canSeeAdminMenu && canAccess(userProfile, 'settings', 'read') ? navItem('settings', 'Configuracoes', Settings) : null,
+        canSeeAdminMenu ? navItem('support', 'Suporte', ShieldCheck) : null,
       ]),
     },
   ].filter((section) => section.items.length > 0);

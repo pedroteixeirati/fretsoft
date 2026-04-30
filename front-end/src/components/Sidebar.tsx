@@ -35,6 +35,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onRequestClose }: SidebarProps) {
   const { userProfile } = useFirebase();
+  const canSeeAdminMenu = userProfile?.role === 'dev';
 
   const allSections = [
     {
@@ -44,16 +45,6 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       items: [
         { id: 'novalogOperations', label: 'Lancamentos', icon: Layers3, allowed: canAccessNovalogOperations(userProfile) },
         { id: 'novalogBillings', label: 'Faturamentos', icon: ReceiptText, allowed: canAccessNovalogOperations(userProfile) },
-      ],
-    },
-    {
-      id: 'registry',
-      label: 'Cadastros',
-      icon: FolderKanban,
-      items: [
-        { id: 'vehicles', label: 'Veiculos', icon: Truck, allowed: canAccess(userProfile, 'vehicles', 'read') },
-        { id: 'suppliers', label: 'Fornecedores', icon: Users, allowed: canAccess(userProfile, 'providers', 'read') },
-        { id: 'companies', label: 'Empresas', icon: Building2, allowed: canAccess(userProfile, 'companies', 'read') },
       ],
     },
     {
@@ -90,21 +81,29 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       ],
     },
     {
+      id: 'registry',
+      label: 'Cadastros',
+      icon: FolderKanban,
+      items: [
+        { id: 'vehicles', label: 'Veiculos', icon: Truck, allowed: canAccess(userProfile, 'vehicles', 'read') },
+        { id: 'suppliers', label: 'Fornecedores', icon: Users, allowed: canAccess(userProfile, 'providers', 'read') },
+        { id: 'companies', label: 'Empresas', icon: Building2, allowed: canAccess(userProfile, 'companies', 'read') },
+      ],
+    },
+    {
       id: 'admin',
       label: 'Administracao',
       icon: Settings,
       items: [
-        { id: 'tenantProfile', label: 'Transportadora', icon: Building2, allowed: canAccess(userProfile, 'tenantProfile', 'read') },
-        { id: 'settings', label: 'Configuracoes', icon: Settings, allowed: canAccess(userProfile, 'settings', 'read') },
-        { id: 'support', label: 'Suporte', icon: ShieldCheck, allowed: true },
+        { id: 'tenantProfile', label: 'Transportadora', icon: Building2, allowed: canSeeAdminMenu && canAccess(userProfile, 'tenantProfile', 'read') },
+        { id: 'settings', label: 'Configuracoes', icon: Settings, allowed: canSeeAdminMenu && canAccess(userProfile, 'settings', 'read') },
+        { id: 'support', label: 'Suporte', icon: ShieldCheck, allowed: canSeeAdminMenu },
       ],
     },
   ];
 
   const sections = allSections
-    // TEMPORARIO: durante a operacao atual vamos manter no menu apenas Novalog e Cadastros.
-    // Quando reabrirmos a navegacao completa, basta ajustar/remover este filtro centralizado.
-    .filter((section) => ['registry', 'novalog', 'management'].includes(section.id))
+    .filter((section) => ['registry', 'novalog', 'management', 'admin'].includes(section.id))
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => item.allowed),

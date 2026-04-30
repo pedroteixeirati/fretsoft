@@ -18,8 +18,9 @@ test('front-end mantem custos operacionais em Operacao e contas a pagar em Gesta
   assert.match(sidebarSource, /id: 'management'[\s\S]*navItem\('payables', 'Contas a pagar'/);
 });
 
-test('front-end protege acesso de custos operacionais e contas a pagar por perfil', () => {
-  assert.match(frontPermissionsSource, /payables:\s*\{[\s\S]*read: \['dev', 'owner', 'admin', 'financial'\]/);
+test('front-end permite leitura financeira ampla e protege acoes por perfil', () => {
+  assert.match(frontPermissionsSource, /revenues:\s*\{[\s\S]*read: \['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'\]/);
+  assert.match(frontPermissionsSource, /payables:\s*\{[\s\S]*read: \['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'\]/);
   assert.match(frontPermissionsSource, /payables:\s*\{[\s\S]*create: \['dev', 'owner', 'admin', 'financial'\]/);
   assert.match(frontPermissionsSource, /expenses:\s*\{[\s\S]*read: \['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'\]/);
   assert.match(frontPermissionsSource, /expenses:\s*\{[\s\S]*create: \['dev', 'owner', 'admin', 'operational'\]/);
@@ -32,13 +33,13 @@ test('App resolve navegacao respeitando as novas secoes operacionais e financeir
   assert.match(navigationSource, /case 'revenues':\s*case 'payables':\s*case 'reports':\s*return activeTab;/);
 });
 
-test('back-end mantem custos operacionais com ownership operacional e payables com ownership financeiro', () => {
+test('back-end mantem custos operacionais e leitura financeira alinhados ao menu', () => {
   assert.match(expensesResourceSource, /read: \['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'\]/);
   assert.match(expensesResourceSource, /create: \['dev', 'owner', 'admin', 'operational'\]/);
   assert.match(expensesResourceSource, /update: \['dev', 'owner', 'admin', 'operational'\]/);
   assert.match(expensesResourceSource, /delete: \['dev', 'owner', 'admin', 'operational'\]/);
 
-  assert.match(payablesResourceSource, /read: \['dev', 'owner', 'admin', 'financial'\]/);
+  assert.match(payablesResourceSource, /read: \['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'\]/);
   assert.match(payablesResourceSource, /create: \['dev', 'owner', 'admin', 'financial'\]/);
   assert.match(payablesResourceSource, /update: \['dev', 'owner', 'admin', 'financial'\]/);
   assert.match(payablesResourceSource, /delete: \['dev', 'owner', 'admin', 'financial'\]/);

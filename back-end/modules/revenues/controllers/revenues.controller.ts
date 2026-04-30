@@ -14,7 +14,12 @@ import {
 } from '../services/revenues.service';
 
 const router = express.Router();
-const permissions = { read: ['dev', 'owner', 'admin', 'financial'], create: ['dev', 'owner', 'admin', 'financial'], update: [], delete: [] } as const;
+const permissions = {
+  read: ['dev', 'owner', 'admin', 'financial', 'operational', 'driver', 'viewer'],
+  create: ['dev', 'owner', 'admin', 'financial'],
+  update: [],
+  delete: [],
+} as const;
 
 router.get('/', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
   try {
