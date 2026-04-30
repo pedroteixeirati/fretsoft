@@ -4,10 +4,12 @@ import { useSearchParams } from 'react-router-dom';
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import { revenuesApi } from '../lib/api';
+import { canAccess } from '../lib/permissions';
 import { formatDateOnlyPtBr } from '../lib/date';
 import { Revenue } from '../types';
 import DataTable, { DataTableColumn } from '../shared/ui/DataTable';
 import FormDatePicker from '../shared/forms/FormDatePicker';
+import { useFirebase } from '../context/FirebaseContext';
 
 function currency(value: number) {
   return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -37,6 +39,7 @@ function receivableLabel(revenue: Revenue) {
 }
 
 export default function Revenues() {
+  const { userProfile } = useFirebase();
   const itemsPerPage = 10;
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedRevenueIdFilter = searchParams.get('revenueId') || '';
@@ -153,6 +156,7 @@ export default function Revenues() {
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedRevenues = filteredRevenues.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
   const hasActiveFilters = Boolean(searchTerm || linkedRevenueIdFilter || statusFilter !== 'all' || companyFilter !== 'all' || dueDateFilter);
+  const canUpdateRevenues = canAccess(userProfile, 'revenues', 'create');
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -170,6 +174,10 @@ export default function Revenues() {
   };
 
   const renderActions = (revenue: Revenue) => {
+    if (!canUpdateRevenues) {
+      return <span className="text-xs font-medium text-on-surface-variant">Somente leitura</span>;
+    }
+
     const canReceive = canReceiveRevenue(revenue);
     const canMarkOverdue = canMarkRevenueAsOverdue(revenue);
     const isProcessing = processingRevenueId === revenue.id;

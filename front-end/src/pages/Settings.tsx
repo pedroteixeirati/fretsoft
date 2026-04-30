@@ -9,24 +9,18 @@ export default function Settings() {
   const { user, userProfile, signUp } = useFirebase();
   const canManageUsers = canAccess(userProfile, 'users', 'create');
   const canCreateAdmin = userProfile?.role === 'dev';
-  const roleOptions = canCreateAdmin
-    ? [
-        { value: 'admin', label: 'Administrador' },
-        { value: 'financial', label: 'Financeiro' },
-        { value: 'operational', label: 'Operacional' },
-        { value: 'driver', label: 'Motorista' },
-        { value: 'viewer', label: 'Visualizador' },
-      ]
-    : [
-        { value: 'financial', label: 'Financeiro' },
-        { value: 'operational', label: 'Operacional' },
-        { value: 'driver', label: 'Motorista' },
-        { value: 'viewer', label: 'Visualizador' },
-      ];
+  const isNovalogTenant = userProfile?.tenantSlug === 'novalog';
+  const roleOptions = [
+    ...(canCreateAdmin ? [{ value: 'admin', label: 'Administrador' }] : []),
+    { value: 'financial', label: 'Financeiro' },
+    { value: 'operational', label: 'Operacional' },
+    ...(!isNovalogTenant ? [{ value: 'driver', label: 'Motorista' }] : []),
+    { value: 'viewer', label: 'Visualizador' },
+  ];
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'financial' | 'operational' | 'driver' | 'viewer'>('driver');
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'financial' | 'operational' | 'driver' | 'viewer'>('operational');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState(false);
@@ -42,7 +36,7 @@ export default function Settings() {
       setNewUserName('');
       setNewUserEmail('');
       setNewUserPassword('');
-      setNewUserRole('driver');
+      setNewUserRole('operational');
     } catch (error: any) {
       let message = error.message || 'Erro ao criar usuario.';
       if (error.code === 'auth/email-already-in-use' || message.includes('email-already-in-use')) {
@@ -75,7 +69,7 @@ export default function Settings() {
 
       <div className="space-y-6">
         {canManageUsers && (
-          <section className="bg-surface-container-lowest rounded-3xl border border-outline-variant overflow-hidden shadow-sm">
+          <section className="bg-surface-container-lowest rounded-3xl border border-outline-variant shadow-sm">
             <div className="p-6 border-b border-outline-variant">
               <h3 className="text-xl font-bold text-on-surface flex items-center gap-2">
                 <UserPlus className="w-6 h-6 text-primary" />

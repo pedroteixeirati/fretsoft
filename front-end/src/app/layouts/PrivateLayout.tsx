@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
+// TODO: migrar o shell principal para features/navigation e remover estes componentes legados.
 import Sidebar from '../../components/Sidebar';
 import TopBar from '../../components/TopBar';
 import { getFirstAllowedPath, getNavItemFromPath, getPathFromNavItem, resolveAllowedTab } from '../router/navigation';
