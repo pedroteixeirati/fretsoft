@@ -1,7 +1,0 @@
-interface:
-  display_name: "Senior QA SaaS"
-  short_description: "QA senior para SaaS B2B com foco em risco e multiempresa"
-  default_prompt: "Use $senior-qa-saas para auditar funcionalidades deste SaaS com postura critica, foco em risco, negocio, seguranca e isolamento multiempresa."
-
-policy:
-  allow_implicit_invocation: true
