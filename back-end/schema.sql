@@ -345,6 +345,7 @@ create table if not exists novalog_billing_items (
   cte_number text not null,
   cte_key text,
   issue_date text,
+  due_date text,
   origin_name text,
   destination_name text,
   amount numeric not null default 0,
@@ -388,6 +389,13 @@ alter table if exists revenues add column if not exists received_at timestamptz;
 alter table if exists revenues add column if not exists freight_id uuid references freights(id) on delete cascade;
 alter table if exists revenues add column if not exists novalog_billing_id uuid;
 alter table if exists revenues add column if not exists novalog_billing_item_id uuid;
+alter table if exists novalog_billing_items add column if not exists due_date text;
+update novalog_billing_items item
+set due_date = billing.due_date
+from novalog_billings billing
+where item.billing_id = billing.id
+  and item.tenant_id = billing.tenant_id
+  and item.due_date is null;
 alter table if exists revenues alter column company_id drop not null;
 alter table if exists revenues alter column company_name drop not null;
 alter table if exists revenues alter column contract_id drop not null;
@@ -898,6 +906,7 @@ create index if not exists idx_novalog_billings_status on novalog_billings(tenan
 create index if not exists idx_novalog_billings_due_date on novalog_billings(tenant_id, due_date);
 create unique index if not exists idx_novalog_billing_items_tenant_display_id on novalog_billing_items(tenant_id, display_id) where display_id is not null;
 create index if not exists idx_novalog_billing_items_billing_id on novalog_billing_items(tenant_id, billing_id);
+create index if not exists idx_novalog_billing_items_due_date on novalog_billing_items(tenant_id, due_date);
 create index if not exists idx_novalog_billing_items_status on novalog_billing_items(tenant_id, status);
 create unique index if not exists idx_novalog_billing_items_tenant_cte_number on novalog_billing_items(tenant_id, cte_number)
   where cte_number is not null and cte_number <> '' and status <> 'canceled';

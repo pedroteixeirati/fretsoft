@@ -22,6 +22,7 @@ export default function NovalogBillingItemEditModal({
 }: NovalogBillingItemEditModalProps) {
   const [cteNumber, setCteNumber] = useState('');
   const [issueDate, setIssueDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [submitError, setSubmitError] = useState('');
@@ -30,6 +31,7 @@ export default function NovalogBillingItemEditModal({
     if (!isOpen || !item) return;
     setCteNumber(item.cteNumber || '');
     setIssueDate(item.issueDate || '');
+    setDueDate(item.dueDate || '');
     setAmount(String(item.amount || '').replace('.', ','));
     setNotes(item.notes || '');
     setSubmitError('');
@@ -39,8 +41,8 @@ export default function NovalogBillingItemEditModal({
     event.preventDefault();
     if (!item) return;
     const amountValue = parseNovalogDecimal(amount);
-    if (!cteNumber.trim() || amountValue <= 0) {
-      setSubmitError('Informe CT-e e valor maior que zero.');
+    if (!cteNumber.trim() || !dueDate || amountValue <= 0) {
+      setSubmitError('Informe CT-e, vencimento e valor maior que zero.');
       return;
     }
 
@@ -48,6 +50,7 @@ export default function NovalogBillingItemEditModal({
     await onSubmit(item.id, {
       cteNumber: cteNumber.trim(),
       issueDate: issueDate || undefined,
+      dueDate,
       amount: amountValue,
       notes: notes.trim() || undefined,
     });
@@ -63,7 +66,7 @@ export default function NovalogBillingItemEditModal({
       <form onSubmit={handleSubmit} className="space-y-5">
         <FormAlert message={submitError} variant="error" />
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <FieldLabel required>CT-e</FieldLabel>
             <Input value={cteNumber} onChange={(event) => setCteNumber(event.target.value)} placeholder="Numero CT-e" />
@@ -73,6 +76,11 @@ export default function NovalogBillingItemEditModal({
             value={issueDate}
             onChange={setIssueDate}
             required={false}
+          />
+          <FormDatePicker
+            label="Vencimento"
+            value={dueDate}
+            onChange={setDueDate}
           />
         </div>
 

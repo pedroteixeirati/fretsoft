@@ -28,6 +28,7 @@ export type NovalogBillingItemRow = {
   cte_number: string;
   cte_key: string | null;
   issue_date: string | null;
+  due_date: string | null;
   origin_name: string | null;
   destination_name: string | null;
   amount: string | number;
@@ -79,6 +80,7 @@ const itemColumns = `id,
        cte_number,
        cte_key,
        issue_date,
+       due_date,
        origin_name,
        destination_name,
        amount,
@@ -233,6 +235,7 @@ async function insertTenantNovalogBillingItem(billingId: string, tenantId: strin
        cte_number,
        cte_key,
        issue_date,
+       due_date,
        origin_name,
        destination_name,
        amount,
@@ -241,13 +244,14 @@ async function insertTenantNovalogBillingItem(billingId: string, tenantId: strin
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $10)`,
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10, $11, $11)`,
     [
       tenantId,
       billingId,
       item.cteNumber,
       item.cteKey,
       item.issueDate,
+      item.dueDate,
       item.originName,
       item.destinationName,
       item.amount,
@@ -329,20 +333,22 @@ export function updateTenantNovalogBillingItem(id: string, tenantId: string, ite
      set cte_number = $1,
          cte_key = $2,
          issue_date = $3,
-         origin_name = $4,
-         destination_name = $5,
-         amount = $6,
-         notes = $7,
-         updated_by_user_id = $8,
+         due_date = $4,
+         origin_name = $5,
+         destination_name = $6,
+         amount = $7,
+         notes = $8,
+         updated_by_user_id = $9,
          updated_at = now()
-     where id = $9
-       and tenant_id = $10
+     where id = $10
+       and tenant_id = $11
        and status not in ('received', 'canceled')
      returning ${itemColumns}`,
     [
       item.cteNumber,
       item.cteKey,
       item.issueDate,
+      item.dueDate,
       item.originName,
       item.destinationName,
       item.amount,

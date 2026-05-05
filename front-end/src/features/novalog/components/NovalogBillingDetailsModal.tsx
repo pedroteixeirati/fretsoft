@@ -107,6 +107,7 @@ export default function NovalogBillingDetailsModal({
                 <tr className="border-b border-outline-variant/10">
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">CT-e</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Emissao</th>
+                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Vencimento</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Valor</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Status</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Recebimento</th>
@@ -118,6 +119,7 @@ export default function NovalogBillingDetailsModal({
                   <tr key={item.id}>
                     <td className="px-5 py-4 text-sm font-bold text-on-surface">{item.cteNumber}</td>
                     <td className="px-5 py-4 text-sm text-on-surface-variant">{item.issueDate ? formatDateOnlyPtBr(item.issueDate) : '-'}</td>
+                    <td className="px-5 py-4 text-sm text-on-surface-variant">{item.dueDate ? formatDateOnlyPtBr(item.dueDate) : formatDateOnlyPtBr(billing.dueDate)}</td>
                     <td className="px-5 py-4 text-right text-sm font-black text-primary">{formatNovalogCurrency(item.amount)}</td>
                     <td className="px-5 py-4 text-center">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${novalogBillingStatusClass(item.status)}`}>

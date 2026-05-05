@@ -10,6 +10,7 @@ const item: NovalogBillingItem = {
   cteNumber: '9614',
   cteKey: '',
   issueDate: '2026-04-01',
+  dueDate: '2026-05-10',
   originName: '',
   destinationName: '',
   amount: 1687.7,
@@ -37,7 +38,7 @@ describe('NovalogBillingItemEditModal', () => {
     await user.clear(screen.getByPlaceholderText('0,00'));
     await user.click(screen.getByRole('button', { name: 'Salvar CT-e' }));
 
-    expect(screen.getByText('Informe CT-e e valor maior que zero.')).toBeInTheDocument();
+    expect(screen.getByText('Informe CT-e, vencimento e valor maior que zero.')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -64,6 +65,7 @@ describe('NovalogBillingItemEditModal', () => {
       cteNumber: '9634',
       amount: 2361.49,
       issueDate: '2026-04-01',
+      dueDate: '2026-05-10',
     }));
   });
 });
