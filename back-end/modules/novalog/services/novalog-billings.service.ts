@@ -71,6 +71,7 @@ function mapBillingItem(row: NovalogBillingItemRow) {
     cteNumber: row.cte_number,
     cteKey: row.cte_key || '',
     issueDate: row.issue_date || '',
+    dueDate: row.due_date || '',
     originName: row.origin_name || '',
     destinationName: row.destination_name || '',
     amount: Number(row.amount || 0),
@@ -92,10 +93,11 @@ function deriveBillingStatus(items: NovalogBillingItemRow[], currentStatus: Nova
   return 'open';
 }
 
-function normalizeBillingItem(item: NovalogBillingItemInput, index: number): NovalogBillingItemPayload {
+function normalizeBillingItem(item: NovalogBillingItemInput, index: number, fallbackDueDate?: string): NovalogBillingItemPayload {
   const cteNumber = normalizeRequiredText(item.cteNumber);
   const cteKey = normalizeOptionalText(item.cteKey);
   const issueDate = normalizeOptionalText(item.issueDate);
+  const dueDate = normalizeOptionalText(item.dueDate) || fallbackDueDate;
   const originName = normalizeOptionalText(item.originName);
   const destinationName = normalizeOptionalText(item.destinationName);
   const notes = normalizeOptionalText(item.notes);
@@ -107,6 +109,9 @@ function normalizeBillingItem(item: NovalogBillingItemInput, index: number): Nov
   if (issueDate && !isValidDate(issueDate)) {
     throw validationError('Informe uma data de emissao valida.', 'invalid_novalog_billing_cte_issue_date', `items.${index}.issueDate`);
   }
+  if (!isValidDate(dueDate)) {
+    throw validationError('Informe uma data de vencimento valida para o CT-e.', 'invalid_novalog_billing_cte_due_date', `items.${index}.dueDate`);
+  }
   if (!isPositiveNumber(amount)) {
     throw validationError('Informe um valor maior que zero para o CT-e.', 'invalid_novalog_billing_cte_amount', `items.${index}.amount`);
   }
@@ -115,6 +120,7 @@ function normalizeBillingItem(item: NovalogBillingItemInput, index: number): Nov
     cteNumber,
     cteKey,
     issueDate,
+    dueDate,
     originName,
     destinationName,
     amount,
@@ -126,7 +132,7 @@ async function validateBillingPayload(auth: AuthContext | undefined, body: Noval
   ensureNovalogContext(auth);
   const companyId = normalizeRequiredText(body.companyId);
   const billingDate = normalizeRequiredText(body.billingDate);
-  const dueDate = normalizeRequiredText(body.dueDate);
+  const fallbackDueDate = normalizeOptionalText(body.dueDate);
   const notes = normalizeOptionalText(body.notes);
   const items = Array.isArray(body.items) ? body.items : [];
 
@@ -136,7 +142,7 @@ async function validateBillingPayload(auth: AuthContext | undefined, body: Noval
   if (!isValidDate(billingDate)) {
     throw validationError('Informe uma data valida para o faturamento.', 'invalid_novalog_billing_date', 'billingDate');
   }
-  if (!isValidDate(dueDate)) {
+  if (fallbackDueDate && !isValidDate(fallbackDueDate)) {
     throw validationError('Informe uma data de vencimento valida.', 'invalid_novalog_billing_due_date', 'dueDate');
   }
   if (items.length === 0) {
@@ -148,7 +154,11 @@ async function validateBillingPayload(auth: AuthContext | undefined, body: Noval
     throw notFoundError('Cliente nao encontrado neste tenant.', 'novalog_billing_company_not_found');
   }
 
-  const normalizedItems = items.map(normalizeBillingItem);
+  const normalizedItems = items.map((item, index) => normalizeBillingItem(item, index, fallbackDueDate));
+  const dueDate = fallbackDueDate || [...normalizedItems].sort((left, right) => left.dueDate.localeCompare(right.dueDate))[0]?.dueDate;
+  if (!dueDate) {
+    throw validationError('Informe uma data de vencimento valida.', 'invalid_novalog_billing_due_date', 'dueDate');
+  }
   const uniqueCtes = new Set<string>();
   for (const item of normalizedItems) {
     const key = item.cteNumber.toLocaleLowerCase('pt-BR');
@@ -198,7 +208,8 @@ function buildCompetence(dueDate: string) {
 async function createRevenueForBillingItem(billing: NovalogBillingRow, item: NovalogBillingItemRow, userId: string | undefined, client: PoolClient) {
   if (item.linked_revenue_id || item.status === 'canceled') return;
 
-  const competence = buildCompetence(billing.due_date);
+  const itemDueDate = item.due_date || billing.due_date;
+  const competence = buildCompetence(itemDueDate);
   const revenueResult = await client.query<{ id: string }>(
     `insert into revenues (
        tenant_id,
@@ -241,7 +252,7 @@ async function createRevenueForBillingItem(billing: NovalogBillingRow, item: Nov
       competence.label,
       `CT-e ${item.cte_number} - Faturamento Novalog ${billing.display_id ? `#${billing.display_id}` : billing.company_name}`,
       Number(item.amount || 0),
-      billing.due_date,
+      itemDueDate,
       userId || null,
     ],
   );
@@ -255,7 +266,8 @@ async function createRevenueForBillingItem(billing: NovalogBillingRow, item: Nov
 async function syncRevenueFromBillingItem(billing: NovalogBillingRow, item: NovalogBillingItemRow, userId: string | undefined, client: PoolClient) {
   if (!item.linked_revenue_id) return;
 
-  const competence = buildCompetence(billing.due_date);
+  const itemDueDate = item.due_date || billing.due_date;
+  const competence = buildCompetence(itemDueDate);
   const result = await updateNovalogBillingRevenueFromItem({
     revenueId: item.linked_revenue_id,
     tenantId: billing.tenant_id,
@@ -268,7 +280,7 @@ async function syncRevenueFromBillingItem(billing: NovalogBillingRow, item: Nova
     competenceLabel: competence.label,
     description: `CT-e ${item.cte_number} - Faturamento Novalog ${billing.display_id ? `#${billing.display_id}` : billing.company_name}`,
     amount: Number(item.amount || 0),
-    dueDate: billing.due_date,
+    dueDate: itemDueDate,
     actorUserId: userId || null,
   }, client);
 
@@ -358,7 +370,11 @@ export async function closeNovalogBilling(auth: AuthContext | undefined, id: str
 export async function updateNovalogBillingItem(auth: AuthContext | undefined, itemId: string, body: NovalogBillingItemInput) {
   ensureNovalogContext(auth);
   const tenantId = auth?.tenantId || '';
-  const payload = normalizeBillingItem(body, 0);
+  const currentItem = await findTenantNovalogBillingItem(itemId, tenantId);
+  if (!currentItem) return null;
+  const billingForFallback = await findTenantNovalogBilling(currentItem.billing_id, tenantId);
+  if (!billingForFallback) return null;
+  const payload = normalizeBillingItem(body, 0, billingForFallback.due_date);
   const client = await getPoolClient();
 
   try {

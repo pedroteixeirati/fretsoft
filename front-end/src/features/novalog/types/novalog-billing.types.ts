@@ -8,6 +8,7 @@ export interface NovalogBillingItem {
   cteNumber: string;
   cteKey: string;
   issueDate: string;
+  dueDate: string;
   originName: string;
   destinationName: string;
   amount: number;
@@ -41,6 +42,7 @@ export interface NovalogBillingItemDraft {
   cteNumber: string;
   cteKey: string;
   issueDate: string;
+  dueDate: string;
   originName: string;
   destinationName: string;
   amount: string;
@@ -50,12 +52,13 @@ export interface NovalogBillingItemDraft {
 export interface NovalogBillingPayload {
   companyId: string;
   billingDate: string;
-  dueDate: string;
+  dueDate?: string;
   notes?: string;
   items: Array<{
     cteNumber: string;
     cteKey?: string;
     issueDate?: string;
+    dueDate?: string;
     originName?: string;
     destinationName?: string;
     amount: number;
@@ -67,6 +70,7 @@ export interface NovalogBillingItemUpdatePayload {
   cteNumber: string;
   cteKey?: string;
   issueDate?: string;
+  dueDate?: string;
   originName?: string;
   destinationName?: string;
   amount: number;

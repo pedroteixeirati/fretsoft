@@ -17,6 +17,7 @@ test('schema cria faturamentos Novalog e itens CT-e com rastreabilidade financei
   assert.match(schemaSource, /status text not null default 'draft' check \(status in \('draft', 'open', 'partially_received', 'received', 'overdue', 'canceled'\)\)/i);
   assert.match(schemaSource, /create table if not exists novalog_billing_items \(/i);
   assert.match(schemaSource, /billing_id uuid not null references novalog_billings\(id\) on delete cascade/i);
+  assert.match(schemaSource, /due_date text/i);
   assert.match(schemaSource, /linked_revenue_id uuid references revenues\(id\) on delete set null/i);
   assert.match(schemaSource, /create unique index if not exists idx_novalog_billing_items_tenant_cte_number/i);
 });
@@ -51,6 +52,7 @@ test('service bloqueia tenants fora da Novalog e valida dados essenciais do fatu
   assert.match(novalogBillingServiceSource, /isValidUuid\(companyId\)/);
   assert.match(novalogBillingServiceSource, /isValidDate\(billingDate\)/);
   assert.match(novalogBillingServiceSource, /isValidDate\(dueDate\)/);
+  assert.match(novalogBillingServiceSource, /invalid_novalog_billing_cte_due_date/);
   assert.match(novalogBillingServiceSource, /items\.length === 0/);
   assert.match(novalogBillingServiceSource, /findCompanyForNovalogBilling\(companyId, auth\?\.tenantId \|\| ''\)/);
   assert.match(novalogBillingServiceSource, /duplicated_novalog_billing_cte/);
@@ -68,6 +70,7 @@ test('fechamento do faturamento gera uma revenue individual para cada CT-e', () 
   assert.match(novalogBillingServiceSource, /export async function closeNovalogBilling/);
   assert.match(novalogBillingServiceSource, /for \(const item of items\) \{[\s\S]*await createRevenueForBillingItem\(billing, item, auth\?\.userId, client\);[\s\S]*\}/);
   assert.match(novalogBillingServiceSource, /insert into revenues \(/);
+  assert.match(novalogBillingServiceSource, /const itemDueDate = item\.due_date \|\| billing\.due_date/);
   assert.match(novalogBillingServiceSource, /novalog_billing_id,\s*novalog_billing_item_id/i);
   assert.match(novalogBillingServiceSource, /source_type,[\s\S]*'novalog_billing_item'/);
   assert.match(novalogBillingServiceSource, /on conflict \(novalog_billing_item_id\) where novalog_billing_item_id is not null do update/i);

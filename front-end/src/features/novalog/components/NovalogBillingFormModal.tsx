@@ -18,14 +18,15 @@ interface NovalogBillingFormModalProps {
   onSubmit: (payload: NovalogBillingPayload) => Promise<void> | void;
 }
 
-type ItemErrors = Partial<Record<keyof Pick<NovalogBillingItemDraft, 'cteNumber' | 'issueDate' | 'amount'>, string>>;
+type ItemErrors = Partial<Record<keyof Pick<NovalogBillingItemDraft, 'cteNumber' | 'issueDate' | 'dueDate' | 'amount'>, string>>;
 
-function createDraftItem(): NovalogBillingItemDraft {
+function createDraftItem(defaultDueDate = getTodayInputDate()): NovalogBillingItemDraft {
   return {
     id: `cte-row-${Math.random().toString(36).slice(2, 10)}`,
     cteNumber: '',
     cteKey: '',
     issueDate: '',
+    dueDate: defaultDueDate,
     originName: '',
     destinationName: '',
     amount: '',
@@ -33,18 +34,28 @@ function createDraftItem(): NovalogBillingItemDraft {
   };
 }
 
-function mapBillingToDraftRows(billing?: NovalogBilling | null) {
-  if (!billing?.items?.length) return [createDraftItem()];
+function mapBillingToDraftRows(billing?: NovalogBilling | null, defaultDueDate = getTodayInputDate()) {
+  if (!billing?.items?.length) return [createDraftItem(defaultDueDate)];
   return billing.items.map((item) => ({
     id: item.id,
     cteNumber: item.cteNumber,
     cteKey: item.cteKey || '',
     issueDate: item.issueDate || '',
+    dueDate: item.dueDate || billing.dueDate || defaultDueDate,
     originName: item.originName || '',
     destinationName: item.destinationName || '',
     amount: String(item.amount).replace('.', ','),
     notes: item.notes || '',
   }));
+}
+
+function getReferenceDueDate(items: NovalogBillingItemDraft[]) {
+  const dueDates = items
+    .map((item) => item.dueDate)
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
+
+  return dueDates[0] || getTodayInputDate();
 }
 
 export default function NovalogBillingFormModal({
@@ -57,7 +68,6 @@ export default function NovalogBillingFormModal({
 }: NovalogBillingFormModalProps) {
   const [companyId, setCompanyId] = useState('');
   const [billingDate, setBillingDate] = useState(getTodayInputDate());
-  const [dueDate, setDueDate] = useState(getTodayInputDate());
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<NovalogBillingItemDraft[]>([createDraftItem()]);
   const [submitError, setSubmitError] = useState('');
@@ -86,9 +96,8 @@ export default function NovalogBillingFormModal({
     if (!isOpen) return;
     setCompanyId(draftBilling?.companyId || '');
     setBillingDate(draftBilling?.billingDate || getTodayInputDate());
-    setDueDate(draftBilling?.dueDate || getTodayInputDate());
     setNotes(draftBilling?.notes || '');
-    setItems(mapBillingToDraftRows(draftBilling));
+    setItems(mapBillingToDraftRows(draftBilling, draftBilling?.dueDate || getTodayInputDate()));
     setSubmitError('');
     setFieldErrors({});
     setItemErrors({});
@@ -132,7 +141,6 @@ export default function NovalogBillingFormModal({
 
     if (!companyId) nextFieldErrors.companyId = 'Selecione o cliente.';
     if (!billingDate) nextFieldErrors.billingDate = 'Informe a data do faturamento.';
-    if (!dueDate) nextFieldErrors.dueDate = 'Informe o vencimento.';
 
     items.forEach((item) => {
       const errors: ItemErrors = {};
@@ -142,6 +150,7 @@ export default function NovalogBillingFormModal({
         errors.cteNumber = 'CT-e duplicado no faturamento.';
       }
       if (cteNumber) seenCtes.add(cteNumber.toLocaleLowerCase('pt-BR'));
+      if (!item.dueDate) errors.dueDate = 'Informe o vencimento.';
       if (parseNovalogDecimal(item.amount) <= 0) errors.amount = 'Informe um valor maior que zero.';
       if (Object.keys(errors).length > 0) nextItemErrors[item.id] = errors;
     });
@@ -157,12 +166,13 @@ export default function NovalogBillingFormModal({
     await onSubmit({
       companyId,
       billingDate,
-      dueDate,
+      dueDate: getReferenceDueDate(items),
       notes: notes.trim() || undefined,
       items: items.map((item) => ({
         cteNumber: item.cteNumber.trim(),
         cteKey: item.cteKey.trim() || undefined,
         issueDate: item.issueDate || undefined,
+        dueDate: item.dueDate,
         amount: parseNovalogDecimal(item.amount),
         notes: item.notes.trim() || undefined,
       })),
@@ -180,7 +190,7 @@ export default function NovalogBillingFormModal({
       <form onSubmit={handleSubmit} className="space-y-6">
         <FormAlert message={submitError} variant="error" />
 
-        <section className="grid gap-4 lg:grid-cols-4">
+        <section className="grid gap-4 lg:grid-cols-3">
           <div className="space-y-2 lg:col-span-2">
             <FieldLabel required>Cliente</FieldLabel>
             <NovalogAutocompleteSelect
@@ -203,15 +213,6 @@ export default function NovalogBillingFormModal({
               setFieldErrors((current) => ({ ...current, billingDate: '' }));
             }}
             error={fieldErrors.billingDate}
-          />
-          <FormDatePicker
-            label="Vencimento"
-            value={dueDate}
-            onChange={(value) => {
-              setDueDate(value);
-              setFieldErrors((current) => ({ ...current, dueDate: '' }));
-            }}
-            error={fieldErrors.dueDate}
           />
         </section>
 
@@ -240,6 +241,7 @@ export default function NovalogBillingFormModal({
                   <tr className="border-b border-outline-variant/10 bg-surface-container-low">
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">CT-e</th>
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Emissao</th>
+                    <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Vencimento</th>
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Valor</th>
                     <th className="px-4 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Acoes</th>
                   </tr>
@@ -258,6 +260,18 @@ export default function NovalogBillingFormModal({
                           required={false}
                           showLabel={false}
                           error={itemErrors[item.id]?.issueDate}
+                          containerClassName="space-y-0"
+                          buttonClassName="rounded-[1.35rem] border-outline-variant bg-surface px-4 py-3.5"
+                        />
+                      </td>
+                      <td className="min-w-[160px] px-4 py-4">
+                        <FormDatePicker
+                          label="Vencimento"
+                          value={item.dueDate}
+                          onChange={(value) => updateItem(item.id, 'dueDate', value)}
+                          required={false}
+                          showLabel={false}
+                          error={itemErrors[item.id]?.dueDate}
                           containerClassName="space-y-0"
                           buttonClassName="rounded-[1.35rem] border-outline-variant bg-surface px-4 py-3.5"
                         />

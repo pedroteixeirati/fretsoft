@@ -5,6 +5,7 @@ export type NovalogBillingItemInput = {
   cteNumber?: string | null;
   cteKey?: string | null;
   issueDate?: string | null;
+  dueDate?: string | null;
   originName?: string | null;
   destinationName?: string | null;
   amount?: number | string | null;
@@ -32,6 +33,7 @@ export type NovalogBillingItemPayload = {
   cteNumber: string;
   cteKey: string | null;
   issueDate: string | null;
+  dueDate: string;
   originName: string | null;
   destinationName: string | null;
   amount: number;

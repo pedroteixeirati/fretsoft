@@ -107,6 +107,7 @@ describe('NovalogBillingFormModal', () => {
               cteNumber: '8899',
               cteKey: '',
               issueDate: '2026-04-09',
+              dueDate: '2026-05-15',
               originName: 'Mina',
               destinationName: 'Gerdau',
               amount: 2000,
@@ -123,6 +124,7 @@ describe('NovalogBillingFormModal', () => {
 
     expect(screen.getByText('Editar faturamento Novalog')).toBeInTheDocument();
     expect(screen.getByDisplayValue('8899')).toBeInTheDocument();
+    expect(screen.getAllByText('Vencimento').length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue('Gerdau')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Faturamento Abril')).toBeInTheDocument();
     expect(within(screen.getByText('Total do faturamento').closest('section') as HTMLElement).getByText(/2.000,00/)).toBeInTheDocument();

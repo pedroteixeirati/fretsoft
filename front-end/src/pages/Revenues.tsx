@@ -50,7 +50,8 @@ export default function Revenues() {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState('all');
   const [companyFilter, setCompanyFilter] = useState('all');
-  const [dueDateFilter, setDueDateFilter] = useState('');
+  const [dueDateStartFilter, setDueDateStartFilter] = useState('');
+  const [dueDateEndFilter, setDueDateEndFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   const loadData = useEffectEvent(async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -120,16 +121,20 @@ export default function Revenues() {
         const matchesLinkedRevenue = !linkedRevenueIdFilter || revenue.id === linkedRevenueIdFilter;
         const matchesStatus = statusFilter === 'all' || revenue.status === statusFilter;
         const matchesCompany = companyFilter === 'all' || normalizedCompany === companyFilter;
-        const matchesDueDate = !dueDateFilter || revenue.dueDate === dueDateFilter;
+        const rangeStart = dueDateStartFilter && dueDateEndFilter && dueDateStartFilter > dueDateEndFilter ? dueDateEndFilter : dueDateStartFilter;
+        const rangeEnd = dueDateStartFilter && dueDateEndFilter && dueDateStartFilter > dueDateEndFilter ? dueDateStartFilter : dueDateEndFilter;
+        const matchesDueDate =
+          (!rangeStart || revenue.dueDate >= rangeStart) &&
+          (!rangeEnd || revenue.dueDate <= rangeEnd);
 
         return matchesSearch && matchesLinkedRevenue && matchesStatus && matchesCompany && matchesDueDate;
       }),
-    [revenues, searchTerm, linkedRevenueIdFilter, statusFilter, companyFilter, dueDateFilter]
+    [revenues, searchTerm, linkedRevenueIdFilter, statusFilter, companyFilter, dueDateStartFilter, dueDateEndFilter]
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, companyFilter, dueDateFilter, revenues.length]);
+  }, [searchTerm, statusFilter, companyFilter, dueDateStartFilter, dueDateEndFilter, revenues.length]);
 
   const companyOptions = useMemo(() => {
     const companies = Array.from(new Set(revenues.map((revenue) => revenue.companyName).filter(Boolean))).sort((first, second) =>
@@ -155,14 +160,15 @@ export default function Revenues() {
   const totalPages = Math.max(1, Math.ceil(filteredRevenues.length / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedRevenues = filteredRevenues.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
-  const hasActiveFilters = Boolean(searchTerm || linkedRevenueIdFilter || statusFilter !== 'all' || companyFilter !== 'all' || dueDateFilter);
+  const hasActiveFilters = Boolean(searchTerm || linkedRevenueIdFilter || statusFilter !== 'all' || companyFilter !== 'all' || dueDateStartFilter || dueDateEndFilter);
   const canUpdateRevenues = canAccess(userProfile, 'revenues', 'create');
 
   const clearFilters = () => {
     setSearchTerm('');
     setCompanyFilter('all');
     setStatusFilter('all');
-    setDueDateFilter('');
+    setDueDateStartFilter('');
+    setDueDateEndFilter('');
     setSearchParams({});
   };
 
@@ -329,16 +335,30 @@ export default function Revenues() {
           />
           <Filter className="h-4 w-4 text-primary" />
         </div>
-        <FormDatePicker
-          label="Vencimento"
-          value={dueDateFilter}
-          onChange={setDueDateFilter}
-          required={false}
-          showLabel={false}
-          placeholder="Vencimento"
-          containerClassName="space-y-0"
-          buttonClassName="h-12 min-w-[12rem] rounded-full border-0 bg-surface px-4 py-0 ring-1 ring-primary/5 grid-cols-[minmax(0,1fr)_1rem_1rem] [&>svg:first-child]:order-3 [&>span]:order-1 [&>svg:last-child]:order-2"
-        />
+        <div className="flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 ring-1 ring-primary/5">
+          <FormDatePicker
+            label="Vencimento inicial"
+            value={dueDateStartFilter}
+            onChange={setDueDateStartFilter}
+            required={false}
+            showLabel={false}
+            placeholder="De"
+            containerClassName="space-y-0"
+            buttonClassName="h-10 min-w-[6.75rem] rounded-full border-0 bg-transparent px-2 py-0 grid-cols-[minmax(0,1fr)_1rem_1rem] [&>svg:first-child]:order-3 [&>span]:order-1 [&>svg:last-child]:order-2"
+          />
+          <span className="text-xs font-bold text-on-surface-variant">ate</span>
+          <FormDatePicker
+            label="Vencimento final"
+            value={dueDateEndFilter}
+            onChange={setDueDateEndFilter}
+            required={false}
+            showLabel={false}
+            placeholder="Ate"
+            min={dueDateStartFilter || undefined}
+            containerClassName="space-y-0"
+            buttonClassName="h-10 min-w-[6.75rem] rounded-full border-0 bg-transparent px-2 py-0 grid-cols-[minmax(0,1fr)_1rem_1rem] [&>svg:first-child]:order-3 [&>span]:order-1 [&>svg:last-child]:order-2"
+          />
+        </div>
         <button
           type="button"
           onClick={clearFilters}

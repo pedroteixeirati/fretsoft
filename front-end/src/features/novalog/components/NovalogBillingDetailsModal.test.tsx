@@ -27,6 +27,7 @@ function makeBilling(overrides: Partial<NovalogBilling> = {}): NovalogBilling {
         cteNumber: '1001',
         cteKey: '',
         issueDate: '2026-04-01',
+        dueDate: '2026-05-10',
         originName: 'Mina X',
         destinationName: 'Gerdau',
         amount: 2000,
@@ -42,6 +43,7 @@ function makeBilling(overrides: Partial<NovalogBilling> = {}): NovalogBilling {
         cteNumber: '1002',
         cteKey: '',
         issueDate: '2026-04-02',
+        dueDate: '2026-05-20',
         originName: 'Mina Y',
         destinationName: 'Gerdau',
         amount: 3000,
@@ -84,6 +86,8 @@ describe('NovalogBillingDetailsModal', () => {
     expect(screen.getByText('1001')).toBeInTheDocument();
     expect(screen.getByText('1002')).toBeInTheDocument();
     expect(screen.getByText('Recebimento')).toBeInTheDocument();
+    expect(screen.getAllByText('Vencimento').length).toBeGreaterThan(0);
+    expect(screen.getByText('20/05/2026')).toBeInTheDocument();
     expect(screen.getByText('12/04/2026')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Recebida' }));
@@ -155,6 +159,7 @@ describe('NovalogBillingDetailsModal', () => {
               cteNumber: '1001',
               cteKey: '',
               issueDate: '2026-04-01',
+              dueDate: '2026-05-10',
               originName: '',
               destinationName: '',
               amount: 2000,
