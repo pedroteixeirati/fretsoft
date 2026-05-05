@@ -1,7 +1,0 @@
-interface:
-  display_name: "Senior Node.js + React"
-  short_description: "Engenharia full stack senior para SaaS em Node e React"
-  default_prompt: "Use $senior-nodejs-react para projetar, implementar ou revisar funcionalidades full stack deste SaaS com postura critica, sem repetir fragilidades do legado."
-
-policy:
-  allow_implicit_invocation: true
