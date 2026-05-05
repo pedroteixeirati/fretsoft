@@ -11,6 +11,7 @@ import { canAccessNovalogOperations } from '../utils/novalog.visibility';
 import { novalogInitialKpis, novalogKpiIcons, novalogWeekOptions } from '../constants/novalog.constants';
 import NovalogEntriesTable from '../components/NovalogEntriesTable';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
+import { matchesNovalogDisplayIdRange } from '../utils/novalog-id-range';
 import NovalogStandardEntryModal from '../components/NovalogStandardEntryModal';
 import NovalogBatchEntryModal from '../components/NovalogBatchEntryModal';
 import { NovalogEntry } from '../types/novalog.types';
@@ -120,12 +121,8 @@ export default function NovalogOperationsPage() {
   const filteredEntries = useMemo(
     () =>
       weekEntries.filter((entry) => {
-        const haystack = [String(entry.displayId ?? ''), entry.ticketNumber, entry.originName, entry.destinationName]
-          .join(' ')
-          .toLowerCase();
-
         return (
-          haystack.includes(searchTerm.toLowerCase()) &&
+          matchesNovalogDisplayIdRange(entry.displayId, searchTerm) &&
           entry.originName.toLowerCase().includes(originFilter.toLowerCase()) &&
           entry.destinationName.toLowerCase().includes(destinationFilter.toLowerCase()) &&
           (entry.fuelStationName ?? '').toLowerCase().includes(fuelStationFilter.toLowerCase())

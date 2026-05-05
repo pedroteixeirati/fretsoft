@@ -33,7 +33,7 @@ export default function NovalogFilters({
         <Input
           value={searchTerm}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por identificador, ticket ou origem"
+          placeholder="Buscar por ID ou intervalo"
           leftIcon={<Search className="h-4 w-4" />}
           containerClassName="min-w-0"
         />
