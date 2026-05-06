@@ -1,12 +1,16 @@
-import React, { useEffect, useEffectEvent, useMemo, useState } from 'react';
-import { Building2, FileText, Filter, MoreVertical, RefreshCw, Search, X } from 'lucide-react';
+import React, { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertTriangle, Building2, FileText, Filter, History, MoreVertical, RefreshCw, Search, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import { revenuesApi } from '../lib/api';
 import { canAccess } from '../lib/permissions';
 import { formatDateOnlyPtBr, formatDateTimePtBr } from '../lib/date';
+import { cn } from '../lib/utils';
 import { Revenue } from '../types';
+import type { RevenuePayment } from '../features/revenues/types/revenue.types';
+import RevenuePaymentModal from '../features/revenues/components/RevenuePaymentModal';
 import DataTable, { DataTableColumn } from '../shared/ui/DataTable';
 import FormDatePicker from '../shared/forms/FormDatePicker';
 import { useFirebase } from '../context/FirebaseContext';
@@ -16,7 +20,7 @@ function currency(value: number) {
 }
 
 function canReceiveRevenue(revenue: Revenue) {
-  return revenue.status === 'pending' || revenue.status === 'billed' || revenue.status === 'overdue';
+  return revenue.status === 'pending' || revenue.status === 'billed' || revenue.status === 'partially_received' || revenue.status === 'overdue';
 }
 
 function canMarkRevenueAsOverdue(revenue: Revenue) {
@@ -38,6 +42,10 @@ function receivableLabel(revenue: Revenue) {
   return revenue.contractName;
 }
 
+function todayInputDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+}
+
 export default function Revenues() {
   const { userProfile } = useFirebase();
   const itemsPerPage = 10;
@@ -53,6 +61,13 @@ export default function Revenues() {
   const [dueDateStartFilter, setDueDateStartFilter] = useState('');
   const [dueDateEndFilter, setDueDateEndFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [paymentRevenue, setPaymentRevenue] = useState<Revenue | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(todayInputDate());
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [payments, setPayments] = useState<RevenuePayment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   const loadData = useEffectEvent(async (mode: 'initial' | 'refresh' = 'initial') => {
     if (mode === 'initial') {
@@ -86,11 +101,57 @@ export default function Revenues() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  const handleReceive = async (revenueId: string) => {
-    setProcessingRevenueId(revenueId);
+  const openPaymentModal = (revenue: Revenue) => {
+    setPaymentRevenue(revenue);
+    setPaymentAmount(String(Number(revenue.balanceAmount || revenue.amount || 0).toFixed(2)).replace('.', ','));
+    setPaymentDate(todayInputDate());
+    setPaymentNotes('');
+    setPaymentError('');
+  };
+
+  useEffect(() => {
+    if (!paymentRevenue) return undefined;
+
+    let isMounted = true;
+    setLoadingPayments(true);
+    void revenuesApi.listPayments(paymentRevenue.id)
+      .then((result) => {
+        if (isMounted) setPayments(result);
+      })
+      .catch(() => {
+        if (isMounted) setPayments([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingPayments(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [paymentRevenue]);
+
+  const handleRegisterPayment = async () => {
+    if (!paymentRevenue) return;
+    const normalizedAmount = Number(paymentAmount.replace(/\./g, '').replace(',', '.'));
+    setPaymentError('');
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      setPaymentError('Informe um valor recebido maior que zero.');
+      return;
+    }
+    if (normalizedAmount - Number(paymentRevenue.balanceAmount || 0) > 0.009) {
+      setPaymentError('O valor recebido nao pode ultrapassar o saldo em aberto.');
+      return;
+    }
+
+    setProcessingRevenueId(paymentRevenue.id);
     try {
-      await revenuesApi.markReceived(revenueId);
+      await revenuesApi.registerPayment(paymentRevenue.id, {
+        amount: normalizedAmount,
+        paymentDate,
+        notes: paymentNotes,
+      });
       await loadData('refresh');
+      setPaymentRevenue(null);
     } finally {
       setProcessingRevenueId(null);
     }
@@ -148,15 +209,13 @@ export default function Revenues() {
   }, [revenues]);
 
   const totalFiltered = filteredRevenues.reduce((sum, revenue) => sum + Number(revenue.amount || 0), 0);
-  const totalReceived = filteredRevenues
-    .filter((revenue) => revenue.status === 'received')
-    .reduce((sum, revenue) => sum + Number(revenue.amount || 0), 0);
+  const totalReceived = filteredRevenues.reduce((sum, revenue) => sum + Number(revenue.receivedAmount || 0), 0);
   const totalOpen = filteredRevenues
-    .filter((revenue) => ['pending', 'billed'].includes(revenue.status))
-    .reduce((sum, revenue) => sum + Number(revenue.amount || 0), 0);
+    .filter((revenue) => ['pending', 'billed', 'partially_received'].includes(revenue.status))
+    .reduce((sum, revenue) => sum + Number(revenue.balanceAmount || 0), 0);
   const totalOverdue = filteredRevenues
     .filter((revenue) => revenue.status === 'overdue')
-    .reduce((sum, revenue) => sum + Number(revenue.amount || 0), 0);
+    .reduce((sum, revenue) => sum + Number(revenue.balanceAmount || 0), 0);
   const totalPages = Math.max(1, Math.ceil(filteredRevenues.length / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedRevenues = filteredRevenues.slice((safeCurrentPage - 1) * itemsPerPage, safeCurrentPage * itemsPerPage);
@@ -184,36 +243,35 @@ export default function Revenues() {
       return <span className="text-xs font-medium text-on-surface-variant">Somente leitura</span>;
     }
 
-    const canReceive = canReceiveRevenue(revenue);
+    const canReceive = canReceiveRevenue(revenue) && Number(revenue.balanceAmount || 0) > 0;
     const canMarkOverdue = canMarkRevenueAsOverdue(revenue);
     const isProcessing = processingRevenueId === revenue.id;
+    const hasHistory = Number(revenue.paymentCount || 0) > 0;
 
-    if (!canReceive && !canMarkOverdue) {
+    if (!canReceive && !canMarkOverdue && !hasHistory) {
       return <span className="text-xs font-medium text-on-surface-variant">Sem acoes</span>;
     }
 
     return (
-      <div className="flex items-center justify-end gap-1">
+      <div className="flex items-center justify-end">
         {canReceive ? (
           <button
             type="button"
-            onClick={() => handleReceive(revenue.id)}
+            onClick={() => openPaymentModal(revenue)}
             disabled={isProcessing}
             className="rounded-full bg-secondary-container px-3 py-1.5 text-[11px] font-bold text-on-secondary-container transition hover:brightness-105 disabled:opacity-50"
           >
             Recebida
           </button>
         ) : null}
-        {canMarkOverdue ? (
-          <button
-            type="button"
-            onClick={() => handleOverdue(revenue.id)}
-            disabled={isProcessing}
-            className="rounded-full bg-error/10 px-3 py-1.5 text-[11px] font-bold text-error transition-colors hover:bg-error/15 disabled:opacity-50"
-          >
-            Em atraso
-          </button>
-        ) : null}
+        <RevenueActionsMenu
+          revenue={revenue}
+          disabled={isProcessing}
+          canMarkOverdue={canMarkOverdue}
+          hasHistory={hasHistory}
+          onOverdue={() => handleOverdue(revenue.id)}
+          onHistory={() => openPaymentModal(revenue)}
+        />
       </div>
     );
   };
@@ -263,6 +321,24 @@ export default function Revenues() {
       className: 'text-right',
       cell: (revenue) => (
         <span className="whitespace-nowrap text-sm font-black text-primary">{currency(Number(revenue.amount || 0))}</span>
+      ),
+    },
+    {
+      id: 'receivedAmount',
+      header: 'Recebido',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (revenue) => (
+        <span className="whitespace-nowrap text-sm font-bold text-on-surface">{currency(Number(revenue.receivedAmount || 0))}</span>
+      ),
+    },
+    {
+      id: 'balanceAmount',
+      header: 'Saldo',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (revenue) => (
+        <span className="whitespace-nowrap text-sm font-black text-primary">{currency(Number(revenue.balanceAmount || 0))}</span>
       ),
     },
     {
@@ -328,6 +404,7 @@ export default function Revenues() {
               { value: 'all', label: 'Todos os Status' },
               { value: 'pending', label: 'Pendente' },
               { value: 'billed', label: 'Cobrada' },
+              { value: 'partially_received', label: 'Parcial' },
               { value: 'received', label: 'Recebida' },
               { value: 'overdue', label: 'Em atraso' },
               { value: 'canceled', label: 'Cancelada' },
@@ -401,6 +478,14 @@ export default function Revenues() {
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Valor</p>
           <p className="mt-1 font-black text-primary">{currency(Number(revenue.amount || 0))}</p>
         </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Recebido</p>
+          <p className="mt-1 font-semibold text-on-surface">{currency(Number(revenue.receivedAmount || 0))}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Saldo</p>
+          <p className="mt-1 font-black text-primary">{currency(Number(revenue.balanceAmount || 0))}</p>
+        </div>
       </div>
       <div className="mt-4 flex justify-end border-t border-outline-variant/10 pt-3">{renderActions(revenue)}</div>
     </article>
@@ -447,7 +532,149 @@ export default function Revenues() {
           onNextPage: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
         }}
       />
+
+      <RevenuePaymentModal
+        revenue={paymentRevenue}
+        title={paymentRevenue ? `Recebimento ${receivableLabel(paymentRevenue)}` : 'Recebimento'}
+        amount={paymentAmount}
+        paymentDate={paymentDate}
+        notes={paymentNotes}
+        error={paymentError}
+        payments={payments}
+        loadingPayments={loadingPayments}
+        isSubmitting={processingRevenueId === paymentRevenue?.id}
+        onAmountChange={setPaymentAmount}
+        onPaymentDateChange={setPaymentDate}
+        onNotesChange={setPaymentNotes}
+        onClose={() => setPaymentRevenue(null)}
+        onSubmit={handleRegisterPayment}
+      />
     </div>
+  );
+}
+
+function RevenueActionsMenu({
+  revenue,
+  disabled,
+  canMarkOverdue,
+  hasHistory,
+  onOverdue,
+  onHistory,
+}: {
+  revenue: Revenue;
+  disabled: boolean;
+  canMarkOverdue: boolean;
+  hasHistory: boolean;
+  onOverdue: () => void;
+  onHistory: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const hasMenuActions = canMarkOverdue || hasHistory;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !dropdownRef.current?.contains(target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [isOpen]);
+
+  const updateDropdownPosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const buttonRect = button.getBoundingClientRect();
+    const dropdownWidth = dropdownRef.current?.offsetWidth || 176;
+    const dropdownHeight = dropdownRef.current?.offsetHeight || 150;
+    const viewportPadding = 12;
+    const gap = 8;
+    const top = Math.min(buttonRect.bottom + gap, window.innerHeight - dropdownHeight - viewportPadding);
+    const left = Math.min(
+      Math.max(viewportPadding, buttonRect.right - dropdownWidth),
+      window.innerWidth - dropdownWidth - viewportPadding,
+    );
+
+    setDropdownStyle({ position: 'fixed', top, left, zIndex: 140 });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+
+    const frameId = window.requestAnimationFrame(updateDropdownPosition);
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [isOpen, updateDropdownPosition]);
+
+  if (!hasMenuActions) return null;
+
+  const runAction = (action: () => void) => {
+    action();
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={`Acoes do recebivel ${receivableLabel(revenue)}`}
+        disabled={disabled}
+        onClick={() => setIsOpen((current) => !current)}
+        className="grid h-9 w-9 place-items-center rounded-full p-0 text-on-surface-variant transition hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <MoreVertical className="block h-4 w-4" />
+      </button>
+
+      {isOpen ? createPortal(
+        <div ref={dropdownRef} style={dropdownStyle} className="w-[12rem] overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-2 text-left shadow-[0_24px_60px_rgba(26,28,21,0.12)]">
+          {canMarkOverdue ? (
+            <RevenueActionMenuItem icon={AlertTriangle} label="Em atraso" tone="danger" onClick={() => runAction(onOverdue)} />
+          ) : null}
+          {hasHistory ? (
+            <RevenueActionMenuItem icon={History} label="Historico" onClick={() => runAction(onHistory)} />
+          ) : null}
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  );
+}
+
+function RevenueActionMenuItem({
+  icon: Icon,
+  label,
+  tone = 'default',
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  tone?: 'default' | 'danger';
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition',
+        tone === 'danger' ? 'text-error hover:bg-error/10' : 'text-on-surface hover:bg-primary/10',
+      )}
+    >
+      <Icon className={cn('h-4 w-4', tone === 'danger' ? 'text-error' : 'text-primary')} />
+      {label}
+    </button>
   );
 }
 
@@ -455,6 +682,8 @@ function statusLabel(status: Revenue['status']) {
   switch (status) {
     case 'billed':
       return 'Cobrada';
+    case 'partially_received':
+      return 'Parcial';
     case 'received':
       return 'Recebida';
     case 'overdue':
@@ -470,6 +699,8 @@ function statusBadgeTone(status: Revenue['status']) {
   switch (status) {
     case 'billed':
       return 'bg-secondary-container text-on-secondary-container';
+    case 'partially_received':
+      return 'bg-tertiary/10 text-tertiary';
     case 'received':
       return 'bg-primary-fixed text-primary';
     case 'overdue':

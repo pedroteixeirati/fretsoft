@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, FileText, Filter, Loader2, PackagePlus, Pickaxe, Search, WalletCards } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import CustomSelect from '../../../components/CustomSelect';
 import KpiCard from '../../../components/KpiCard';
 import { useFirebase } from '../../../context/FirebaseContext';
@@ -10,6 +9,9 @@ import { formatDateOnlyPtBr } from '../../../lib/date';
 import { ConfirmDialog } from '../../../shared/ui';
 import { queryKeys } from '../../../shared/lib/query-keys';
 import { companiesApi } from '../../companies/services/companies.api';
+import RevenuePaymentModal from '../../revenues/components/RevenuePaymentModal';
+import { revenuesApi } from '../../revenues/services/revenues.api';
+import type { Revenue, RevenuePayment } from '../../revenues/types/revenue.types';
 import NovalogBillingDetailsModal from '../components/NovalogBillingDetailsModal';
 import NovalogBillingFormModal from '../components/NovalogBillingFormModal';
 import NovalogBillingItemEditModal from '../components/NovalogBillingItemEditModal';
@@ -32,7 +34,7 @@ const statusOptions = [
 ];
 
 export default function NovalogBillingsPage() {
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { userProfile } = useFirebase();
   const canAccessNovalogModule = canAccessNovalogOperations(userProfile);
   const canReadCompanies = canAccessNovalogModule && canAccess(userProfile, 'companies', 'read');
@@ -62,6 +64,13 @@ export default function NovalogBillingsPage() {
   const [deletingItem, setDeletingItem] = useState<NovalogBillingItem | null>(null);
   const [selectedBilling, setSelectedBilling] = useState<NovalogBilling | null>(null);
   const [detailsError, setDetailsError] = useState('');
+  const [paymentRevenue, setPaymentRevenue] = useState<Revenue | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }));
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [payments, setPayments] = useState<RevenuePayment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   const filteredBillings = useMemo(
     () =>
@@ -114,14 +123,19 @@ export default function NovalogBillingsPage() {
     }
   };
 
-  const handleSubmit = async (payload: NovalogBillingPayload) => {
-    if (editingBilling) {
-      await updateBilling.mutateAsync({ id: editingBilling.id, payload });
-    } else {
-      await createBilling.mutateAsync(payload);
-    }
+  const handleSubmit = async (payload: NovalogBillingPayload, action: 'draft' | 'close') => {
+    const savedBilling = editingBilling
+      ? await updateBilling.mutateAsync({ id: editingBilling.id, payload })
+      : await createBilling.mutateAsync(payload);
+
     setIsFormOpen(false);
     setEditingBilling(null);
+
+    if (action === 'close' && savedBilling?.id) {
+      await closeBilling.mutateAsync(savedBilling.id);
+      setSelectedBilling(null);
+      setIsDetailsOpen(false);
+    }
   };
 
   const handleEdit = (billing: NovalogBilling) => {
@@ -149,6 +163,81 @@ export default function NovalogBillingsPage() {
     await refreshSelectedBilling(billing.id);
   };
 
+  useEffect(() => {
+    if (!paymentRevenue) return undefined;
+
+    let isMounted = true;
+    setLoadingPayments(true);
+    void revenuesApi.listPayments(paymentRevenue.id)
+      .then((result) => {
+        if (isMounted) setPayments(result);
+      })
+      .catch(() => {
+        if (isMounted) setPayments([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingPayments(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [paymentRevenue]);
+
+  const openRevenuePayment = async (item: NovalogBillingItem) => {
+    if (!item.linkedRevenueId) {
+      setDetailsError('Recebivel vinculado a este CT-e ainda nao foi gerado.');
+      return;
+    }
+
+    setDetailsError('');
+    setLoadingPayments(true);
+    try {
+      const tenantRevenues = await revenuesApi.list();
+      const revenue = tenantRevenues.find((current) => current.id === item.linkedRevenueId);
+      if (!revenue) {
+        setDetailsError('Nao foi possivel localizar o recebivel vinculado a este CT-e.');
+        return;
+      }
+      setPaymentRevenue(revenue);
+      setPaymentAmount(String(Number(revenue.balanceAmount || revenue.amount || 0).toFixed(2)).replace('.', ','));
+      setPaymentDate(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }));
+      setPaymentNotes('');
+      setPaymentError('');
+    } catch {
+      setDetailsError('Nao foi possivel carregar o recebivel vinculado a este CT-e.');
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
+  const handleRegisterRevenuePayment = async () => {
+    if (!paymentRevenue) return;
+    const normalizedAmount = Number(paymentAmount.replace(/\./g, '').replace(',', '.'));
+    setPaymentError('');
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      setPaymentError('Informe um valor recebido maior que zero.');
+      return;
+    }
+    if (normalizedAmount - Number(paymentRevenue.balanceAmount || 0) > 0.009) {
+      setPaymentError('O valor recebido nao pode ultrapassar o saldo em aberto.');
+      return;
+    }
+
+    await revenuesApi.registerPayment(paymentRevenue.id, {
+      amount: normalizedAmount,
+      paymentDate,
+      notes: paymentNotes,
+    });
+
+    if (selectedBilling?.id) {
+      await refreshSelectedBilling(selectedBilling.id);
+    }
+    await queryClient.invalidateQueries({ queryKey: queryKeys.novalogBillings.all });
+    await queryClient.invalidateQueries({ queryKey: ['revenues'] });
+    setPaymentRevenue(null);
+  };
+
   const handleUpdateItem = async (itemId: string, payload: NovalogBillingItemUpdatePayload) => {
     const billing = await updateItem.mutateAsync({ id: itemId, payload });
     setEditingItem(null);
@@ -160,15 +249,6 @@ export default function NovalogBillingsPage() {
     const billing = await deleteItem.mutateAsync(deletingItem.id);
     setDeletingItem(null);
     setSelectedBilling(billing);
-  };
-
-  const handleOpenRevenue = (item: NovalogBillingItem) => {
-    if (!item.linkedRevenueId) return;
-    const params = new URLSearchParams({
-      search: `CT-e ${item.cteNumber}`,
-      revenueId: item.linkedRevenueId,
-    });
-    navigate(`/contas-a-receber?${params.toString()}`);
   };
 
   if (!canAccessNovalogModule) {
@@ -332,7 +412,24 @@ export default function NovalogBillingsPage() {
         onOverdueItem={handleOverdueItem}
         onEditItem={setEditingItem}
         onDeleteItem={setDeletingItem}
-        onOpenRevenue={handleOpenRevenue}
+        onOpenRevenue={openRevenuePayment}
+      />
+
+      <RevenuePaymentModal
+        revenue={paymentRevenue}
+        title={paymentRevenue ? `Recebimento ${paymentRevenue.description}` : 'Recebimento'}
+        amount={paymentAmount}
+        paymentDate={paymentDate}
+        notes={paymentNotes}
+        error={paymentError}
+        payments={payments}
+        loadingPayments={loadingPayments}
+        isSubmitting={false}
+        onAmountChange={setPaymentAmount}
+        onPaymentDateChange={setPaymentDate}
+        onNotesChange={setPaymentNotes}
+        onClose={() => setPaymentRevenue(null)}
+        onSubmit={handleRegisterRevenuePayment}
       />
 
       <NovalogBillingItemEditModal

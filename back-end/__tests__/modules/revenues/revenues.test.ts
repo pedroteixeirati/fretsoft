@@ -16,6 +16,7 @@ const appSource = readFileSync(resolve(process.cwd(), 'back-end/shared/infra/htt
 const freightsServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/freights/services/freights.service.ts'), 'utf8');
 const revenuesServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/revenues/services/revenues.service.ts'), 'utf8');
 const revenuesRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/revenues/repositories/revenues.repository.ts'), 'utf8');
+const revenuePaymentsRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/revenues/repositories/revenue-payments.repository.ts'), 'utf8');
 
 test('gera receitas automaticas apenas para contratos recorrentes com valor mensal positivo', () => {
   assert.equal(shouldGenerateContractRevenue('recurring', 18000), true);
@@ -89,8 +90,8 @@ test('transicoes financeiras impedem cobranca e atraso em receitas concluidas', 
     /markRevenueAsCharged[\s\S]*where id = \$3[\s\S]*tenant_id = \$4[\s\S]*status in \('pending', 'overdue'\)/i
   );
   assert.match(
-    revenuesRepositorySource,
-    /markRevenueAsReceived[\s\S]*where id = \$2[\s\S]*tenant_id = \$3[\s\S]*status in \('pending', 'billed', 'overdue'\)/i
+    revenuePaymentsRepositorySource,
+    /insert into revenue_payments \([\s\S]*tenant_id,[\s\S]*revenue_id,[\s\S]*amount,[\s\S]*payment_date/i
   );
   assert.match(
     revenuesRepositorySource,

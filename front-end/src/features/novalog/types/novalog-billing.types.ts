@@ -1,5 +1,5 @@
 export type NovalogBillingStatus = 'draft' | 'open' | 'partially_received' | 'received' | 'overdue' | 'canceled';
-export type NovalogBillingItemStatus = 'pending' | 'billed' | 'received' | 'overdue' | 'canceled';
+export type NovalogBillingItemStatus = 'pending' | 'billed' | 'partially_received' | 'received' | 'overdue' | 'canceled';
 
 export interface NovalogBillingItem {
   id: string;
@@ -12,6 +12,9 @@ export interface NovalogBillingItem {
   originName: string;
   destinationName: string;
   amount: number;
+  receivedAmount: number;
+  balanceAmount: number;
+  paymentCount: number;
   status: NovalogBillingItemStatus;
   receivedAt?: string;
   notes: string;

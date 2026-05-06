@@ -8,8 +8,10 @@ import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import {
   chargeRevenue,
   generateTenantRevenues,
+  listRevenuePayments,
   listTenantRevenues,
   overdueRevenue,
+  registerRevenuePayment,
   receiveRevenue,
 } from '../services/revenues.service';
 
@@ -58,6 +60,36 @@ router.post('/:id/charge', loadAuthContext, async (req: AuthenticatedRequest, re
     }
 
     res.json(revenue);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/payments', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', permissions, req.auth?.role), 'Sem permissao para visualizar pagamentos.')) {
+      return;
+    }
+
+    res.json(await listRevenuePayments(req.params.id, req.auth?.tenantId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/payments', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('create', permissions, req.auth?.role), 'Sem permissao para registrar recebimento.')) {
+      return;
+    }
+
+    const revenue = await registerRevenuePayment(req.params.id, req.auth?.tenantId, req.body, req.auth?.userId);
+    if (!revenue) {
+      sendErrorResponse(res, notFoundError('Receita nao encontrada.', 'revenue_not_found'));
+      return;
+    }
+
+    res.status(201).json(revenue);
   } catch (error) {
     next(error);
   }

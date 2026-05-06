@@ -34,6 +34,9 @@ export type NovalogBillingItemRow = {
   amount: string | number;
   status: NovalogBillingItemStatus;
   received_at: string | null;
+  received_amount?: string | number | null;
+  balance_amount?: string | number | null;
+  payment_count?: string | number | null;
   notes: string | null;
   linked_revenue_id: string | null;
   created_at: string;
@@ -56,11 +59,16 @@ const billingAggregateSelect = `select b.id,
        b.created_at,
        count(i.id) filter (where i.status <> 'canceled') as cte_count,
        coalesce(sum(i.amount) filter (where i.status <> 'canceled'), 0) as total_amount,
-       coalesce(sum(i.amount) filter (where i.status = 'received'), 0) as received_amount,
-       coalesce(sum(i.amount) filter (where i.status in ('pending', 'billed')), 0) as open_amount,
-       coalesce(sum(i.amount) filter (where i.status = 'overdue'), 0) as overdue_amount
+       coalesce(sum(coalesce(rp.received_amount, case when i.status = 'received' then i.amount else 0 end)) filter (where i.status <> 'canceled'), 0) as received_amount,
+       coalesce(sum(greatest(coalesce(i.amount, 0) - coalesce(rp.received_amount, 0), 0)) filter (where i.status in ('pending', 'billed', 'partially_received')), 0) as open_amount,
+       coalesce(sum(greatest(coalesce(i.amount, 0) - coalesce(rp.received_amount, 0), 0)) filter (where i.status = 'overdue'), 0) as overdue_amount
 from novalog_billings b
-left join novalog_billing_items i on i.billing_id = b.id and i.tenant_id = b.tenant_id`;
+left join novalog_billing_items i on i.billing_id = b.id and i.tenant_id = b.tenant_id
+left join (
+  select tenant_id, revenue_id, coalesce(sum(amount), 0) as received_amount
+  from revenue_payments
+  group by tenant_id, revenue_id
+) rp on rp.tenant_id = i.tenant_id and rp.revenue_id = i.linked_revenue_id`;
 
 const billingGroupBy = `group by b.id,
          b.display_id,
@@ -135,12 +143,39 @@ export async function findTenantNovalogBilling(id: string, tenantId: string, cli
 
 export async function listTenantNovalogBillingItems(billingId: string, tenantId: string, client?: PoolClient) {
   const result = await db(client).query<NovalogBillingItemRow>(
-    `select ${itemColumns}
-     from novalog_billing_items
-     where billing_id = $1
-       and tenant_id = $2
-       and status <> 'canceled'
-     order by display_id asc, created_at asc`,
+    `select i.id,
+            i.display_id,
+            i.tenant_id,
+            i.billing_id,
+            i.cte_number,
+            i.cte_key,
+            i.issue_date,
+            i.due_date,
+            i.origin_name,
+            i.destination_name,
+            i.amount,
+            i.status,
+            i.received_at,
+            coalesce(rp.received_amount, case when i.status = 'received' then i.amount else 0 end) as received_amount,
+            greatest(i.amount - coalesce(rp.received_amount, 0), 0) as balance_amount,
+            coalesce(rp.payment_count, 0) as payment_count,
+            i.notes,
+            i.linked_revenue_id,
+            i.created_at
+     from novalog_billing_items i
+     left join (
+       select tenant_id,
+              revenue_id,
+              coalesce(sum(amount), 0) as received_amount,
+              count(*) as payment_count
+       from revenue_payments
+       where tenant_id = $2
+       group by tenant_id, revenue_id
+     ) rp on rp.tenant_id = i.tenant_id and rp.revenue_id = i.linked_revenue_id
+     where i.billing_id = $1
+       and i.tenant_id = $2
+       and i.status <> 'canceled'
+     order by i.display_id asc, i.created_at asc`,
     [billingId, tenantId],
   );
 
@@ -342,7 +377,7 @@ export function updateTenantNovalogBillingItem(id: string, tenantId: string, ite
          updated_at = now()
      where id = $10
        and tenant_id = $11
-       and status not in ('received', 'canceled')
+       and status not in ('received', 'partially_received', 'canceled')
      returning ${itemColumns}`,
     [
       item.cteNumber,

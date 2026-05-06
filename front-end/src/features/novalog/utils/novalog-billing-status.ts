@@ -23,6 +23,8 @@ export function novalogBillingItemStatusLabel(status: NovalogBillingItemStatus) 
   switch (status) {
     case 'billed':
       return 'Cobrado';
+    case 'partially_received':
+      return 'Parcial';
     case 'received':
       return 'Recebido';
     case 'overdue':

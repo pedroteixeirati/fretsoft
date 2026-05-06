@@ -14,10 +14,24 @@ export interface Revenue {
   description: string;
   amount: number;
   dueDate: string;
-  status: 'pending' | 'billed' | 'received' | 'overdue' | 'canceled';
+  status: 'pending' | 'billed' | 'partially_received' | 'received' | 'overdue' | 'canceled';
   sourceType: 'contract' | 'freight' | 'manual' | 'novalog_billing_item';
+  receivedAmount: number;
+  balanceAmount: number;
+  paymentCount: number;
+  lastPaymentAt?: string;
   chargeReference?: string;
   chargeGeneratedAt?: string;
   receivedAt?: string;
+  createdAt: string;
+}
+
+export interface RevenuePayment {
+  id: string;
+  tenantId: string;
+  revenueId: string;
+  amount: number;
+  paymentDate: string;
+  notes: string;
   createdAt: string;
 }

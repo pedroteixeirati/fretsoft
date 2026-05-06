@@ -109,6 +109,8 @@ export default function NovalogBillingDetailsModal({
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Emissao</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Vencimento</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Valor</th>
+                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Recebido</th>
+                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Saldo</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Status</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Recebimento</th>
                   <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Acoes</th>
@@ -121,6 +123,8 @@ export default function NovalogBillingDetailsModal({
                     <td className="px-5 py-4 text-sm text-on-surface-variant">{item.issueDate ? formatDateOnlyPtBr(item.issueDate) : '-'}</td>
                     <td className="px-5 py-4 text-sm text-on-surface-variant">{item.dueDate ? formatDateOnlyPtBr(item.dueDate) : formatDateOnlyPtBr(billing.dueDate)}</td>
                     <td className="px-5 py-4 text-right text-sm font-black text-primary">{formatNovalogCurrency(item.amount)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-bold text-on-surface">{formatNovalogCurrency(item.receivedAmount || 0)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-black text-primary">{formatNovalogCurrency(item.balanceAmount ?? item.amount)}</td>
                     <td className="px-5 py-4 text-center">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${novalogBillingStatusClass(item.status)}`}>
                         {novalogBillingItemStatusLabel(item.status)}
@@ -131,9 +135,9 @@ export default function NovalogBillingDetailsModal({
                     </td>
                     <td className="px-5 py-4">
                       <div className="grid min-w-[148px] grid-cols-[6rem_2.25rem] items-center justify-center gap-2">
-                        {canOperateItems && item.status !== 'received' && item.status !== 'canceled' ? (
-                          <button type="button" disabled={isSubmitting} onClick={() => onReceiveItem(item.id)} className="rounded-full bg-secondary-container px-3 py-2 text-[11px] font-bold text-on-secondary-container disabled:opacity-60">
-                            Recebida
+                        {canOperateItems && item.status !== 'received' && item.status !== 'partially_received' && item.status !== 'canceled' ? (
+                          <button type="button" disabled={isSubmitting} onClick={() => (item.linkedRevenueId && onOpenRevenue ? onOpenRevenue(item) : onReceiveItem(item.id))} className="rounded-full bg-secondary-container px-3 py-2 text-[11px] font-bold text-on-secondary-container disabled:opacity-60">
+                            Receber
                           </button>
                         ) : (
                           <span aria-hidden="true" />
@@ -200,7 +204,7 @@ function NovalogBillingItemActionsMenu({
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-  const canEditItem = item.status !== 'received' && item.status !== 'canceled';
+  const canEditItem = item.status !== 'received' && item.status !== 'partially_received' && item.status !== 'canceled';
   const canMarkOverdue = canOperateItems && item.status !== 'overdue' && canEditItem;
   const canOpenRevenue = Boolean(item.linkedRevenueId && onOpenRevenue);
   const hasActions = canMarkOverdue || canEditItem || canOpenRevenue;

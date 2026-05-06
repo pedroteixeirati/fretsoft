@@ -1,3 +1,5 @@
+export type RevenueStatus = 'pending' | 'billed' | 'partially_received' | 'received' | 'overdue' | 'canceled';
+
 export type RevenueRow = {
   id: string;
   display_id?: string | number | null;
@@ -14,11 +16,25 @@ export type RevenueRow = {
   description: string;
   amount: string | number;
   due_date: string;
-  status: 'pending' | 'billed' | 'received' | 'overdue' | 'canceled';
+  status: RevenueStatus;
   source_type: 'contract' | 'freight' | 'manual' | 'novalog_billing_item';
   charge_reference: string | null;
   charge_generated_at: string | null;
   received_at: string | null;
+  received_amount?: string | number | null;
+  balance_amount?: string | number | null;
+  payment_count?: string | number | null;
+  last_payment_at?: string | null;
+  created_at: string;
+};
+
+export type RevenuePaymentRow = {
+  id: string;
+  tenant_id: string;
+  revenue_id: string;
+  amount: string | number;
+  payment_date: string;
+  notes: string | null;
   created_at: string;
 };
 
@@ -56,6 +72,8 @@ export type FreightLinkedContractRow = {
 
 export function mapRevenue(row: RevenueRow) {
   const isNovalogBillingItem = row.source_type === 'novalog_billing_item';
+  const receivedAmount = Number(row.received_amount ?? (row.status === 'received' ? row.amount : 0) ?? 0);
+  const balanceAmount = Number(row.balance_amount ?? Math.max(Number(row.amount || 0) - receivedAmount, 0));
   return {
     id: row.id,
     displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
@@ -71,12 +89,28 @@ export function mapRevenue(row: RevenueRow) {
     competenceLabel: row.competence_label,
     description: row.description,
     amount: Number(row.amount || 0),
+    receivedAmount,
+    balanceAmount,
+    paymentCount: Number(row.payment_count || 0),
+    lastPaymentAt: row.last_payment_at || undefined,
     dueDate: row.due_date,
     status: row.status,
     sourceType: row.source_type,
     chargeReference: row.charge_reference || undefined,
     chargeGeneratedAt: row.charge_generated_at || undefined,
     receivedAt: row.received_at || undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapRevenuePayment(row: RevenuePaymentRow) {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    revenueId: row.revenue_id,
+    amount: Number(row.amount || 0),
+    paymentDate: row.payment_date,
+    notes: row.notes || '',
     createdAt: row.created_at,
   };
 }

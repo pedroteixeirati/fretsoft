@@ -1,5 +1,5 @@
 export type NovalogBillingStatus = 'draft' | 'open' | 'partially_received' | 'received' | 'overdue' | 'canceled';
-export type NovalogBillingItemStatus = 'pending' | 'billed' | 'received' | 'overdue' | 'canceled';
+export type NovalogBillingItemStatus = 'pending' | 'billed' | 'partially_received' | 'received' | 'overdue' | 'canceled';
 
 export type NovalogBillingItemInput = {
   cteNumber?: string | null;

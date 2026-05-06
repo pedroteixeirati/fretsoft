@@ -5,6 +5,7 @@ import type {
   FreightLinkedContractRow,
   FreightRevenueSeedRow,
   RevenueRow,
+  RevenueStatus,
 } from '../dtos/revenue.types';
 
 function db(client?: PoolClient) {
@@ -261,30 +262,45 @@ export function upsertFreightRevenue(params: {
 
 export function listRevenuesByTenant(tenantId: string) {
   return pool.query<RevenueRow>(
-    `select id,
-            display_id,
-            company_id,
-            company_name,
-            contract_id,
-            contract_name,
-            freight_id,
-            novalog_billing_id,
-            novalog_billing_item_id,
-            competence_month,
-            competence_year,
-            competence_label,
-            description,
-            amount,
-            due_date,
-            status,
-            source_type,
-            charge_reference,
-            charge_generated_at,
-            received_at,
-            created_at
-     from revenues
-     where tenant_id = $1
-     order by competence_year desc, competence_month desc, created_at desc`,
+    `with payment_totals as (
+       select tenant_id,
+              revenue_id,
+              coalesce(sum(amount), 0) as received_amount,
+              count(*) as payment_count,
+              max(payment_date) as last_payment_at
+       from revenue_payments
+       where tenant_id = $1
+       group by tenant_id, revenue_id
+     )
+     select r.id,
+            r.display_id,
+            r.company_id,
+            r.company_name,
+            r.contract_id,
+            r.contract_name,
+            r.freight_id,
+            r.novalog_billing_id,
+            r.novalog_billing_item_id,
+            r.competence_month,
+            r.competence_year,
+            r.competence_label,
+            r.description,
+            r.amount,
+            r.due_date,
+            r.status,
+            r.source_type,
+            r.charge_reference,
+            r.charge_generated_at,
+            r.received_at,
+            case when r.status = 'received' and p.revenue_id is null then r.amount else coalesce(p.received_amount, 0) end as received_amount,
+            greatest(r.amount - case when r.status = 'received' and p.revenue_id is null then r.amount else coalesce(p.received_amount, 0) end, 0) as balance_amount,
+            coalesce(p.payment_count, 0) as payment_count,
+            p.last_payment_at,
+            r.created_at
+     from revenues r
+     left join payment_totals p on p.tenant_id = r.tenant_id and p.revenue_id = r.id
+     where r.tenant_id = $1
+     order by r.competence_year desc, r.competence_month desc, r.created_at desc`,
     [tenantId]
   );
 }
@@ -394,7 +410,7 @@ export function markRevenueAsOverdue(actorUserId: string | undefined, revenueId:
   );
 }
 
-export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: string, status: 'pending' | 'billed' | 'received' | 'overdue' | 'canceled', actorUserId?: string, client?: PoolClient) {
+export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: string, status: RevenueStatus, actorUserId?: string, client?: PoolClient) {
   return db(client).query<RevenueRow>(
     `update revenues
      set status = $1,
@@ -404,7 +420,7 @@ export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: s
      where id = $3
        and tenant_id = $4
        and source_type = 'novalog_billing_item'
-       and ($1 <> 'canceled' or status <> 'received')
+       and ($1 <> 'canceled' or status not in ('received', 'partially_received'))
      returning id,
                display_id,
                company_id,
@@ -462,7 +478,7 @@ export function updateNovalogBillingRevenueFromItem(params: {
      where id = $12
        and tenant_id = $13
        and source_type = 'novalog_billing_item'
-       and status <> 'received'
+       and status not in ('received', 'partially_received')
      returning id,
                display_id,
                company_id,

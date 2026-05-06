@@ -1,4 +1,5 @@
-import { notFoundError } from '../../../shared/errors/app-error';
+import { notFoundError, validationError } from '../../../shared/errors/app-error';
+import { isPositiveNumber, isValidDate, normalizeOptionalText } from '../../../shared/validation/validation';
 import {
   addMonths,
   formatCompetenceLabel,
@@ -18,15 +19,26 @@ import {
   listRevenuesByTenant,
   markRevenueAsCharged,
   markRevenueAsOverdue,
-  markRevenueAsReceived,
   upsertContractRevenue,
   upsertFreightRevenue,
 } from '../repositories/revenues.repository';
-import { mapRevenue } from '../dtos/revenue.types';
+import {
+  findRevenueByIdForUpdate,
+  getRevenuePoolClient,
+  insertRevenuePayment,
+  listRevenuePaymentsByRevenue,
+  sumRevenuePayments,
+  updateRevenuePaymentState,
+} from '../repositories/revenue-payments.repository';
+import { mapRevenue, mapRevenuePayment, type RevenueStatus } from '../dtos/revenue.types';
 import { syncNovalogBillingItemFromRevenue } from '../../novalog/services/novalog-billings.service';
 
 function formatMonthStartDate(referenceDate: Date) {
   return startOfMonth(referenceDate).toISOString().slice(0, 10);
+}
+
+function formatTodayDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 }
 
 function formatFreightSegment(freight: { origin: string; destination: string }) {
@@ -217,11 +229,10 @@ export async function chargeRevenue(revenueId: string, tenantId?: string, actorU
 }
 
 export async function receiveRevenue(revenueId: string, tenantId?: string, actorUserId?: string) {
-  const result = await markRevenueAsReceived(actorUserId, revenueId, tenantId);
-  if (result.rows[0]?.source_type === 'novalog_billing_item') {
-    await syncNovalogBillingItemFromRevenue(tenantId, revenueId, 'received', actorUserId);
-  }
-  return result.rows[0] ? mapRevenue(result.rows[0]) : null;
+  return registerRevenuePayment(revenueId, tenantId, {
+    paymentDate: formatTodayDate(),
+    notes: 'Baixa total registrada pelo contas a receber.',
+  }, actorUserId);
 }
 
 export async function overdueRevenue(revenueId: string, tenantId?: string, actorUserId?: string) {
@@ -230,4 +241,90 @@ export async function overdueRevenue(revenueId: string, tenantId?: string, actor
     await syncNovalogBillingItemFromRevenue(tenantId, revenueId, 'overdue', actorUserId);
   }
   return result.rows[0] ? mapRevenue(result.rows[0]) : null;
+}
+
+export async function listRevenuePayments(revenueId: string, tenantId?: string) {
+  if (!tenantId) return [];
+  const result = await listRevenuePaymentsByRevenue(revenueId, tenantId);
+  return result.rows.map(mapRevenuePayment);
+}
+
+export async function registerRevenuePayment(
+  revenueId: string,
+  tenantId: string | undefined,
+  body: { amount?: number | string | null; paymentDate?: string | null; notes?: string | null },
+  actorUserId?: string,
+) {
+  if (!tenantId) return null;
+
+  const paymentDate = normalizeOptionalText(body.paymentDate) || formatTodayDate();
+  if (!isValidDate(paymentDate)) {
+    throw validationError('Informe uma data de recebimento valida.', 'invalid_revenue_payment_date', 'paymentDate');
+  }
+
+  const client = await getRevenuePoolClient();
+
+  try {
+    await client.query('begin');
+    const revenueResult = await findRevenueByIdForUpdate(revenueId, tenantId, client);
+    const revenue = revenueResult.rows[0];
+    if (!revenue) {
+      await client.query('rollback');
+      return null;
+    }
+    if (revenue.status === 'canceled') {
+      throw validationError('Conta cancelada nao pode receber pagamento.', 'revenue_payment_canceled');
+    }
+
+    const receivedBefore = await sumRevenuePayments(revenueId, tenantId, client);
+    const totalAmount = Number(revenue.amount || 0);
+    const balance = Math.max(totalAmount - receivedBefore, 0);
+    const paymentAmount = body.amount === undefined || body.amount === null || body.amount === ''
+      ? balance
+      : Number(body.amount);
+
+    if (!isPositiveNumber(paymentAmount)) {
+      throw validationError('Informe um valor de recebimento maior que zero.', 'invalid_revenue_payment_amount', 'amount');
+    }
+    if (paymentAmount - balance > 0.009) {
+      throw validationError('Valor recebido nao pode ultrapassar o saldo em aberto.', 'revenue_payment_exceeds_balance', 'amount');
+    }
+
+    await insertRevenuePayment({
+      tenantId,
+      revenueId,
+      amount: paymentAmount,
+      paymentDate,
+      notes: normalizeOptionalText(body.notes),
+      actorUserId,
+    }, client);
+
+    const receivedAfter = receivedBefore + paymentAmount;
+    const nextStatus: RevenueStatus = receivedAfter >= totalAmount - 0.009 ? 'received' : 'partially_received';
+    const updatedResult = await updateRevenuePaymentState({
+      revenueId,
+      tenantId,
+      status: nextStatus,
+      actorUserId,
+    }, client);
+    const updatedRevenue = updatedResult.rows[0];
+
+    await client.query('commit');
+
+    if (updatedRevenue?.source_type === 'novalog_billing_item') {
+      await syncNovalogBillingItemFromRevenue(tenantId, revenueId, nextStatus, actorUserId);
+    }
+
+    if (!updatedRevenue) return null;
+    updatedRevenue.received_amount = receivedAfter;
+    updatedRevenue.balance_amount = Math.max(totalAmount - receivedAfter, 0);
+    updatedRevenue.payment_count = (await listRevenuePaymentsByRevenue(revenueId, tenantId)).rowCount || 0;
+    updatedRevenue.last_payment_at = paymentDate;
+    return mapRevenue(updatedRevenue);
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

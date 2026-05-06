@@ -64,6 +64,8 @@ function mapBilling(row: NovalogBillingRow, items?: NovalogBillingItemRow[]) {
 }
 
 function mapBillingItem(row: NovalogBillingItemRow) {
+  const amount = Number(row.amount || 0);
+  const receivedAmount = Number(row.received_amount ?? (row.status === 'received' ? row.amount : 0) ?? 0);
   return {
     id: row.id,
     displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
@@ -74,7 +76,10 @@ function mapBillingItem(row: NovalogBillingItemRow) {
     dueDate: row.due_date || '',
     originName: row.origin_name || '',
     destinationName: row.destination_name || '',
-    amount: Number(row.amount || 0),
+    amount,
+    receivedAmount,
+    balanceAmount: Number(row.balance_amount ?? Math.max(amount - receivedAmount, 0)),
+    paymentCount: Number(row.payment_count || 0),
     status: row.status,
     receivedAt: row.received_at || undefined,
     notes: row.notes || '',
@@ -89,7 +94,7 @@ function deriveBillingStatus(items: NovalogBillingItemRow[], currentStatus: Nova
   if (activeItems.length === 0) return 'open';
   if (activeItems.every((item) => item.status === 'received')) return 'received';
   if (activeItems.some((item) => item.status === 'overdue')) return 'overdue';
-  if (activeItems.some((item) => item.status === 'received')) return 'partially_received';
+  if (activeItems.some((item) => item.status === 'received' || item.status === 'partially_received')) return 'partially_received';
   return 'open';
 }
 
@@ -384,8 +389,8 @@ export async function updateNovalogBillingItem(auth: AuthContext | undefined, it
       await client.query('rollback');
       return null;
     }
-    if (item.status === 'received') {
-      throw validationError('CT-e recebido nao pode ser editado.', 'novalog_billing_item_received_not_editable');
+    if (item.status === 'received' || item.status === 'partially_received') {
+      throw validationError('CT-e com recebimento registrado nao pode ser editado.', 'novalog_billing_item_received_not_editable');
     }
     if (item.status === 'canceled') {
       throw validationError('CT-e cancelado nao pode ser editado.', 'novalog_billing_item_canceled_not_editable');
@@ -430,8 +435,8 @@ export async function deleteNovalogBillingItem(auth: AuthContext | undefined, it
       await client.query('rollback');
       return null;
     }
-    if (item.status === 'received') {
-      throw validationError('CT-e recebido nao pode ser excluido.', 'novalog_billing_item_received_not_deletable');
+    if (item.status === 'received' || item.status === 'partially_received') {
+      throw validationError('CT-e com recebimento registrado nao pode ser excluido.', 'novalog_billing_item_received_not_deletable');
     }
     if (item.status === 'canceled') {
       throw validationError('CT-e ja esta cancelado.', 'novalog_billing_item_already_canceled');

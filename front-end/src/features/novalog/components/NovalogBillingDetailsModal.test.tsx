@@ -31,6 +31,9 @@ function makeBilling(overrides: Partial<NovalogBilling> = {}): NovalogBilling {
         originName: 'Mina X',
         destinationName: 'Gerdau',
         amount: 2000,
+        receivedAmount: 2000,
+        balanceAmount: 0,
+        paymentCount: 1,
         status: 'received',
         receivedAt: '2026-04-12T00:00:00.000Z',
         notes: '',
@@ -47,6 +50,9 @@ function makeBilling(overrides: Partial<NovalogBilling> = {}): NovalogBilling {
         originName: 'Mina Y',
         destinationName: 'Gerdau',
         amount: 3000,
+        receivedAmount: 0,
+        balanceAmount: 3000,
+        paymentCount: 0,
         status: 'pending',
         notes: '',
         linkedRevenueId: 'revenue-2',
@@ -90,7 +96,7 @@ describe('NovalogBillingDetailsModal', () => {
     expect(screen.getByText('20/05/2026')).toBeInTheDocument();
     expect(screen.getByText('12/04/2026')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Recebida' }));
+    await user.click(screen.getByRole('button', { name: 'Receber' }));
     await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1002' }));
     await user.click(screen.getByRole('button', { name: 'Em atraso' }));
     await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1002' }));
@@ -100,7 +106,8 @@ describe('NovalogBillingDetailsModal', () => {
     await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1001' }));
     await user.click(screen.getByRole('button', { name: 'Recebivel' }));
 
-    expect(onReceiveItem).toHaveBeenCalledWith('item-2');
+    expect(onReceiveItem).not.toHaveBeenCalled();
+    expect(onOpenRevenue).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-2', linkedRevenueId: 'revenue-2' }));
     expect(onOverdueItem).toHaveBeenCalledWith('item-2');
     expect(onEditItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-2' }));
     expect(onDeleteItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'item-2' }));
@@ -123,7 +130,7 @@ describe('NovalogBillingDetailsModal', () => {
     );
 
     expect(screen.queryByText('Feche para baixar')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Recebida' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Receber' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fechar e gerar recebiveis' })).toBeInTheDocument();
   });
 
@@ -163,6 +170,9 @@ describe('NovalogBillingDetailsModal', () => {
               originName: '',
               destinationName: '',
               amount: 2000,
+              receivedAmount: 2000,
+              balanceAmount: 0,
+              paymentCount: 1,
               status: 'received',
               receivedAt: '2026-04-12T00:00:00.000Z',
               notes: '',

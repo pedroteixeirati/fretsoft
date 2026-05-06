@@ -15,7 +15,7 @@ interface NovalogBillingFormModalProps {
   draftBilling?: NovalogBilling | null;
   isSubmitting?: boolean;
   onClose: () => void;
-  onSubmit: (payload: NovalogBillingPayload) => Promise<void> | void;
+  onSubmit: (payload: NovalogBillingPayload, action: 'draft' | 'close') => Promise<void> | void;
 }
 
 type ItemErrors = Partial<Record<keyof Pick<NovalogBillingItemDraft, 'cteNumber' | 'issueDate' | 'dueDate' | 'amount'>, string>>;
@@ -49,15 +49,6 @@ function mapBillingToDraftRows(billing?: NovalogBilling | null, defaultDueDate =
   }));
 }
 
-function getReferenceDueDate(items: NovalogBillingItemDraft[]) {
-  const dueDates = items
-    .map((item) => item.dueDate)
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right));
-
-  return dueDates[0] || getTodayInputDate();
-}
-
 export default function NovalogBillingFormModal({
   isOpen,
   companies,
@@ -68,6 +59,7 @@ export default function NovalogBillingFormModal({
 }: NovalogBillingFormModalProps) {
   const [companyId, setCompanyId] = useState('');
   const [billingDate, setBillingDate] = useState(getTodayInputDate());
+  const [dueDate, setDueDate] = useState(getTodayInputDate());
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<NovalogBillingItemDraft[]>([createDraftItem()]);
   const [submitError, setSubmitError] = useState('');
@@ -96,6 +88,7 @@ export default function NovalogBillingFormModal({
     if (!isOpen) return;
     setCompanyId(draftBilling?.companyId || '');
     setBillingDate(draftBilling?.billingDate || getTodayInputDate());
+    setDueDate(draftBilling?.dueDate || getTodayInputDate());
     setNotes(draftBilling?.notes || '');
     setItems(mapBillingToDraftRows(draftBilling, draftBilling?.dueDate || getTodayInputDate()));
     setSubmitError('');
@@ -119,7 +112,7 @@ export default function NovalogBillingFormModal({
     });
   };
 
-  const addItem = () => setItems((current) => [...current, createDraftItem()]);
+  const addItem = () => setItems((current) => [...current, createDraftItem(dueDate)]);
 
   const duplicateItem = (itemId: string) => {
     setItems((current) => {
@@ -135,12 +128,15 @@ export default function NovalogBillingFormModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const action = submitter?.dataset.action === 'close' ? 'close' : 'draft';
     const nextFieldErrors: Record<string, string> = {};
     const nextItemErrors: Record<string, ItemErrors> = {};
     const seenCtes = new Set<string>();
 
     if (!companyId) nextFieldErrors.companyId = 'Selecione o cliente.';
     if (!billingDate) nextFieldErrors.billingDate = 'Informe a data do faturamento.';
+    if (!dueDate) nextFieldErrors.dueDate = 'Informe o vencimento.';
 
     items.forEach((item) => {
       const errors: ItemErrors = {};
@@ -166,17 +162,17 @@ export default function NovalogBillingFormModal({
     await onSubmit({
       companyId,
       billingDate,
-      dueDate: getReferenceDueDate(items),
+      dueDate,
       notes: notes.trim() || undefined,
       items: items.map((item) => ({
         cteNumber: item.cteNumber.trim(),
         cteKey: item.cteKey.trim() || undefined,
         issueDate: item.issueDate || undefined,
-        dueDate: item.dueDate,
+        dueDate: item.dueDate || dueDate,
         amount: parseNovalogDecimal(item.amount),
         notes: item.notes.trim() || undefined,
       })),
-    });
+    }, action);
   };
 
   return (
@@ -190,7 +186,7 @@ export default function NovalogBillingFormModal({
       <form onSubmit={handleSubmit} className="space-y-6">
         <FormAlert message={submitError} variant="error" />
 
-        <section className="grid gap-4 lg:grid-cols-3">
+        <section className="grid gap-4 lg:grid-cols-4">
           <div className="space-y-2 lg:col-span-2">
             <FieldLabel required>Cliente</FieldLabel>
             <NovalogAutocompleteSelect
@@ -213,6 +209,15 @@ export default function NovalogBillingFormModal({
               setFieldErrors((current) => ({ ...current, billingDate: '' }));
             }}
             error={fieldErrors.billingDate}
+          />
+          <FormDatePicker
+            label="Vencimento"
+            value={dueDate}
+            onChange={(value) => {
+              setDueDate(value);
+              setFieldErrors((current) => ({ ...current, dueDate: '' }));
+            }}
+            error={fieldErrors.dueDate}
           />
         </section>
 
@@ -306,8 +311,11 @@ export default function NovalogBillingFormModal({
           <button type="button" onClick={onClose} disabled={isSubmitting} className="rounded-full border border-outline-variant bg-surface px-5 py-3 text-sm font-bold text-on-surface transition hover:border-primary/20 hover:bg-primary/5">
             Cancelar
           </button>
-          <button type="submit" disabled={isSubmitting} className="rounded-full bg-primary px-5 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition hover:scale-[1.01] active:scale-95 disabled:opacity-60">
+          <button type="submit" data-action="draft" disabled={isSubmitting} className="rounded-full border border-outline-variant bg-surface px-5 py-3 text-sm font-bold text-on-surface transition hover:border-primary/20 hover:bg-primary/5 disabled:opacity-60">
             {isSubmitting ? 'Salvando...' : 'Salvar rascunho'}
+          </button>
+          <button type="submit" data-action="close" disabled={isSubmitting} className="rounded-full bg-primary px-5 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition hover:scale-[1.01] active:scale-95 disabled:opacity-60">
+            {isSubmitting ? 'Gerando...' : 'Salvar e gerar recebiveis'}
           </button>
         </div>
       </form>
