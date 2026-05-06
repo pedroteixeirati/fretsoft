@@ -309,7 +309,7 @@ create table if not exists revenues (
   description text not null,
   amount numeric not null default 0,
   due_date text not null,
-  status text not null default 'pending' check (status in ('pending', 'billed', 'received', 'overdue', 'canceled')),
+  status text not null default 'pending' check (status in ('pending', 'billed', 'partially_received', 'received', 'overdue', 'canceled')),
   source_type text not null default 'contract' check (source_type in ('contract', 'freight', 'manual', 'novalog_billing_item')),
   charge_reference text,
   charge_generated_at timestamptz,
@@ -349,7 +349,7 @@ create table if not exists novalog_billing_items (
   origin_name text,
   destination_name text,
   amount numeric not null default 0,
-  status text not null default 'pending' check (status in ('pending', 'billed', 'received', 'overdue', 'canceled')),
+  status text not null default 'pending' check (status in ('pending', 'billed', 'partially_received', 'received', 'overdue', 'canceled')),
   received_at timestamptz,
   notes text,
   linked_revenue_id uuid references revenues(id) on delete set null,
@@ -358,6 +358,42 @@ create table if not exists novalog_billing_items (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists revenue_payments (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  revenue_id uuid not null references revenues(id) on delete cascade,
+  amount numeric not null check (amount > 0),
+  payment_date text not null,
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+insert into revenue_payments (
+  tenant_id,
+  revenue_id,
+  amount,
+  payment_date,
+  notes,
+  created_by_user_id,
+  created_at
+)
+select r.tenant_id,
+       r.id,
+       r.amount,
+       coalesce(to_char(r.received_at::date, 'YYYY-MM-DD'), r.due_date),
+       'Baixa anterior importada automaticamente para historico de pagamentos.',
+       r.updated_by_user_id,
+       coalesce(r.received_at, r.updated_at, now())
+from revenues r
+where r.status = 'received'
+  and not exists (
+    select 1
+    from revenue_payments p
+    where p.tenant_id = r.tenant_id
+      and p.revenue_id = r.id
+  );
 
 create table if not exists payables (
   id uuid primary key default gen_random_uuid(),
@@ -402,7 +438,7 @@ alter table if exists revenues alter column contract_id drop not null;
 alter table if exists revenues alter column contract_name drop not null;
 alter table if exists revenues drop constraint if exists revenues_status_check;
 alter table if exists revenues
-  add constraint revenues_status_check check (status in ('pending', 'billed', 'received', 'overdue', 'canceled'));
+  add constraint revenues_status_check check (status in ('pending', 'billed', 'partially_received', 'received', 'overdue', 'canceled'));
 alter table if exists revenues drop constraint if exists revenues_source_type_check;
 alter table if exists revenues
   add constraint revenues_source_type_check check (source_type in ('contract', 'freight', 'manual', 'novalog_billing_item'));
@@ -414,6 +450,9 @@ alter table if exists revenues drop constraint if exists revenues_novalog_billin
 alter table if exists revenues
   add constraint revenues_novalog_billing_item_id_fkey
   foreign key (novalog_billing_item_id) references novalog_billing_items(id) on delete set null;
+alter table if exists novalog_billing_items drop constraint if exists novalog_billing_items_status_check;
+alter table if exists novalog_billing_items
+  add constraint novalog_billing_items_status_check check (status in ('pending', 'billed', 'partially_received', 'received', 'overdue', 'canceled'));
 create unique index if not exists idx_revenues_contract_competence
   on revenues(tenant_id, contract_id, competence_month, competence_year)
   where contract_id is not null;
@@ -914,6 +953,8 @@ create unique index if not exists idx_expenses_tenant_display_id on expenses(ten
 create index if not exists idx_expenses_tenant_id on expenses(tenant_id);
 create unique index if not exists idx_revenues_tenant_display_id on revenues(tenant_id, display_id) where display_id is not null;
 create index if not exists idx_revenues_tenant_id on revenues(tenant_id);
+create index if not exists idx_revenue_payments_revenue_id on revenue_payments(tenant_id, revenue_id);
+create index if not exists idx_revenue_payments_payment_date on revenue_payments(tenant_id, payment_date);
 create unique index if not exists idx_payables_tenant_display_id on payables(tenant_id, display_id) where display_id is not null;
 create index if not exists idx_payables_tenant_id on payables(tenant_id);
 create index if not exists idx_payables_tenant_status on payables(tenant_id, status);

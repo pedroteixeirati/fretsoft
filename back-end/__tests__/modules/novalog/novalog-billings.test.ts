@@ -62,7 +62,7 @@ test('service deriva status do faturamento a partir dos CT-es individuais', () =
   assert.match(novalogBillingServiceSource, /function deriveBillingStatus/);
   assert.match(novalogBillingServiceSource, /activeItems\.every\(\(item\) => item\.status === 'received'\).*return 'received'/s);
   assert.match(novalogBillingServiceSource, /activeItems\.some\(\(item\) => item\.status === 'overdue'\).*return 'overdue'/s);
-  assert.match(novalogBillingServiceSource, /activeItems\.some\(\(item\) => item\.status === 'received'\).*return 'partially_received'/s);
+  assert.match(novalogBillingServiceSource, /activeItems\.some\(\(item\) => item\.status === 'received' \|\| item\.status === 'partially_received'\).*return 'partially_received'/s);
   assert.match(novalogBillingServiceSource, /return 'open'/);
 });
 
@@ -88,20 +88,21 @@ test('baixa de CT-e exige faturamento fechado e sincroniza a revenue vinculada',
 test('edicao e exclusao de CT-e bloqueiam recebidos e sincronizam recebiveis', () => {
   assert.match(novalogBillingServiceSource, /export async function updateNovalogBillingItem/);
   assert.match(novalogBillingServiceSource, /export async function deleteNovalogBillingItem/);
-  assert.match(novalogBillingServiceSource, /item\.status === 'received'[\s\S]*novalog_billing_item_received_not_editable/);
-  assert.match(novalogBillingServiceSource, /item\.status === 'received'[\s\S]*novalog_billing_item_received_not_deletable/);
+  assert.match(novalogBillingServiceSource, /item\.status === 'received' \|\| item\.status === 'partially_received'[\s\S]*novalog_billing_item_received_not_editable/);
+  assert.match(novalogBillingServiceSource, /item\.status === 'received' \|\| item\.status === 'partially_received'[\s\S]*novalog_billing_item_received_not_deletable/);
   assert.match(novalogBillingServiceSource, /updateTenantNovalogBillingItem\(itemId, tenantId, payload, auth\?\.userId, client\)/);
   assert.match(novalogBillingServiceSource, /syncRevenueFromBillingItem\(billing, updatedItem, auth\?\.userId, client\)/);
   assert.match(novalogBillingServiceSource, /countActiveTenantNovalogBillingItems\(item\.billing_id, tenantId, client\)/);
   assert.match(novalogBillingServiceSource, /updateTenantNovalogBillingItemStatus\(itemId, tenantId, 'canceled', auth\?\.userId, client\)/);
   assert.match(revenuesRepositorySource, /updateNovalogBillingRevenueFromItem/);
-  assert.match(revenuesRepositorySource, /and status <> 'received'/);
+  assert.match(revenuesRepositorySource, /and status not in \('received', 'partially_received'\)/);
 });
 
 test('baixa no contas a receber sincroniza de volta o CT-e Novalog', () => {
   assert.match(revenuesServiceSource, /syncNovalogBillingItemFromRevenue/);
   assert.match(revenuesServiceSource, /source_type === 'novalog_billing_item'[\s\S]*syncNovalogBillingItemFromRevenue\(tenantId, revenueId, 'billed', actorUserId\)/);
-  assert.match(revenuesServiceSource, /source_type === 'novalog_billing_item'[\s\S]*syncNovalogBillingItemFromRevenue\(tenantId, revenueId, 'received', actorUserId\)/);
+  assert.match(revenuesServiceSource, /registerRevenuePayment\(revenueId, tenantId/);
+  assert.match(revenuesServiceSource, /syncNovalogBillingItemFromRevenue\(tenantId, revenueId, nextStatus, actorUserId\)/);
   assert.match(revenuesServiceSource, /source_type === 'novalog_billing_item'[\s\S]*syncNovalogBillingItemFromRevenue\(tenantId, revenueId, 'overdue', actorUserId\)/);
   assert.match(novalogBillingRepositorySource, /updateNovalogBillingItemStatusByRevenue/);
 });
@@ -109,8 +110,8 @@ test('baixa no contas a receber sincroniza de volta o CT-e Novalog', () => {
 test('repository lista faturamentos com totais agregados e persiste itens em transacao', () => {
   assert.match(novalogBillingRepositorySource, /count\(i\.id\) filter \(where i\.status <> 'canceled'\) as cte_count/);
   assert.match(novalogBillingRepositorySource, /sum\(i\.amount\) filter \(where i\.status <> 'canceled'\)/);
-  assert.match(novalogBillingRepositorySource, /sum\(i\.amount\) filter \(where i\.status = 'received'\)/);
-  assert.match(novalogBillingRepositorySource, /sum\(i\.amount\) filter \(where i\.status in \('pending', 'billed'\)\)/);
+  assert.match(novalogBillingRepositorySource, /rp\.received_amount/);
+  assert.match(novalogBillingRepositorySource, /i\.status in \('pending', 'billed', 'partially_received'\)/);
   assert.match(novalogBillingRepositorySource, /and status <> 'canceled'/);
   assert.match(novalogBillingRepositorySource, /updateTenantNovalogBillingItem/);
   assert.match(novalogBillingRepositorySource, /countActiveTenantNovalogBillingItems/);

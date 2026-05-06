@@ -77,7 +77,30 @@ describe('NovalogBillingFormModal', () => {
           }),
         ],
       }),
+      'draft',
     );
+  });
+
+  it('permite salvar e gerar recebiveis no mesmo fluxo', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <NovalogBillingFormModal
+        isOpen
+        companies={companies}
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByPlaceholderText('Selecione o cliente'));
+    await user.click(screen.getByText('Gerdau'));
+    await user.type(screen.getByPlaceholderText('Numero CTe'), '7777');
+    await user.type(screen.getByPlaceholderText('0,00'), '1000');
+    await user.click(screen.getByRole('button', { name: 'Salvar e gerar recebiveis' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ companyId: 'company-1' }), 'close');
   });
 
   it('preenche dados ao editar faturamento em rascunho', () => {
