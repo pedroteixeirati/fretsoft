@@ -49,3 +49,13 @@ export function calculateNovalogEntryAmounts(weight: number, companyRatePerTon: 
     driverNetAmount,
   };
 }
+
+export function getNovalogWeekNumberFromDate(value: string) {
+  const day = Number(value.slice(8, 10));
+
+  if (!Number.isFinite(day) || day <= 0) return 1;
+  if (day <= 7) return 1;
+  if (day <= 14) return 2;
+  if (day <= 21) return 3;
+  return 4;
+}

@@ -49,7 +49,7 @@ export default function TopBar() {
     }
   };
 
-  const displayName = userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Usuario';
+  const displayName = userProfile?.name || user?.email?.split('@')[0] || 'Usuario';
 
   const handleLogout = async () => {
     try {

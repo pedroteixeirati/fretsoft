@@ -2,13 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Layers3, PackagePlus, Pickaxe } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import KpiCard from '../../../components/KpiCard';
+import CustomSelect from '../../../components/CustomSelect';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { canAccess } from '../../../lib/permissions';
 import { queryKeys } from '../../../shared/lib/query-keys';
 import { providersApi } from '../../providers/services/providers.api';
 import { companiesApi } from '../../companies/services/companies.api';
 import { canAccessNovalogOperations } from '../utils/novalog.visibility';
-import { novalogInitialKpis, novalogKpiIcons, novalogWeekOptions } from '../constants/novalog.constants';
+import { novalogInitialKpis, novalogKpiIcons } from '../constants/novalog.constants';
+import { novalogApi } from '../services/novalog.api';
 import NovalogEntriesTable from '../components/NovalogEntriesTable';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
 import { matchesNovalogDisplayIdRange } from '../utils/novalog-id-range';
@@ -21,9 +23,25 @@ import { useNovalogMutations } from '../hooks/useNovalogMutations';
 type StandardModalMode = 'create' | 'edit' | 'duplicate';
 const itemsPerPage = 20;
 
+function getCurrentReferenceMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatReferenceMonthLabel(value: string) {
+  const [year, month] = value.split('-').map(Number);
+  if (!year || !month) return value;
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, 1));
+}
+
 export default function NovalogOperationsPage() {
   const { userProfile } = useFirebase();
-  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [selectedReferenceMonth, setSelectedReferenceMonth] = useState(getCurrentReferenceMonth);
+  const [knownReferenceMonths, setKnownReferenceMonths] = useState<string[]>(() => [getCurrentReferenceMonth()]);
   const [isStandardModalOpen, setIsStandardModalOpen] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [standardModalMode, setStandardModalMode] = useState<StandardModalMode>('create');
@@ -37,7 +55,12 @@ export default function NovalogOperationsPage() {
   const canAccessNovalogModule = canAccessNovalogOperations(userProfile);
   const canReadProviders = canAccessNovalogModule && canAccess(userProfile, 'providers', 'read');
   const canReadCompanies = canAccessNovalogModule && canAccess(userProfile, 'companies', 'read');
-  const { entries, isLoading, error } = useNovalogQuery(canAccessNovalogModule);
+  const { entries, isLoading, error } = useNovalogQuery(canAccessNovalogModule, selectedReferenceMonth);
+  const referenceMonthsQuery = useQuery({
+    queryKey: queryKeys.novalog.referenceMonths(),
+    queryFn: novalogApi.listReferenceMonths,
+    enabled: canAccessNovalogModule,
+  });
   const providersQuery = useQuery({
     queryKey: queryKeys.providers.list(),
     queryFn: providersApi.list,
@@ -60,14 +83,14 @@ export default function NovalogOperationsPage() {
   const openEditModal = (entry: NovalogEntry) => {
     setStandardModalMode('edit');
     setDraftEntry(entry);
-    setSelectedWeek(entry.weekNumber);
+    setSelectedReferenceMonth(entry.referenceMonth || entry.operationDate.slice(0, 7));
     setIsStandardModalOpen(true);
   };
 
   const openDuplicateModal = (entry: NovalogEntry) => {
     setStandardModalMode('duplicate');
     setDraftEntry(entry);
-    setSelectedWeek(entry.weekNumber);
+    setSelectedReferenceMonth(entry.referenceMonth || entry.operationDate.slice(0, 7));
     setIsStandardModalOpen(true);
   };
 
@@ -78,13 +101,19 @@ export default function NovalogOperationsPage() {
   };
 
   const handleStandardSubmit = async (entry: NovalogEntry) => {
+    const entryReferenceMonth = entry.referenceMonth || entry.operationDate.slice(0, 7);
+
     if (standardModalMode === 'edit' && draftEntry) {
       await updateEntry.mutateAsync({ id: draftEntry.id, payload: entry });
+      setSelectedReferenceMonth(entryReferenceMonth);
+      setKnownReferenceMonths((current) => Array.from(new Set([entryReferenceMonth, ...current])));
       closeStandardModal();
       return;
     }
 
     await createEntry.mutateAsync(entry);
+    setSelectedReferenceMonth(entryReferenceMonth);
+    setKnownReferenceMonths((current) => Array.from(new Set([entryReferenceMonth, ...current])));
     closeStandardModal();
   };
 
@@ -106,21 +135,38 @@ export default function NovalogOperationsPage() {
     });
 
     setIsBatchModalOpen(false);
-    setSelectedWeek(newEntries[0].weekNumber);
+    const batchReferenceMonth = newEntries[0].referenceMonth || newEntries[0].operationDate.slice(0, 7);
+    setSelectedReferenceMonth(batchReferenceMonth);
+    setKnownReferenceMonths((current) => Array.from(new Set([batchReferenceMonth, ...current])));
   };
 
   const handleDeleteEntry = (entry: NovalogEntry) => {
     deleteEntry.mutate(entry.id);
   };
 
-  const weekEntries = useMemo(
-    () => entries.filter((entry) => entry.weekNumber === selectedWeek),
-    [entries, selectedWeek],
+  const referenceMonthOptions = useMemo(() => {
+    const months = new Set(knownReferenceMonths);
+    (referenceMonthsQuery.data ?? []).forEach((month) => months.add(month));
+    entries.forEach((entry) => months.add(entry.referenceMonth || entry.operationDate.slice(0, 7)));
+    months.add(selectedReferenceMonth);
+
+    return Array.from(months)
+      .filter(Boolean)
+      .sort((left, right) => right.localeCompare(left))
+      .map((month) => ({
+        value: month,
+        label: formatReferenceMonthLabel(month),
+      }));
+  }, [entries, knownReferenceMonths, referenceMonthsQuery.data, selectedReferenceMonth]);
+
+  const referenceMonthEntries = useMemo(
+    () => entries,
+    [entries],
   );
 
   const filteredEntries = useMemo(
     () =>
-      weekEntries.filter((entry) => {
+      referenceMonthEntries.filter((entry) => {
         return (
           matchesNovalogDisplayIdRange(entry.displayId, searchTerm) &&
           entry.originName.toLowerCase().includes(originFilter.toLowerCase()) &&
@@ -128,12 +174,12 @@ export default function NovalogOperationsPage() {
           (entry.fuelStationName ?? '').toLowerCase().includes(fuelStationFilter.toLowerCase())
         );
       }),
-    [destinationFilter, fuelStationFilter, originFilter, searchTerm, weekEntries],
+    [destinationFilter, fuelStationFilter, originFilter, referenceMonthEntries, searchTerm],
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedWeek, searchTerm, originFilter, destinationFilter, fuelStationFilter, entries.length]);
+  }, [selectedReferenceMonth, searchTerm, originFilter, destinationFilter, fuelStationFilter, entries.length]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -270,27 +316,17 @@ export default function NovalogOperationsPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Competencia atual</p>
-            <h2 className="mt-2 text-xl font-black text-on-surface">Abril de 2026</h2>
-            <p className="mt-1 text-sm text-on-surface-variant">Selecione a semana operacional que queremos acompanhar.</p>
+            <h2 className="mt-2 text-xl font-black capitalize text-on-surface">{formatReferenceMonthLabel(selectedReferenceMonth)}</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">Acompanhe os lancamentos pela competencia da data operacional.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {novalogWeekOptions.map((week) => {
-              const isActive = week.id === selectedWeek;
-              return (
-                <button
-                  key={week.id}
-                  type="button"
-                  onClick={() => setSelectedWeek(week.id)}
-                  className={`rounded-full border px-4 py-2 text-sm font-bold transition ${
-                    isActive
-                      ? 'border-primary bg-primary text-on-primary shadow-lg shadow-primary/20'
-                      : 'border-outline-variant bg-surface text-on-surface hover:border-primary/20 hover:bg-primary/5'
-                  }`}
-                >
-                  {week.label}
-                </button>
-              );
-            })}
+          <div className="w-full max-w-[280px]">
+            <CustomSelect
+              value={selectedReferenceMonth}
+              onChange={setSelectedReferenceMonth}
+              options={referenceMonthOptions}
+              placeholder="Competencia"
+              buttonClassName="rounded-full bg-surface px-5 py-3 font-bold"
+            />
           </div>
         </div>
       </section>
@@ -315,7 +351,7 @@ export default function NovalogOperationsPage() {
           destinationFilter={destinationFilter}
           fuelStationFilter={fuelStationFilter}
           filteredCount={filteredEntries.length}
-          totalCount={weekEntries.length}
+          totalCount={referenceMonthEntries.length}
           currentPage={safeCurrentPage}
           totalPages={totalPages}
           onSearchChange={setSearchTerm}
@@ -331,7 +367,6 @@ export default function NovalogOperationsPage() {
 
       <NovalogStandardEntryModal
         isOpen={isStandardModalOpen}
-        weekNumber={selectedWeek}
         originOptions={originOptions}
         destinationOptions={destinationOptions}
         draftEntry={draftEntry}
@@ -343,7 +378,6 @@ export default function NovalogOperationsPage() {
 
       <NovalogBatchEntryModal
         isOpen={isBatchModalOpen}
-        weekNumber={selectedWeek}
         originOptions={originOptions}
         destinationOptions={destinationOptions}
         isSubmitting={isSubmitting}

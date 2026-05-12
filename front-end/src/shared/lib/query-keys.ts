@@ -26,7 +26,8 @@ export const queryKeys = {
   },
   novalog: {
     all: ['novalog'] as const,
-    list: () => ['novalog', 'list'] as const,
+    list: (filters?: { referenceMonth?: string }) => ['novalog', 'list', filters ?? {}] as const,
+    referenceMonths: () => ['novalog', 'referenceMonths'] as const,
   },
   novalogBillings: {
     all: ['novalogBillings'] as const,
