@@ -11,6 +11,7 @@ import {
   createNovalogEntry,
   deleteNovalogEntry,
   listNovalogEntries,
+  listNovalogReferenceMonths,
   novalogPermissions,
   updateNovalogEntry,
 } from '../services/novalog.service';
@@ -202,7 +203,21 @@ router.get('/novalog/entries', loadAuthContext, async (req: AuthenticatedRequest
       return;
     }
 
-    res.json(serializeNovalogEntries(await listNovalogEntries(req.auth)));
+    res.json(serializeNovalogEntries(await listNovalogEntries(req.auth, {
+      referenceMonth: typeof req.query.referenceMonth === 'string' ? req.query.referenceMonth : undefined,
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/novalog/entries/reference-months', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', novalogPermissions, req.auth?.role), 'Sem permissao para visualizar competencias Novalog.')) {
+      return;
+    }
+
+    res.json(await listNovalogReferenceMonths(req.auth));
   } catch (error) {
     next(error);
   }

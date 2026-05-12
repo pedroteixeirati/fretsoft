@@ -15,12 +15,12 @@ import {
   calculateNovalogEntryAmounts,
   formatNovalogCurrency,
   formatNovalogDecimalInput,
+  getNovalogWeekNumberFromDate,
   parseNovalogDecimal,
 } from '../utils/novalog.calculations';
 
 interface NovalogStandardEntryModalProps {
   isOpen: boolean;
-  weekNumber: number;
   originOptions: NovalogOption[];
   destinationOptions: NovalogOption[];
   draftEntry?: NovalogEntry | null;
@@ -68,7 +68,6 @@ function getFormErrors(formData: NovalogStandardEntryFormData): FormFieldErrors<
 
 export default function NovalogStandardEntryModal({
   isOpen,
-  weekNumber,
   originOptions,
   destinationOptions,
   draftEntry,
@@ -140,7 +139,8 @@ export default function NovalogStandardEntryModal({
     onSubmit({
       id: mode === 'edit' && draftEntry ? draftEntry.id : `novalog-entry-${Date.now()}`,
       displayId: mode === 'edit' ? draftEntry?.displayId : undefined,
-      weekNumber,
+      weekNumber: getNovalogWeekNumberFromDate(formData.operationDate),
+      referenceMonth: formData.operationDate.slice(0, 7),
       operationDate: formData.operationDate,
       originName: formData.originName.trim(),
       destinationName: formData.destinationName.trim(),

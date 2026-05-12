@@ -24,6 +24,10 @@ export type NovalogBatchInput = {
   entries?: NovalogEntryInput[];
 };
 
+export type NovalogEntriesFilters = {
+  referenceMonth?: string;
+};
+
 export type NovalogEntryPayload = {
   referenceMonth: string;
   weekNumber: number;

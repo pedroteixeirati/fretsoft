@@ -7,12 +7,13 @@ import {
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
 import type { AuthContext } from '../../auth/dtos/auth-context';
-import type { NovalogBatchInput, NovalogEntryInput, NovalogEntryPayload } from '../dtos/novalog.types';
+import type { NovalogBatchInput, NovalogEntriesFilters, NovalogEntryInput, NovalogEntryPayload } from '../dtos/novalog.types';
 import {
   deleteTenantNovalogEntry,
   insertTenantNovalogEntriesBatch,
   insertTenantNovalogEntry,
   listTenantNovalogEntries,
+  listTenantNovalogReferenceMonths,
   type NovalogEntryRow,
   updateTenantNovalogEntry,
 } from '../repositories/novalog.repository';
@@ -36,6 +37,18 @@ function ensureNovalogContext(auth?: AuthContext) {
 
 function buildReferenceMonth(operationDate: string) {
   return operationDate.slice(0, 7);
+}
+
+function normalizeEntriesFilters(filters: NovalogEntriesFilters = {}) {
+  const referenceMonth = normalizeOptionalText(filters.referenceMonth);
+
+  if (referenceMonth && !/^\d{4}-\d{2}$/.test(referenceMonth)) {
+    throw validationError('Informe uma competencia valida no formato YYYY-MM.', 'invalid_novalog_reference_month', 'referenceMonth');
+  }
+
+  return {
+    referenceMonth,
+  };
 }
 
 function calculateAmounts(weight: number, companyRatePerTon: number, aggregatedRatePerTon: number) {
@@ -173,10 +186,15 @@ export async function validateNovalogBatchPayload(body: NovalogBatchInput) {
   return normalizedEntries;
 }
 
-export async function listNovalogEntries(auth?: AuthContext) {
+export async function listNovalogEntries(auth?: AuthContext, filters: NovalogEntriesFilters = {}) {
   ensureNovalogContext(auth);
-  const rows = await listTenantNovalogEntries(auth?.tenantId || '');
+  const rows = await listTenantNovalogEntries(auth?.tenantId || '', normalizeEntriesFilters(filters));
   return rows.map(mapNovalogRow);
+}
+
+export async function listNovalogReferenceMonths(auth?: AuthContext) {
+  ensureNovalogContext(auth);
+  return listTenantNovalogReferenceMonths(auth?.tenantId || '');
 }
 
 export async function createNovalogEntry(auth: AuthContext | undefined, body: NovalogEntryInput) {

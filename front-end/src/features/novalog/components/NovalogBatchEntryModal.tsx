@@ -14,6 +14,7 @@ import {
   calculateNovalogEntryAmounts,
   formatNovalogCurrency,
   formatNovalogDecimalInput,
+  getNovalogWeekNumberFromDate,
   parseNovalogDecimal,
 } from '../utils/novalog.calculations';
 
@@ -26,7 +27,6 @@ type BatchRowErrors = Partial<Record<BatchRowField, string>>;
 
 interface NovalogBatchEntryModalProps {
   isOpen: boolean;
-  weekNumber: number;
   originOptions: NovalogOption[];
   destinationOptions: NovalogOption[];
   isSubmitting?: boolean;
@@ -51,7 +51,6 @@ function getInitialRows() {
 
 export default function NovalogBatchEntryModal({
   isOpen,
-  weekNumber,
   originOptions,
   destinationOptions,
   isSubmitting = false,
@@ -207,7 +206,8 @@ export default function NovalogBatchEntryModal({
       const amounts = calculateNovalogEntryAmounts(parseNovalogDecimal(row.weight), parseNovalogDecimal(row.companyRatePerTon), parseNovalogDecimal(row.aggregatedRatePerTon));
       return {
         id: `novalog-entry-${Date.now()}-${row.id}`,
-        weekNumber,
+        weekNumber: getNovalogWeekNumberFromDate(operationDate),
+        referenceMonth: operationDate.slice(0, 7),
         operationDate,
         originName: originName.trim(),
         destinationName: row.destinationName.trim(),

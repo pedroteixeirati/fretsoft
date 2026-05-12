@@ -10,14 +10,13 @@ export async function ensureUser(decoded: DecodedIdToken) {
   const existing = await findUserByFirebaseUid(decoded.uid);
 
   if (!existing) {
-    return createUserFromIdentity(decoded.uid, decoded.email || '', decoded.name || null);
+    return createUserFromIdentity(decoded.uid, decoded.email || '', null);
   }
 
   const normalizedEmail = decoded.email || existing.email;
-  const normalizedName = decoded.name || existing.name;
 
-  if (normalizedEmail !== existing.email || normalizedName !== existing.name) {
-    return updateUserProfile(existing.id, normalizedEmail, normalizedName || null);
+  if (normalizedEmail !== existing.email) {
+    return updateUserProfile(existing.id, normalizedEmail, existing.name || null);
   }
 
   return existing;
@@ -35,7 +34,7 @@ export async function resolveAuthContext(decoded: DecodedIdToken) {
     uid: decoded.uid,
     userId: user.id,
     email: user.email,
-    name: user.name || decoded.name,
+    name: user.name || undefined,
     role: membership.role,
     tenantId: membership.tenant_id,
     tenantName: membership.tenant_name,

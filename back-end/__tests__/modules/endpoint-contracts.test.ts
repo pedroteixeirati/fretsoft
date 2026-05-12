@@ -8,6 +8,7 @@ function readModule(relativePath: string) {
 }
 
 const authControllerSource = readModule('back-end/modules/auth/controllers/auth.controller.ts');
+const authContextServiceSource = readModule('back-end/modules/auth/services/auth-context.service.ts');
 const cargasControllerSource = readModule('back-end/modules/cargas/controllers/cargas.controller.ts');
 const companiesControllerSource = readModule('back-end/modules/companies/controllers/companies.controller.ts');
 const contractsControllerSource = readModule('back-end/modules/contracts/controllers/contracts.controller.ts');
@@ -46,10 +47,13 @@ test('app HTTP registra todos os routers principais da API', () => {
 
 test('auth expoe endpoint de perfil autenticado com dados do tenant', () => {
   assert.match(authControllerSource, /router\.get\('\/me\/profile'/);
+  assert.match(authControllerSource, /name: auth\.name/);
   assert.match(authControllerSource, /tenantId: auth\.tenantId/);
   assert.match(authControllerSource, /tenantName: auth\.tenantName/);
   assert.match(authControllerSource, /tenantSlug: auth\.tenantSlug/);
   assert.match(authControllerSource, /tenantLogoUrl: auth\.tenantLogoUrl \|\| ''/);
+  assert.match(authContextServiceSource, /name: user\.name \|\| undefined/);
+  assert.doesNotMatch(authContextServiceSource, /name: user\.name \|\| decoded\.name/);
 });
 
 test('contrato global de erro usa code field e details no backend', () => {

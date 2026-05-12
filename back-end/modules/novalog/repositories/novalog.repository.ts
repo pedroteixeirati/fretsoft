@@ -1,5 +1,5 @@
 import { pool } from '../../../shared/infra/database/pool';
-import type { NovalogEntryPayload, NovalogEntryMode } from '../dtos/novalog.types';
+import type { NovalogEntriesFilters, NovalogEntryPayload, NovalogEntryMode } from '../dtos/novalog.types';
 
 export type NovalogEntryRow = {
   id: string;
@@ -51,7 +51,15 @@ const novalogReturningColumns = `returning id,
                entry_mode,
                batch_key`;
 
-export async function listTenantNovalogEntries(tenantId: string) {
+export async function listTenantNovalogEntries(tenantId: string, filters: NovalogEntriesFilters = {}) {
+  const values: unknown[] = [tenantId];
+  const whereClauses = ['tenant_id = $1'];
+
+  if (filters.referenceMonth) {
+    values.push(filters.referenceMonth);
+    whereClauses.push(`reference_month = $${values.length}`);
+  }
+
   const result = await pool.query<NovalogEntryRow>(
     `select id,
             display_id,
@@ -77,12 +85,24 @@ export async function listTenantNovalogEntries(tenantId: string) {
             entry_mode,
             batch_key
      from novalog_operation_entries
-     where tenant_id = $1
+     where ${whereClauses.join(' and ')}
      order by operation_date desc, created_at desc`,
-    [tenantId],
+    values,
   );
 
   return result.rows;
+}
+
+export async function listTenantNovalogReferenceMonths(tenantId: string) {
+  const result = await pool.query<{ reference_month: string }>(
+    `select distinct reference_month
+     from novalog_operation_entries
+     where tenant_id = $1
+     order by reference_month desc`,
+    [tenantId],
+  );
+
+  return result.rows.map((row) => row.reference_month);
 }
 
 export async function insertTenantNovalogEntry(payload: NovalogEntryPayload, tenantId: string, userId?: string) {

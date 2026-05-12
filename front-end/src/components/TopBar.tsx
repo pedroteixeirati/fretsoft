@@ -54,7 +54,6 @@ export default function TopBar({ onNavigate, onToggleSidebar }: TopBarProps) {
 
   const displayName =
     userProfile?.name ||
-    user?.displayName ||
     user?.email?.split('@')[0] ||
     'Usuario';
 
