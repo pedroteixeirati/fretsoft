@@ -12,6 +12,14 @@ function makeProfile(role: UserProfile['role']): UserProfile {
   };
 }
 
+function makeNovalogProfile(role: UserProfile['role']): UserProfile {
+  return {
+    ...makeProfile(role),
+    tenantSlug: 'novalog',
+    tenantName: 'Novalog',
+  };
+}
+
 describe('router navigation helpers', () => {
   it('resolve item a partir do caminho', () => {
     expect(getNavItemFromPath('/contas-a-pagar')).toBe('payables');
@@ -23,6 +31,7 @@ describe('router navigation helpers', () => {
   it('resolve caminho a partir do item', () => {
     expect(getPathFromNavItem('reports')).toBe('/relatorios');
     expect(getPathFromNavItem('cargas')).toBe('/cargas');
+    expect(getPathFromNavItem('novalogReports')).toBe('/novalog/relatorios');
   });
 
   it('retorna a primeira rota permitida para perfil financeiro', () => {
@@ -33,5 +42,9 @@ describe('router navigation helpers', () => {
     expect(resolveAllowedTab(makeProfile('viewer'), 'revenues')).toBe('revenues');
     expect(resolveAllowedTab(makeProfile('viewer'), 'payables')).toBe('payables');
     expect(resolveAllowedTab(makeProfile('viewer'), 'reports')).toBe('reports');
+  });
+
+  it('permite resolver a rota de relatorios Novalog para o tenant especifico', () => {
+    expect(resolveAllowedTab(makeNovalogProfile('financial'), 'novalogReports')).toBe('novalogReports');
   });
 });

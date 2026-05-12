@@ -45,6 +45,7 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       items: [
         { id: 'novalogOperations', label: 'Lancamentos', icon: Layers3, allowed: canAccessNovalogOperations(userProfile) },
         { id: 'novalogBillings', label: 'Faturamentos', icon: ReceiptText, allowed: canAccessNovalogOperations(userProfile) },
+        { id: 'novalogReports', label: 'Relatorios Novalog', icon: BarChart3, allowed: canAccessNovalogOperations(userProfile) },
       ],
     },
     {
@@ -77,7 +78,7 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       items: [
         { id: 'revenues', label: 'Contas a receber', icon: WalletCards, allowed: true },
         { id: 'payables', label: 'Contas a pagar', icon: CreditCard, allowed: true },
-        { id: 'reports', label: 'Relatorios', icon: BarChart3, allowed: true },
+        { id: 'reports', label: 'Relatorios', icon: BarChart3, allowed: userProfile?.tenantSlug !== 'novalog' },
       ],
     },
     {

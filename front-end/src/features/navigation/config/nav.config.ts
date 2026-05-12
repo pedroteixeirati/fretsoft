@@ -76,6 +76,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       items: compactItems([
         userProfile?.tenantSlug === 'novalog' ? navItem('novalogOperations', 'Lancamentos', Layers3) : null,
         userProfile?.tenantSlug === 'novalog' ? navItem('novalogBillings', 'Faturamentos', ReceiptText) : null,
+        userProfile?.tenantSlug === 'novalog' ? navItem('novalogReports', 'Relatorios Novalog', BarChart3) : null,
       ]),
     },
     {
@@ -85,7 +86,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       items: [
         navItem('revenues', 'Contas a receber', WalletCards),
         navItem('payables', 'Contas a pagar', CreditCard),
-        navItem('reports', 'Relatorios', BarChart3),
+        userProfile?.tenantSlug === 'novalog' ? null : navItem('reports', 'Relatorios', BarChart3),
       ],
     },
     {
