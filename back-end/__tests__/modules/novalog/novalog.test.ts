@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 const novalogControllerSource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/controllers/novalog.controller.ts'), 'utf8');
 const novalogRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/repositories/novalog.repository.ts'), 'utf8');
 const novalogServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/services/novalog.service.ts'), 'utf8');
+const novalogBillingsRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/repositories/novalog-billings.repository.ts'), 'utf8');
+const novalogBillingsServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/services/novalog-billings.service.ts'), 'utf8');
 
 test('repositorio Novalog lista e persiste registros explicitamente por tenant', () => {
   assert.match(novalogRepositorySource, /from novalog_operation_entries/i);
@@ -16,6 +18,14 @@ test('repositorio Novalog lista e persiste registros explicitamente por tenant',
   assert.match(novalogRepositorySource, /delete from novalog_operation_entries/i);
   assert.match(novalogRepositorySource, /await client\.query\('begin'\)/);
   assert.match(novalogRepositorySource, /await client\.query\('commit'\)/);
+});
+
+test('relatorio Novalog expoe pagamentos reais ligados aos recebiveis de CT-e', () => {
+  assert.match(novalogControllerSource, /router\.get\('\/novalog\/reports\/payments'/);
+  assert.match(novalogBillingsServiceSource, /export async function listNovalogReportPayments\(auth\?: AuthContext\)/);
+  assert.match(novalogBillingsRepositorySource, /from revenue_payments rp/i);
+  assert.match(novalogBillingsRepositorySource, /r\.source_type = 'novalog_billing_item'/);
+  assert.match(novalogBillingsRepositorySource, /i\.cte_number/);
 });
 
 test('controller e service Novalog expoem CRUD e lote sem depender de resources', () => {

@@ -15,6 +15,7 @@ import {
   linkRevenueToNovalogBillingItem,
   listTenantNovalogBillingItems,
   listTenantNovalogBillings,
+  listTenantNovalogReportPayments,
   replaceTenantNovalogBillingItems,
   countActiveTenantNovalogBillingItems,
   updateTenantNovalogBillingItem,
@@ -298,6 +299,24 @@ export async function listNovalogBillings(auth?: AuthContext) {
   ensureNovalogContext(auth);
   const rows = await listTenantNovalogBillings(auth?.tenantId || '');
   return rows.map((row) => mapBilling(row));
+}
+
+export async function listNovalogReportPayments(auth?: AuthContext) {
+  ensureNovalogContext(auth);
+  const rows = await listTenantNovalogReportPayments(auth?.tenantId || '');
+
+  return rows.map((row) => ({
+    id: row.id,
+    revenueId: row.revenue_id,
+    billingId: row.novalog_billing_id || undefined,
+    billingItemId: row.novalog_billing_item_id || undefined,
+    companyId: row.company_id || '',
+    companyName: row.company_name || 'Cliente nao informado',
+    cteNumber: row.cte_number || '-',
+    amount: Number(row.amount || 0),
+    paymentDate: row.payment_date,
+    notes: row.notes || '',
+  }));
 }
 
 export async function getNovalogBilling(auth: AuthContext | undefined, id: string) {

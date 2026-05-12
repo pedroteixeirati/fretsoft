@@ -42,6 +42,19 @@ export type NovalogBillingItemRow = {
   created_at: string;
 };
 
+export type NovalogReportPaymentRow = {
+  id: string;
+  revenue_id: string;
+  novalog_billing_id: string | null;
+  novalog_billing_item_id: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  cte_number: string | null;
+  amount: string | number;
+  payment_date: string;
+  notes: string | null;
+};
+
 export type CompanyForBillingRow = {
   id: string;
   company_name: string;
@@ -122,6 +135,34 @@ export async function listTenantNovalogBillings(tenantId: string) {
      where b.tenant_id = $1
      ${billingGroupBy}
      order by b.billing_date desc, b.created_at desc`,
+    [tenantId],
+  );
+
+  return result.rows;
+}
+
+export async function listTenantNovalogReportPayments(tenantId: string) {
+  const result = await pool.query<NovalogReportPaymentRow>(
+    `select rp.id,
+            rp.revenue_id,
+            r.novalog_billing_id,
+            r.novalog_billing_item_id,
+            r.company_id,
+            r.company_name,
+            i.cte_number,
+            rp.amount,
+            rp.payment_date,
+            rp.notes
+     from revenue_payments rp
+     inner join revenues r
+       on r.id = rp.revenue_id
+      and r.tenant_id = rp.tenant_id
+     left join novalog_billing_items i
+       on i.id = r.novalog_billing_item_id
+      and i.tenant_id = r.tenant_id
+     where rp.tenant_id = $1
+       and r.source_type = 'novalog_billing_item'
+     order by rp.payment_date desc, rp.created_at desc`,
     [tenantId],
   );
 

@@ -22,6 +22,7 @@ import {
   deleteNovalogBillingItem,
   getNovalogBilling,
   listNovalogBillings,
+  listNovalogReportPayments,
   novalogBillingPermissions,
   updateNovalogBilling,
   updateNovalogBillingItem,
@@ -36,6 +37,18 @@ router.get('/novalog/billings', loadAuthContext, async (req: AuthenticatedReques
     }
 
     res.json(await listNovalogBillings(req.auth));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/novalog/reports/payments', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', novalogBillingPermissions, req.auth?.role), 'Sem permissao para visualizar relatorios Novalog.')) {
+      return;
+    }
+
+    res.json(await listNovalogReportPayments(req.auth));
   } catch (error) {
     next(error);
   }
