@@ -48,6 +48,38 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, operat
   }
 }
 
+export async function apiFileRequest(path: string, init: RequestInit = {}, operationType: OperationType = OperationType.GET) {
+  try {
+    const response = await fetch(path, {
+      ...init,
+      headers: await buildHeaders(init.headers),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({} as ApiErrorPayload));
+      throw new ApiRequestError({
+        error: payload.error || `Erro ${response.status}`,
+        code: payload.code,
+        field: payload.field,
+        details: payload.details,
+        status: response.status,
+      });
+    }
+
+    const disposition = response.headers.get('content-disposition') || '';
+    const fileNameMatch = disposition.match(/filename="?([^"]+)"?/i);
+    return {
+      blob: await response.blob(),
+      fileName: fileNameMatch?.[1] || 'relatorio.xlsx',
+    };
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
+    handleDataError(error, operationType, path);
+  }
+}
+
 export function createCrudApi<T>(path: string) {
   return {
     list: () => apiRequest<T[]>(path, {}, OperationType.LIST),

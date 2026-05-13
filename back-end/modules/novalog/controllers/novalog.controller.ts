@@ -27,6 +27,7 @@ import {
   updateNovalogBilling,
   updateNovalogBillingItem,
 } from '../services/novalog-billings.service';
+import { exportNovalogReportWorkbook } from '../services/novalog-reports-export.service';
 
 const router = express.Router();
 
@@ -49,6 +50,26 @@ router.get('/novalog/reports/payments', loadAuthContext, async (req: Authenticat
     }
 
     res.json(await listNovalogReportPayments(req.auth));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/novalog/reports/export', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', novalogBillingPermissions, req.auth?.role), 'Sem permissao para exportar relatorios Novalog.')) {
+      return;
+    }
+
+    const result = await exportNovalogReportWorkbook(req.auth, req.query as Record<string, unknown>);
+    if (!result) {
+      sendErrorResponse(res, notFoundError('Relatorio Novalog nao encontrado.', 'novalog_report_not_found'));
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+    res.send(result.buffer);
   } catch (error) {
     next(error);
   }

@@ -34,4 +34,20 @@ describe('NovalogReportsPage contract', () => {
     expect(pageSource).toMatch(/payment\.paymentDate/);
     expect(pageSource).toMatch(/payment\.amount/);
   });
+
+  it('pagina as tabelas analiticas de saldo e recebimentos', () => {
+    expect(pageSource).toMatch(/balanceCurrentPage/);
+    expect(pageSource).toMatch(/receiptsCurrentPage/);
+    expect(pageSource).toMatch(/paginatedClientBalanceRows/);
+    expect(pageSource).toMatch(/paginatedPayments/);
+    expect(pageSource).toMatch(/currentPage: safeBalanceCurrentPage/);
+    expect(pageSource).toMatch(/currentPage: safeReceiptsCurrentPage/);
+  });
+
+  it('oferece exportacao da aba atual e do relatorio completo', () => {
+    expect(pageSource).toMatch(/novalogReportsApi\.exportWorkbook/);
+    expect(pageSource).toMatch(/getActiveTabLabel\(activeTab\)/);
+    expect(pageSource).toMatch(/Relatorio completo/);
+    expect(pageSource).toMatch(/type: 'tab' \| 'complete'/);
+  });
 });
