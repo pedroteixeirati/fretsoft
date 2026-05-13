@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BarChart3, CalendarDays, Download, FileText, ReceiptText, RefreshCcw, Users, WalletCards } from 'lucide-react';
+import { AlertTriangle, BarChart3, CalendarDays, Check, ChevronDown, Download, FileText, ReceiptText, RefreshCcw, Users, WalletCards } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import CustomSelect from '../../../components/CustomSelect';
 import KpiCard from '../../../components/KpiCard';
@@ -13,6 +13,7 @@ import { novalogApi } from '../services/novalog.api';
 import { revenuesApi } from '../../revenues/services/revenues.api';
 import { useNovalogBillingsQuery } from '../hooks/useNovalogBillingsQuery';
 import { useNovalogReportPaymentsQuery } from '../hooks/useNovalogReportsQuery';
+import { novalogReportsApi } from '../services/novalog-reports.api';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
 import type { Revenue } from '../../revenues/types/revenue.types';
 import type { NovalogReportPayment } from '../types/novalog-report.types';
@@ -61,6 +62,15 @@ function matchesStatus(revenue: Revenue, status: string) {
   return status === 'all' || revenue.status === status;
 }
 
+function getActiveTabLabel(tab: ActiveTab) {
+  const labels: Record<ActiveTab, string> = {
+    balance: 'Saldo a receber por cliente',
+    receipts: 'Recebimentos',
+    operations: 'Operacao',
+  };
+  return labels[tab];
+}
+
 function makeClientBalanceRows(revenues: Revenue[]) {
   const grouped = new Map<string, ClientBalanceRow>();
 
@@ -88,6 +98,7 @@ function makeClientBalanceRows(revenues: Revenue[]) {
 }
 
 export default function NovalogReportsPage() {
+  const itemsPerPage = 10;
   const { userProfile } = useFirebase();
   const canAccessNovalogModule = canAccessNovalogOperations(userProfile);
   const [activeTab, setActiveTab] = useState<ActiveTab>('balance');
@@ -98,6 +109,10 @@ export default function NovalogReportsPage() {
   const [endDate, setEndDate] = useState(initialRange.end);
   const [companyFilter, setCompanyFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [balanceCurrentPage, setBalanceCurrentPage] = useState(1);
+  const [receiptsCurrentPage, setReceiptsCurrentPage] = useState(1);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const referenceMonthsQuery = useQuery({
     queryKey: queryKeys.novalog.referenceMonths(),
@@ -176,6 +191,26 @@ export default function NovalogReportsPage() {
   const rankingRows = clientBalanceRows.filter((row) => row.balanceAmount > 0).slice(0, 5);
   const maximumBalance = Math.max(...rankingRows.map((row) => row.balanceAmount), 1);
   const operationEntries = entriesQuery.data ?? [];
+  const balanceTotalPages = Math.max(1, Math.ceil(clientBalanceRows.length / itemsPerPage));
+  const safeBalanceCurrentPage = Math.min(balanceCurrentPage, balanceTotalPages);
+  const paginatedClientBalanceRows = clientBalanceRows.slice(
+    (safeBalanceCurrentPage - 1) * itemsPerPage,
+    safeBalanceCurrentPage * itemsPerPage,
+  );
+  const receiptsTotalPages = Math.max(1, Math.ceil(filteredPayments.length / itemsPerPage));
+  const safeReceiptsCurrentPage = Math.min(receiptsCurrentPage, receiptsTotalPages);
+  const paginatedPayments = filteredPayments.slice(
+    (safeReceiptsCurrentPage - 1) * itemsPerPage,
+    safeReceiptsCurrentPage * itemsPerPage,
+  );
+
+  useEffect(() => {
+    setBalanceCurrentPage(1);
+  }, [referenceMonth, companyFilter, statusFilter, startDate, endDate, clientBalanceRows.length]);
+
+  useEffect(() => {
+    setReceiptsCurrentPage(1);
+  }, [referenceMonth, companyFilter, startDate, endDate, filteredPayments.length]);
 
   const kpis = useMemo(() => {
     const balanceAmount = filteredRevenues.reduce((sum, revenue) => sum + Number(revenue.balanceAmount || 0), 0);
@@ -223,6 +258,33 @@ export default function NovalogReportsPage() {
     const nextRange = getReferenceMonthRange(referenceMonth);
     setStartDate(nextRange.start);
     setEndDate(nextRange.end);
+  };
+
+  const handleExport = async (type: 'tab' | 'complete') => {
+    setIsExporting(true);
+    setIsExportMenuOpen(false);
+    try {
+      const result = await novalogReportsApi.exportWorkbook({
+        type,
+        tab: activeTab,
+        referenceMonth,
+        startDate,
+        endDate,
+        companyName: companyFilter,
+        status: statusFilter,
+      });
+      if (!result) return;
+      const url = URL.createObjectURL(result.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = result.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (!canAccessNovalogModule) {
@@ -285,10 +347,30 @@ export default function NovalogReportsPage() {
             <RefreshCcw className="h-4 w-4" />
             Limpar filtros
           </button>
-          <button type="button" disabled className="inline-flex h-12 cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-bold text-on-primary opacity-95">
-            <Download className="h-4 w-4" />
-            Exportar
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              disabled={isExporting}
+              onClick={() => setIsExportMenuOpen((current) => !current)}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-bold text-on-primary shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <Download className="h-4 w-4" />
+              {isExporting ? 'Exportando...' : 'Exportar'}
+              <ChevronDown className="h-4 w-4" />
+            </button>
+            {isExportMenuOpen ? (
+              <div className="absolute right-0 z-30 mt-2 w-72 overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface shadow-2xl">
+                <button type="button" onClick={() => void handleExport('tab')} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-on-surface transition hover:bg-primary/10">
+                  <Check className="h-4 w-4 text-primary" />
+                  {getActiveTabLabel(activeTab)}
+                </button>
+                <button type="button" onClick={() => void handleExport('complete')} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-on-surface transition hover:bg-primary/10">
+                  <Download className="h-4 w-4 text-primary" />
+                  Relatorio completo
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -309,11 +391,17 @@ export default function NovalogReportsPage() {
 
           <div className="grid gap-5 xl:grid-cols-[1.35fr_0.95fr]">
             <DataTable
-              rows={clientBalanceRows}
+              rows={paginatedClientBalanceRows}
               columns={clientColumns}
               getRowKey={(row) => row.id}
               emptyLabel="Nenhum saldo a receber encontrado para os filtros selecionados."
               summary={`${clientBalanceRows.length} cliente(s) no agrupamento`}
+              pagination={{
+                currentPage: safeBalanceCurrentPage,
+                totalPages: balanceTotalPages,
+                onPreviousPage: () => setBalanceCurrentPage((page) => Math.max(1, page - 1)),
+                onNextPage: () => setBalanceCurrentPage((page) => Math.min(balanceTotalPages, page + 1)),
+              }}
             />
             <section className="rounded-[1.5rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
               <h2 className="text-lg font-black text-on-surface">Concentracao do saldo a receber</h2>
@@ -354,13 +442,19 @@ export default function NovalogReportsPage() {
             <KpiCard label="Faturamentos considerados" value={kpis.billingCount} icon={BarChart3} tone="tertiary" />
           </div>
           <DataTable
-            rows={filteredPayments}
+            rows={paginatedPayments}
             columns={paymentColumns}
             getRowKey={(payment) => payment.id}
             loading={isLoadingPayments}
             loadingLabel="Carregando pagamentos Novalog..."
             emptyLabel="Nenhum pagamento efetivo encontrado no periodo selecionado."
             summary={`${filteredPayments.length} pagamento(s) encontrado(s)`}
+            pagination={{
+              currentPage: safeReceiptsCurrentPage,
+              totalPages: receiptsTotalPages,
+              onPreviousPage: () => setReceiptsCurrentPage((page) => Math.max(1, page - 1)),
+              onNextPage: () => setReceiptsCurrentPage((page) => Math.min(receiptsTotalPages, page + 1)),
+            }}
           />
         </>
       ) : null}

@@ -8,6 +8,7 @@ const novalogRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/mo
 const novalogServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/services/novalog.service.ts'), 'utf8');
 const novalogBillingsRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/repositories/novalog-billings.repository.ts'), 'utf8');
 const novalogBillingsServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/services/novalog-billings.service.ts'), 'utf8');
+const novalogReportsExportServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/novalog/services/novalog-reports-export.service.ts'), 'utf8');
 
 test('repositorio Novalog lista e persiste registros explicitamente por tenant', () => {
   assert.match(novalogRepositorySource, /from novalog_operation_entries/i);
@@ -26,6 +27,18 @@ test('relatorio Novalog expoe pagamentos reais ligados aos recebiveis de CT-e', 
   assert.match(novalogBillingsRepositorySource, /from revenue_payments rp/i);
   assert.match(novalogBillingsRepositorySource, /r\.source_type = 'novalog_billing_item'/);
   assert.match(novalogBillingsRepositorySource, /i\.cte_number/);
+});
+
+test('relatorio Novalog exporta planilha xlsx com aba atual e relatorio completo', () => {
+  assert.match(novalogControllerSource, /router\.get\('\/novalog\/reports\/export'/);
+  assert.match(novalogControllerSource, /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
+  assert.match(novalogReportsExportServiceSource, /export async function exportNovalogReportWorkbook/);
+  assert.match(novalogReportsExportServiceSource, /workbook\.addWorksheet\('Resumo'\)/);
+  assert.match(novalogReportsExportServiceSource, /workbook\.addWorksheet\('Saldo por Cliente'\)/);
+  assert.match(novalogReportsExportServiceSource, /workbook\.addWorksheet\('Recebimentos'\)/);
+  assert.match(novalogReportsExportServiceSource, /workbook\.addWorksheet\('Faturamentos'\)/);
+  assert.match(novalogReportsExportServiceSource, /workbook\.addWorksheet\('Operacao'\)/);
+  assert.match(novalogReportsExportServiceSource, /auth\.tenantLogoUrl/);
 });
 
 test('controller e service Novalog expoem CRUD e lote sem depender de resources', () => {
