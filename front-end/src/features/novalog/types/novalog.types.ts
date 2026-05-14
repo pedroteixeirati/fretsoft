@@ -29,6 +29,9 @@ export interface NovalogEntry {
   fuelStationName: string;
   entryMode: NovalogEntryMode;
   batchKey?: string;
+  createdByUserId?: string;
+  createdByName?: string;
+  createdAt?: string;
 }
 
 export interface NovalogOption {

@@ -6,12 +6,13 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  subtitle?: React.ReactNode;
   children: React.ReactNode;
   panelClassName?: string;
   contentClassName?: string;
 }
 
-export default function Modal({ isOpen, onClose, title, children, panelClassName = '', contentClassName = '' }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, subtitle, children, panelClassName = '', contentClassName = '' }: ModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -29,11 +30,14 @@ export default function Modal({ isOpen, onClose, title, children, panelClassName
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className={`relative w-full max-w-2xl bg-surface-container-lowest rounded-[2.5rem] shadow-2xl overflow-hidden border border-outline-variant ${panelClassName}`}
           >
-            <div className="flex items-center justify-between p-8 border-b border-outline-variant">
-              <h2 className="text-2xl font-black text-on-surface tracking-tight">{title}</h2>
+            <div className="flex items-center justify-between gap-6 p-8 border-b border-outline-variant">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-black text-on-surface tracking-tight">{title}</h2>
+                {subtitle ? <div className="mt-2 text-sm font-medium text-on-surface-variant">{subtitle}</div> : null}
+              </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full hover:bg-surface-container transition-colors"
+                className="shrink-0 p-2 rounded-full hover:bg-surface-container transition-colors"
               >
                 <X className="w-6 h-6 text-on-surface-variant" />
               </button>

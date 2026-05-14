@@ -30,17 +30,20 @@ describe('NovalogEntriesTable', () => {
       <NovalogEntriesTable
         entries={[entry]}
         searchTerm=""
-        originFilter=""
-        destinationFilter=""
+        referenceMonthFilter="all"
+        referenceMonthOptions={[{ value: 'all', label: 'Todas as competencias' }]}
+        ticketFilter=""
         fuelStationFilter=""
+        operationDateFilter=""
         filteredCount={1}
         totalCount={1}
         currentPage={1}
         totalPages={1}
         onSearchChange={() => undefined}
-        onOriginFilterChange={() => undefined}
-        onDestinationFilterChange={() => undefined}
+        onReferenceMonthFilterChange={() => undefined}
+        onTicketFilterChange={() => undefined}
         onFuelStationFilterChange={() => undefined}
+        onOperationDateFilterChange={() => undefined}
         onPreviousPage={() => undefined}
         onNextPage={() => undefined}
         onEdit={onEdit}

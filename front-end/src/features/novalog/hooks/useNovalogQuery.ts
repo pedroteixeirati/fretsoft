@@ -7,13 +7,19 @@ export function useNovalogQuery(enabled: boolean, referenceMonth?: string) {
   const query = useQuery({
     queryKey: queryKeys.novalog.list({ referenceMonth }),
     queryFn: () => novalogApi.list({ referenceMonth }),
-    enabled: enabled && Boolean(referenceMonth),
+    enabled,
   });
 
   const entries = useMemo(() => {
     const items = query.data ?? [];
 
-    return [...items].sort((left, right) => (left.displayId ?? Number.MAX_SAFE_INTEGER) - (right.displayId ?? Number.MAX_SAFE_INTEGER));
+    return [...items].sort((left, right) => {
+      if (left.createdAt && right.createdAt) {
+        return right.createdAt.localeCompare(left.createdAt);
+      }
+
+      return (right.displayId ?? 0) - (left.displayId ?? 0);
+    });
   }, [query.data]);
 
   return {

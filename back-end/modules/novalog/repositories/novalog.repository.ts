@@ -25,6 +25,9 @@ export type NovalogEntryRow = {
   notes: string | null;
   entry_mode: NovalogEntryMode;
   batch_key: string | null;
+  created_by_user_id: string | null;
+  created_by_name: string | null;
+  created_at: string;
 };
 
 const novalogReturningColumns = `returning id,
@@ -49,44 +52,50 @@ const novalogReturningColumns = `returning id,
                driver_net_amount,
                notes,
                entry_mode,
-               batch_key`;
+               batch_key,
+               created_by_user_id,
+               created_at`;
 
 export async function listTenantNovalogEntries(tenantId: string, filters: NovalogEntriesFilters = {}) {
   const values: unknown[] = [tenantId];
-  const whereClauses = ['tenant_id = $1'];
+  const whereClauses = ['e.tenant_id = $1'];
 
   if (filters.referenceMonth) {
     values.push(filters.referenceMonth);
-    whereClauses.push(`reference_month = $${values.length}`);
+    whereClauses.push(`e.reference_month = $${values.length}`);
   }
 
   const result = await pool.query<NovalogEntryRow>(
-    `select id,
-            display_id,
-            tenant_id,
-            reference_month,
-            week_number,
-            operation_date,
-            origin_name,
-            destination_name,
-            weight,
-            company_rate_per_ton,
-            company_gross_amount,
-            aggregated_rate_per_ton,
-            aggregated_gross_amount,
-            ticket_number,
-            fuel_station_name,
-            driver_name,
-            vehicle_label,
-            driver_share_percent,
-            driver_share_amount,
-            driver_net_amount,
-            notes,
-            entry_mode,
-            batch_key
-     from novalog_operation_entries
+    `select e.id,
+            e.display_id,
+            e.tenant_id,
+            e.reference_month,
+            e.week_number,
+            e.operation_date,
+            e.origin_name,
+            e.destination_name,
+            e.weight,
+            e.company_rate_per_ton,
+            e.company_gross_amount,
+            e.aggregated_rate_per_ton,
+            e.aggregated_gross_amount,
+            e.ticket_number,
+            e.fuel_station_name,
+            e.driver_name,
+            e.vehicle_label,
+            e.driver_share_percent,
+            e.driver_share_amount,
+            e.driver_net_amount,
+            e.notes,
+            e.entry_mode,
+            e.batch_key,
+            e.created_by_user_id,
+            coalesce(created_by_user.name, '') as created_by_name,
+            e.created_at
+     from novalog_operation_entries e
+     left join users created_by_user on created_by_user.id = e.created_by_user_id
      where ${whereClauses.join(' and ')}
-     order by operation_date desc, created_at desc`,
+     order by e.created_at desc, e.id desc`,
     values,
   );
 
