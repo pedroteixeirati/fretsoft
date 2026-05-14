@@ -111,6 +111,8 @@ test('repository lista faturamentos com totais agregados e persiste itens em tra
   assert.match(novalogBillingRepositorySource, /count\(i\.id\) filter \(where i\.status <> 'canceled'\) as cte_count/);
   assert.match(novalogBillingRepositorySource, /sum\(i\.amount\) filter \(where i\.status <> 'canceled'\)/);
   assert.match(novalogBillingRepositorySource, /rp\.received_amount/);
+  assert.match(novalogBillingRepositorySource, /max\(payment_date\) filter \(where status = 'active'\) as last_payment_at/);
+  assert.match(novalogBillingServiceSource, /lastPaymentAt: row\.last_payment_at \|\| undefined/);
   assert.match(novalogBillingRepositorySource, /i\.status in \('pending', 'billed', 'partially_received'\)/);
   assert.match(novalogBillingRepositorySource, /and status <> 'canceled'/);
   assert.match(novalogBillingRepositorySource, /updateTenantNovalogBillingItem/);

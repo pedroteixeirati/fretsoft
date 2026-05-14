@@ -1,106 +1,115 @@
 import React from 'react';
-import { AlertTriangle, HelpCircle } from 'lucide-react';
-import Button from './Button';
-import Modal from './Modal';
+import { AlertTriangle, HelpCircle, Info } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 
-type ConfirmDialogTone = 'default' | 'warning' | 'danger';
+export type ConfirmDialogTone = 'default' | 'warning' | 'danger';
 
-interface ConfirmDialogProps {
+export interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
-  description: React.ReactNode;
+  description?: React.ReactNode;
+  message?: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmDialogTone;
-  icon?: React.ElementType;
+  variant?: ConfirmDialogTone;
   isLoading?: boolean;
-  onConfirm: () => void | Promise<void>;
-  onClose: () => void;
+  onConfirm: () => void;
+  onClose?: () => void;
+  onCancel?: () => void;
 }
 
-const toneConfig: Record<ConfirmDialogTone, {
-  icon: React.ElementType;
-  iconClassName: string;
-  iconWrapperClassName: string;
-  confirmVariant: 'primary' | 'danger';
-}> = {
+const variantConfig = {
   default: {
     icon: HelpCircle,
-    iconClassName: 'text-primary',
-    iconWrapperClassName: 'bg-primary/10',
-    confirmVariant: 'primary',
+    iconClassName: 'bg-primary/10 text-primary',
+    buttonClassName: 'bg-primary text-on-primary shadow-primary/20',
   },
   warning: {
-    icon: AlertTriangle,
-    iconClassName: 'text-tertiary',
-    iconWrapperClassName: 'bg-tertiary/10',
-    confirmVariant: 'primary',
+    icon: Info,
+    iconClassName: 'bg-tertiary/10 text-tertiary',
+    buttonClassName: 'bg-tertiary text-on-tertiary shadow-tertiary/20',
   },
   danger: {
     icon: AlertTriangle,
-    iconClassName: 'text-error',
-    iconWrapperClassName: 'bg-error/10',
-    confirmVariant: 'danger',
+    iconClassName: 'bg-error/10 text-error',
+    buttonClassName: 'bg-error text-on-error shadow-error/20',
   },
-};
+} satisfies Record<ConfirmDialogTone, { icon: React.ElementType; iconClassName: string; buttonClassName: string }>;
 
 export default function ConfirmDialog({
   isOpen,
   title,
   description,
+  message,
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
-  tone = 'default',
-  icon,
+  tone,
+  variant,
   isLoading = false,
   onConfirm,
   onClose,
+  onCancel,
 }: ConfirmDialogProps) {
-  const config = toneConfig[tone];
-  const Icon = icon || config.icon;
+  const dialogTone = variant || tone || 'default';
+  const handleCancel = onCancel || onClose || (() => {});
+  const config = variantConfig[dialogTone];
+  const Icon = config.icon;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={isLoading ? () => undefined : onClose}
-      title={title}
-      panelClassName="max-w-[min(92vw,460px)]"
-      contentClassName="p-6"
-    >
-      <div className="space-y-6">
-        <div className="flex items-start gap-4">
-          <span className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl', config.iconWrapperClassName)}>
-            <Icon className={cn('h-5 w-5', config.iconClassName)} />
-          </span>
-          <div className="min-w-0 space-y-2">
-            <p className="text-sm leading-6 text-on-surface-variant">{description}</p>
-          </div>
-        </div>
+    <AnimatePresence>
+      {isOpen ? (
+        <div className="fixed inset-0 z-[180] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={isLoading ? undefined : handleCancel}
+            className="absolute inset-0 bg-on-surface/50 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 16 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-dialog-title"
+            className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-outline-variant bg-surface-container-lowest p-6 shadow-2xl"
+          >
+            <div className="flex items-start gap-4">
+              <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-2xl', config.iconClassName)}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 id="confirm-dialog-title" className="text-xl font-black tracking-tight text-on-surface">
+                  {title}
+                </h2>
+                <div className="mt-2 text-sm leading-6 text-on-surface-variant">{message ?? description}</div>
+              </div>
+            </div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-outline-variant/10 pt-5 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={isLoading}
-            onClick={onClose}
-            className="rounded-full"
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            type="button"
-            variant={config.confirmVariant}
-            disabled={isLoading}
-            onClick={onConfirm}
-            className="rounded-full"
-          >
-            {isLoading ? 'Processando...' : confirmLabel}
-          </Button>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={isLoading}
+                className="rounded-full border border-outline-variant bg-surface px-5 py-3 text-sm font-bold text-on-surface transition hover:border-primary/20 hover:bg-primary/5 disabled:opacity-50"
+              >
+                {cancelLabel}
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={isLoading}
+                className={cn('rounded-full px-5 py-3 text-sm font-bold shadow-lg transition hover:scale-[1.01] active:scale-95 disabled:opacity-60', config.buttonClassName)}
+              >
+                {isLoading ? 'Processando...' : confirmLabel}
+              </button>
+            </div>
+          </motion.div>
         </div>
-      </div>
-    </Modal>
+      ) : null}
+    </AnimatePresence>
   );
 }
-
-export type { ConfirmDialogProps, ConfirmDialogTone };

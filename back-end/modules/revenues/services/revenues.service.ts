@@ -1,5 +1,5 @@
 import { notFoundError, validationError } from '../../../shared/errors/app-error';
-import { isPositiveNumber, isValidDate, normalizeOptionalText } from '../../../shared/validation/validation';
+import { isPositiveNumber, isValidDate, normalizeOptionalText, normalizeRequiredText } from '../../../shared/validation/validation';
 import {
   addMonths,
   formatCompetenceLabel,
@@ -24,9 +24,11 @@ import {
 } from '../repositories/revenues.repository';
 import {
   findRevenueByIdForUpdate,
+  findRevenuePaymentByIdForUpdate,
   getRevenuePoolClient,
   insertRevenuePayment,
   listRevenuePaymentsByRevenue,
+  reverseRevenuePayment,
   sumRevenuePayments,
   updateRevenuePaymentState,
 } from '../repositories/revenue-payments.repository';
@@ -43,6 +45,13 @@ function formatTodayDate() {
 
 function formatFreightSegment(freight: { origin: string; destination: string }) {
   return `${freight.origin} x ${freight.destination}`;
+}
+
+function deriveRevenueStatusAfterPayments(revenue: { amount: string | number; charge_reference?: string | null }, receivedAmount: number): RevenueStatus {
+  const totalAmount = Number(revenue.amount || 0);
+  if (receivedAmount >= totalAmount - 0.009) return 'received';
+  if (receivedAmount > 0.009) return 'partially_received';
+  return revenue.charge_reference ? 'billed' : 'pending';
 }
 
 function isContractActiveForCompetence(contract: { start_date: string; end_date: string }, competenceDate: Date) {
@@ -300,7 +309,7 @@ export async function registerRevenuePayment(
     }, client);
 
     const receivedAfter = receivedBefore + paymentAmount;
-    const nextStatus: RevenueStatus = receivedAfter >= totalAmount - 0.009 ? 'received' : 'partially_received';
+    const nextStatus = deriveRevenueStatusAfterPayments(revenue, receivedAfter);
     const updatedResult = await updateRevenuePaymentState({
       revenueId,
       tenantId,
@@ -320,6 +329,86 @@ export async function registerRevenuePayment(
     updatedRevenue.balance_amount = Math.max(totalAmount - receivedAfter, 0);
     updatedRevenue.payment_count = (await listRevenuePaymentsByRevenue(revenueId, tenantId)).rowCount || 0;
     updatedRevenue.last_payment_at = paymentDate;
+    return mapRevenue(updatedRevenue);
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function reverseRegisteredRevenuePayment(
+  revenueId: string,
+  paymentId: string,
+  tenantId: string | undefined,
+  body: { reason?: string | null },
+  actorUserId?: string,
+) {
+  if (!tenantId) return null;
+  const reason = normalizeRequiredText(body.reason);
+  if (reason.length < 3) {
+    throw validationError('Informe o motivo do estorno.', 'invalid_revenue_payment_reversal_reason', 'reason');
+  }
+
+  const client = await getRevenuePoolClient();
+
+  try {
+    await client.query('begin');
+    const revenueResult = await findRevenueByIdForUpdate(revenueId, tenantId, client);
+    const revenue = revenueResult.rows[0];
+    if (!revenue) {
+      await client.query('rollback');
+      return null;
+    }
+    if (revenue.status === 'canceled') {
+      throw validationError('Conta cancelada nao pode ter pagamentos estornados.', 'revenue_payment_reversal_canceled');
+    }
+
+    const paymentResult = await findRevenuePaymentByIdForUpdate(paymentId, revenueId, tenantId, client);
+    const payment = paymentResult.rows[0];
+    if (!payment) {
+      await client.query('rollback');
+      return null;
+    }
+    if (payment.status === 'reversed') {
+      throw validationError('Este pagamento ja foi estornado.', 'revenue_payment_already_reversed');
+    }
+
+    const reverseResult = await reverseRevenuePayment({
+      paymentId,
+      revenueId,
+      tenantId,
+      reason,
+      actorUserId,
+    }, client);
+    if (reverseResult.rowCount === 0) {
+      throw validationError('Este pagamento nao pode ser estornado.', 'revenue_payment_not_reversible');
+    }
+
+    const receivedAfter = await sumRevenuePayments(revenueId, tenantId, client);
+    const totalAmount = Number(revenue.amount || 0);
+    const nextStatus = deriveRevenueStatusAfterPayments(revenue, receivedAfter);
+    const updatedResult = await updateRevenuePaymentState({
+      revenueId,
+      tenantId,
+      status: nextStatus,
+      actorUserId,
+    }, client);
+    const updatedRevenue = updatedResult.rows[0];
+
+    await client.query('commit');
+
+    if (updatedRevenue?.source_type === 'novalog_billing_item') {
+      await syncNovalogBillingItemFromRevenue(tenantId, revenueId, nextStatus, actorUserId);
+    }
+
+    if (!updatedRevenue) return null;
+    updatedRevenue.received_amount = receivedAfter;
+    updatedRevenue.balance_amount = Math.max(totalAmount - receivedAfter, 0);
+    const paymentsResult = await listRevenuePaymentsByRevenue(revenueId, tenantId);
+    updatedRevenue.payment_count = paymentsResult.rowCount || 0;
+    updatedRevenue.last_payment_at = paymentsResult.rows.find((current) => current.status === 'active')?.payment_date || null;
     return mapRevenue(updatedRevenue);
   } catch (error) {
     await client.query('rollback');

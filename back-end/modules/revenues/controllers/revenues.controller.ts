@@ -12,6 +12,7 @@ import {
   listTenantRevenues,
   overdueRevenue,
   registerRevenuePayment,
+  reverseRegisteredRevenuePayment,
   receiveRevenue,
 } from '../services/revenues.service';
 
@@ -90,6 +91,24 @@ router.post('/:id/payments', loadAuthContext, async (req: AuthenticatedRequest, 
     }
 
     res.status(201).json(revenue);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/payments/:paymentId/reverse', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('create', permissions, req.auth?.role), 'Sem permissao para estornar recebimento.')) {
+      return;
+    }
+
+    const revenue = await reverseRegisteredRevenuePayment(req.params.id, req.params.paymentId, req.auth?.tenantId, req.body, req.auth?.userId);
+    if (!revenue) {
+      sendErrorResponse(res, notFoundError('Receita ou pagamento nao encontrado.', 'revenue_payment_not_found'));
+      return;
+    }
+
+    res.json(revenue);
   } catch (error) {
     next(error);
   }

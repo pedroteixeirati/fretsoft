@@ -13,5 +13,10 @@ export const revenuesApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }, OperationType.UPDATE),
+  reversePayment: (id: string, paymentId: string, payload: { reason: string }) =>
+    apiRequest<Revenue>(`/api/revenues/${id}/payments/${paymentId}/reverse`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, OperationType.UPDATE),
   markOverdue: (id: string) => apiRequest<Revenue>(`/api/revenues/${id}/overdue`, { method: 'POST' }, OperationType.UPDATE),
 };

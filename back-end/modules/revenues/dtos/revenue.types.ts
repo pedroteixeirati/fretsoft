@@ -35,6 +35,9 @@ export type RevenuePaymentRow = {
   amount: string | number;
   payment_date: string;
   notes: string | null;
+  status: 'active' | 'reversed';
+  reversed_at: string | null;
+  reversal_reason: string | null;
   created_at: string;
 };
 
@@ -111,6 +114,9 @@ export function mapRevenuePayment(row: RevenuePaymentRow) {
     amount: Number(row.amount || 0),
     paymentDate: row.payment_date,
     notes: row.notes || '',
+    status: row.status || 'active',
+    reversedAt: row.reversed_at || undefined,
+    reversalReason: row.reversal_reason || '',
     createdAt: row.created_at,
   };
 }
