@@ -37,6 +37,7 @@ export type NovalogBillingItemRow = {
   received_amount?: string | number | null;
   balance_amount?: string | number | null;
   payment_count?: string | number | null;
+  last_payment_at?: string | null;
   notes: string | null;
   linked_revenue_id: string | null;
   created_at: string;
@@ -80,6 +81,7 @@ left join novalog_billing_items i on i.billing_id = b.id and i.tenant_id = b.ten
 left join (
   select tenant_id, revenue_id, coalesce(sum(amount), 0) as received_amount
   from revenue_payments
+  where status = 'active'
   group by tenant_id, revenue_id
 ) rp on rp.tenant_id = i.tenant_id and rp.revenue_id = i.linked_revenue_id`;
 
@@ -161,6 +163,7 @@ export async function listTenantNovalogReportPayments(tenantId: string) {
        on i.id = r.novalog_billing_item_id
       and i.tenant_id = r.tenant_id
      where rp.tenant_id = $1
+       and rp.status = 'active'
        and r.source_type = 'novalog_billing_item'
      order by rp.payment_date desc, rp.created_at desc`,
     [tenantId],
@@ -200,6 +203,7 @@ export async function listTenantNovalogBillingItems(billingId: string, tenantId:
             coalesce(rp.received_amount, case when i.status = 'received' then i.amount else 0 end) as received_amount,
             greatest(i.amount - coalesce(rp.received_amount, 0), 0) as balance_amount,
             coalesce(rp.payment_count, 0) as payment_count,
+            rp.last_payment_at,
             i.notes,
             i.linked_revenue_id,
             i.created_at
@@ -207,8 +211,9 @@ export async function listTenantNovalogBillingItems(billingId: string, tenantId:
      left join (
        select tenant_id,
               revenue_id,
-              coalesce(sum(amount), 0) as received_amount,
-              count(*) as payment_count
+              coalesce(sum(amount) filter (where status = 'active'), 0) as received_amount,
+              count(*) filter (where status = 'active') as payment_count,
+              max(payment_date) filter (where status = 'active') as last_payment_at
        from revenue_payments
        where tenant_id = $2
        group by tenant_id, revenue_id
@@ -392,7 +397,7 @@ export function updateTenantNovalogBillingItemStatus(id: string, tenantId: strin
   return db(client).query<NovalogBillingItemRow>(
     `update novalog_billing_items
      set status = $1,
-         received_at = case when $1 = 'received' then now() else received_at end,
+         received_at = case when $1 = 'received' then now() when $1 in ('pending', 'billed', 'partially_received', 'overdue') then null else received_at end,
          updated_by_user_id = $2,
          updated_at = now()
      where id = $3
@@ -465,7 +470,7 @@ export function updateNovalogBillingItemStatusByRevenue(revenueId: string, tenan
   return pool.query<NovalogBillingItemRow>(
     `update novalog_billing_items
      set status = $1,
-         received_at = case when $1 = 'received' then coalesce(received_at, now()) else received_at end,
+         received_at = case when $1 = 'received' then coalesce(received_at, now()) when $1 in ('pending', 'billed', 'partially_received', 'overdue') then null else received_at end,
          updated_by_user_id = $2,
          updated_at = now()
      where linked_revenue_id = $3

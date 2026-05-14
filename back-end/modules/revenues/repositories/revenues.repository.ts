@@ -265,9 +265,9 @@ export function listRevenuesByTenant(tenantId: string) {
     `with payment_totals as (
        select tenant_id,
               revenue_id,
-              coalesce(sum(amount), 0) as received_amount,
+              coalesce(sum(amount) filter (where status = 'active'), 0) as received_amount,
               count(*) as payment_count,
-              max(payment_date) as last_payment_at
+              max(payment_date) filter (where status = 'active') as last_payment_at
        from revenue_payments
        where tenant_id = $1
        group by tenant_id, revenue_id

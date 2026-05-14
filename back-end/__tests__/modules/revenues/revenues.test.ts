@@ -94,8 +94,35 @@ test('transicoes financeiras impedem cobranca e atraso em receitas concluidas', 
     /insert into revenue_payments \([\s\S]*tenant_id,[\s\S]*revenue_id,[\s\S]*amount,[\s\S]*payment_date/i
   );
   assert.match(
+    revenuePaymentsRepositorySource,
+    /sum\(amount\)[\s\S]*status = 'active'/i
+  );
+  assert.match(
+    revenuePaymentsRepositorySource,
+    /update revenue_payments[\s\S]*set status = 'reversed'[\s\S]*reversal_reason/i
+  );
+  assert.match(
     revenuesRepositorySource,
     /markRevenueAsOverdue[\s\S]*where id = \$2[\s\S]*tenant_id = \$3[\s\S]*status in \('pending', 'billed'\)/i
+  );
+});
+
+test('estorno de pagamento preserva historico e recalcula recebivel por pagamentos ativos', () => {
+  assert.match(
+    readFileSync(resolve(process.cwd(), 'back-end/migrations/1713405600000_revenue_payment_reversals.sql'), 'utf8'),
+    /add column if not exists status text not null default 'active'[\s\S]*reversal_reason text/i
+  );
+  assert.match(
+    revenuesServiceSource,
+    /reverseRegisteredRevenuePayment[\s\S]*findRevenuePaymentByIdForUpdate[\s\S]*reverseRevenuePayment[\s\S]*sumRevenuePayments/i
+  );
+  assert.match(
+    revenuesServiceSource,
+    /syncNovalogBillingItemFromRevenue\(tenantId, revenueId, nextStatus, actorUserId\)/i
+  );
+  assert.match(
+    revenuesRepositorySource,
+    /sum\(amount\) filter \(where status = 'active'\)/i
   );
 });
 

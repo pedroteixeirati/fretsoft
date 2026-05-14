@@ -187,11 +187,13 @@ test('revenues expoe listagem geracao cobranca recebimento e atraso', () => {
   assert.match(revenuesControllerSource, /router\.post\('\/generate'/);
   assert.match(revenuesControllerSource, /router\.post\('\/:id\/charge'/);
   assert.match(revenuesControllerSource, /router\.post\('\/:id\/receive'/);
+  assert.match(revenuesControllerSource, /router\.post\('\/:id\/payments\/:paymentId\/reverse'/);
   assert.match(revenuesControllerSource, /router\.post\('\/:id\/overdue'/);
   assert.match(revenuesControllerSource, /Sem permissao para visualizar receitas\./);
   assert.match(revenuesControllerSource, /Sem permissao para gerar receitas\./);
   assert.match(revenuesControllerSource, /Sem permissao para gerar cobrancas\./);
   assert.match(revenuesControllerSource, /Sem permissao para atualizar o recebimento\./);
+  assert.match(revenuesControllerSource, /Sem permissao para estornar recebimento\./);
   assert.match(revenuesControllerSource, /Sem permissao para marcar atraso\./);
   assert.match(revenuesControllerSource, /Receita nao encontrada\./);
 });

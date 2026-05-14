@@ -49,6 +49,9 @@ export function listRevenuePaymentsByRevenue(revenueId: string, tenantId: string
             amount,
             payment_date,
             notes,
+            status,
+            reversed_at,
+            reversal_reason,
             created_at
      from revenue_payments
      where revenue_id = $1
@@ -63,11 +66,33 @@ export async function sumRevenuePayments(revenueId: string, tenantId: string, cl
     `select coalesce(sum(amount), 0)::text as total
      from revenue_payments
      where revenue_id = $1
-       and tenant_id = $2`,
+       and tenant_id = $2
+       and status = 'active'`,
     [revenueId, tenantId],
   );
 
   return Number(result.rows[0]?.total || 0);
+}
+
+export function findRevenuePaymentByIdForUpdate(paymentId: string, revenueId: string, tenantId: string, client: PoolClient) {
+  return client.query<RevenuePaymentRow>(
+    `select id,
+            tenant_id,
+            revenue_id,
+            amount,
+            payment_date,
+            notes,
+            status,
+            reversed_at,
+            reversal_reason,
+            created_at
+     from revenue_payments
+     where id = $1
+       and revenue_id = $2
+       and tenant_id = $3
+     for update`,
+    [paymentId, revenueId, tenantId],
+  );
 }
 
 export function insertRevenuePayment(params: {
@@ -94,6 +119,9 @@ export function insertRevenuePayment(params: {
                amount,
                payment_date,
                notes,
+               status,
+               reversed_at,
+               reversal_reason,
                created_at`,
     [
       params.tenantId,
@@ -102,6 +130,43 @@ export function insertRevenuePayment(params: {
       params.paymentDate,
       params.notes || null,
       params.actorUserId || null,
+    ],
+  );
+}
+
+export function reverseRevenuePayment(params: {
+  paymentId: string;
+  revenueId: string;
+  tenantId: string;
+  reason: string;
+  actorUserId?: string | null;
+}, client: PoolClient) {
+  return client.query<RevenuePaymentRow>(
+    `update revenue_payments
+     set status = 'reversed',
+         reversed_at = now(),
+         reversed_by_user_id = $1,
+         reversal_reason = $2
+     where id = $3
+       and revenue_id = $4
+       and tenant_id = $5
+       and status = 'active'
+     returning id,
+               tenant_id,
+               revenue_id,
+               amount,
+               payment_date,
+               notes,
+               status,
+               reversed_at,
+               reversal_reason,
+               created_at`,
+    [
+      params.actorUserId || null,
+      params.reason,
+      params.paymentId,
+      params.revenueId,
+      params.tenantId,
     ],
   );
 }
@@ -115,7 +180,7 @@ export function updateRevenuePaymentState(params: {
   return client.query<RevenueRow>(
     `update revenues
      set status = $1,
-         received_at = case when $1 = 'received' then coalesce(received_at, now()) else received_at end,
+         received_at = case when $1 = 'received' then coalesce(received_at, now()) when $1 in ('pending', 'billed', 'partially_received', 'overdue') then null else received_at end,
          updated_by_user_id = $2,
          updated_at = now()
      where id = $3

@@ -33,5 +33,8 @@ export interface RevenuePayment {
   amount: number;
   paymentDate: string;
   notes: string;
+  status: 'active' | 'reversed';
+  reversedAt?: string;
+  reversalReason?: string;
   createdAt: string;
 }

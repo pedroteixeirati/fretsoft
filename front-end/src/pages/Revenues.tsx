@@ -6,7 +6,7 @@ import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import { revenuesApi } from '../lib/api';
 import { canAccess } from '../lib/permissions';
-import { formatDateOnlyPtBr, formatDateTimePtBr } from '../lib/date';
+import { formatDateOnlyPtBr } from '../lib/date';
 import { cn } from '../lib/utils';
 import { Revenue } from '../types';
 import type { RevenuePayment } from '../features/revenues/types/revenue.types';
@@ -68,6 +68,7 @@ export default function Revenues() {
   const [paymentError, setPaymentError] = useState('');
   const [payments, setPayments] = useState<RevenuePayment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [reversingPaymentId, setReversingPaymentId] = useState<string | null>(null);
 
   const loadData = useEffectEvent(async (mode: 'initial' | 'refresh' = 'initial') => {
     if (mode === 'initial') {
@@ -154,6 +155,22 @@ export default function Revenues() {
       setPaymentRevenue(null);
     } finally {
       setProcessingRevenueId(null);
+    }
+  };
+
+  const handleReversePayment = async (payment: RevenuePayment, reason: string) => {
+    if (!paymentRevenue) return;
+
+    setReversingPaymentId(payment.id);
+    try {
+      const updatedRevenue = await revenuesApi.reversePayment(paymentRevenue.id, payment.id, { reason });
+      setPaymentRevenue(updatedRevenue);
+      setPaymentAmount(String(Number(updatedRevenue.balanceAmount || updatedRevenue.amount || 0).toFixed(2)).replace('.', ','));
+      const refreshedPayments = await revenuesApi.listPayments(updatedRevenue.id);
+      setPayments(refreshedPayments);
+      await loadData('refresh');
+    } finally {
+      setReversingPaymentId(null);
     }
   };
 
@@ -254,19 +271,10 @@ export default function Revenues() {
 
     return (
       <div className="flex items-center justify-end">
-        {canReceive ? (
-          <button
-            type="button"
-            onClick={() => openPaymentModal(revenue)}
-            disabled={isProcessing}
-            className="rounded-full bg-secondary-container px-3 py-1.5 text-[11px] font-bold text-on-secondary-container transition hover:brightness-105 disabled:opacity-50"
-          >
-            Recebida
-          </button>
-        ) : null}
         <RevenueActionsMenu
           revenue={revenue}
           disabled={isProcessing}
+          canReceive={canReceive}
           canMarkOverdue={canMarkOverdue}
           hasHistory={hasHistory}
           onOverdue={() => handleOverdue(revenue.id)}
@@ -359,7 +367,7 @@ export default function Revenues() {
       className: 'text-center',
       cell: (revenue) => (
         <span className="whitespace-nowrap text-sm font-semibold text-on-surface-variant">
-          {revenue.status === 'received' ? formatDateTimePtBr(revenue.receivedAt) : '-'}
+          {revenue.lastPaymentAt ? formatDateOnlyPtBr(revenue.lastPaymentAt) : '-'}
         </span>
       ),
     },
@@ -471,7 +479,7 @@ export default function Revenues() {
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">Recebimento</p>
           <p className="mt-1 font-semibold text-on-surface-variant">
-            {revenue.status === 'received' ? formatDateTimePtBr(revenue.receivedAt) : '-'}
+            {revenue.lastPaymentAt ? formatDateOnlyPtBr(revenue.lastPaymentAt) : '-'}
           </p>
         </div>
         <div className="text-right">
@@ -543,11 +551,13 @@ export default function Revenues() {
         payments={payments}
         loadingPayments={loadingPayments}
         isSubmitting={processingRevenueId === paymentRevenue?.id}
+        reversingPaymentId={reversingPaymentId}
         onAmountChange={setPaymentAmount}
         onPaymentDateChange={setPaymentDate}
         onNotesChange={setPaymentNotes}
         onClose={() => setPaymentRevenue(null)}
         onSubmit={handleRegisterPayment}
+        onReversePayment={handleReversePayment}
       />
     </div>
   );
@@ -556,6 +566,7 @@ export default function Revenues() {
 function RevenueActionsMenu({
   revenue,
   disabled,
+  canReceive,
   canMarkOverdue,
   hasHistory,
   onOverdue,
@@ -563,6 +574,7 @@ function RevenueActionsMenu({
 }: {
   revenue: Revenue;
   disabled: boolean;
+  canReceive: boolean;
   canMarkOverdue: boolean;
   hasHistory: boolean;
   onOverdue: () => void;
@@ -573,7 +585,7 @@ function RevenueActionsMenu({
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-  const hasMenuActions = canMarkOverdue || hasHistory;
+  const hasMenuActions = canReceive || canMarkOverdue || hasHistory;
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -642,8 +654,8 @@ function RevenueActionsMenu({
           {canMarkOverdue ? (
             <RevenueActionMenuItem icon={AlertTriangle} label="Em atraso" tone="danger" onClick={() => runAction(onOverdue)} />
           ) : null}
-          {hasHistory ? (
-            <RevenueActionMenuItem icon={History} label="Historico" onClick={() => runAction(onHistory)} />
+          {canReceive || hasHistory ? (
+            <RevenueActionMenuItem icon={History} label="Detalhes do recebivel" onClick={() => runAction(onHistory)} />
           ) : null}
         </div>,
         document.body,

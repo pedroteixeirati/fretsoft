@@ -36,6 +36,7 @@ function makeBilling(overrides: Partial<NovalogBilling> = {}): NovalogBilling {
         paymentCount: 1,
         status: 'received',
         receivedAt: '2026-04-12T00:00:00.000Z',
+        lastPaymentAt: '2026-04-11',
         notes: '',
         linkedRevenueId: 'revenue-1',
         createdAt: '2026-04-10T00:00:00.000Z',
@@ -94,7 +95,8 @@ describe('NovalogBillingDetailsModal', () => {
     expect(screen.getByText('Recebimento')).toBeInTheDocument();
     expect(screen.getAllByText('Vencimento').length).toBeGreaterThan(0);
     expect(screen.getByText('20/05/2026')).toBeInTheDocument();
-    expect(screen.getByText('12/04/2026')).toBeInTheDocument();
+    expect(screen.getByText('11/04/2026')).toBeInTheDocument();
+    expect(screen.queryByText('12/04/2026')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Receber' }));
     await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 1002' }));
@@ -192,6 +194,50 @@ describe('NovalogBillingDetailsModal', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument();
+  });
+
+  it('nao mostra exclusao quando o faturamento possui apenas um CT-e ativo', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <NovalogBillingDetailsModal
+        isOpen
+        billing={makeBilling({
+          items: [
+            {
+              id: 'single-item',
+              billingId: 'billing-1',
+              cteNumber: '3421',
+              cteKey: '',
+              issueDate: '2026-05-06',
+              dueDate: '2026-05-27',
+              originName: '',
+              destinationName: '',
+              amount: 10,
+              receivedAmount: 0,
+              balanceAmount: 10,
+              paymentCount: 0,
+              status: 'pending',
+              notes: '',
+              linkedRevenueId: 'revenue-3421',
+              createdAt: '2026-05-06T00:00:00.000Z',
+            },
+          ],
+        })}
+        onClose={vi.fn()}
+        onCloseBilling={vi.fn()}
+        onEdit={vi.fn()}
+        onReceiveItem={vi.fn()}
+        onOverdueItem={vi.fn()}
+        onEditItem={vi.fn()}
+        onDeleteItem={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Acoes do CT-e 3421' }));
+
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument();
   });
 });

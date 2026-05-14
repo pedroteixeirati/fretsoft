@@ -17,6 +17,7 @@ export interface NovalogBillingItem {
   paymentCount: number;
   status: NovalogBillingItemStatus;
   receivedAt?: string;
+  lastPaymentAt?: string;
   notes: string;
   linkedRevenueId?: string;
   createdAt: string;

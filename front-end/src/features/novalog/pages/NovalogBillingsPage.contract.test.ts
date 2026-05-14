@@ -24,16 +24,22 @@ describe('NovalogBillingsPage contract', () => {
     expect(pageSource).toMatch(/Buscar faturamento/);
     expect(pageSource).toMatch(/statusOptions/);
     expect(pageSource).toMatch(/Ver detalhes/);
+    expect(pageSource).toMatch(/DataTable/);
+    expect(pageSource).toMatch(/paginatedBillings/);
+    expect(pageSource).toMatch(/pagination=\{\{/);
   });
 
   it('orquestra criacao, fechamento e baixa individual usando hooks da feature', () => {
     expect(pageSource).toMatch(/useNovalogBillingsQuery/);
     expect(pageSource).toMatch(/useNovalogBillingsMutations/);
     expect(pageSource).toMatch(/createBilling\.mutateAsync\(payload\)/);
-    expect(pageSource).toMatch(/updateBilling\.mutateAsync\(\{ id: editingBilling\.id, payload \}\)/);
+    expect(pageSource).toMatch(/updateBilling\.mutateAsync\(\{ id: billingId, payload \}\)/);
     expect(pageSource).toMatch(/closeBilling\.mutateAsync\(billing\.id\)/);
     expect(pageSource).toMatch(/markItemReceived\.mutateAsync\(itemId\)/);
     expect(pageSource).toMatch(/markItemOverdue\.mutateAsync\(itemId\)/);
     expect(pageSource).toMatch(/deleteItem\.mutateAsync\(deletingItem\.id\)/);
+    expect(pageSource).toMatch(/Fechar faturamento\?/);
+    expect(pageSource).toMatch(/Salvar e gerar recebiveis\?/);
+    expect(pageSource).toMatch(/Marcar CT-e em atraso\?/);
   });
 });

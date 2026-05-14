@@ -83,6 +83,7 @@ function mapBillingItem(row: NovalogBillingItemRow) {
     paymentCount: Number(row.payment_count || 0),
     status: row.status,
     receivedAt: row.received_at || undefined,
+    lastPaymentAt: row.last_payment_at || undefined,
     notes: row.notes || '',
     linkedRevenueId: row.linked_revenue_id || undefined,
     createdAt: row.created_at,

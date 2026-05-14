@@ -366,6 +366,10 @@ create table if not exists revenue_payments (
   amount numeric not null check (amount > 0),
   payment_date text not null,
   notes text,
+  status text not null default 'active' check (status in ('active', 'reversed')),
+  reversed_at timestamptz,
+  reversed_by_user_id uuid references users(id) on delete set null,
+  reversal_reason text,
   created_by_user_id uuid references users(id) on delete set null,
   created_at timestamptz not null default now()
 );
@@ -955,6 +959,7 @@ create unique index if not exists idx_revenues_tenant_display_id on revenues(ten
 create index if not exists idx_revenues_tenant_id on revenues(tenant_id);
 create index if not exists idx_revenue_payments_revenue_id on revenue_payments(tenant_id, revenue_id);
 create index if not exists idx_revenue_payments_payment_date on revenue_payments(tenant_id, payment_date);
+create index if not exists idx_revenue_payments_active_totals on revenue_payments(tenant_id, revenue_id) where status = 'active';
 create unique index if not exists idx_payables_tenant_display_id on payables(tenant_id, display_id) where display_id is not null;
 create index if not exists idx_payables_tenant_id on payables(tenant_id);
 create index if not exists idx_payables_tenant_status on payables(tenant_id, status);

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Clock, Edit2, ExternalLink, FileText, MoreVertical, Trash2 } from 'lucide-react';
 import Modal from '../../../components/Modal';
-import { formatDateOnlyPtBr, formatDateTimePtBr } from '../../../lib/date';
+import { formatDateOnlyPtBr } from '../../../lib/date';
 import { cn } from '../../../lib/utils';
 import { NovalogBilling, NovalogBillingItem } from '../types/novalog-billing.types';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
@@ -38,6 +38,7 @@ export default function NovalogBillingDetailsModal({
   if (!billing) return null;
   const items = billing.items ?? [];
   const canOperateItems = billing.status !== 'draft' && billing.status !== 'canceled';
+  const activeItemsCount = items.filter((item) => item.status !== 'canceled').length;
 
   return (
     <Modal
@@ -131,7 +132,7 @@ export default function NovalogBillingDetailsModal({
                       </span>
                     </td>
                     <td className="px-5 py-4 text-center text-sm font-semibold text-on-surface-variant">
-                      {item.status === 'received' ? formatDateTimePtBr(item.receivedAt) : '-'}
+                      {item.lastPaymentAt ? formatDateOnlyPtBr(item.lastPaymentAt) : '-'}
                     </td>
                     <td className="px-5 py-4">
                       <div className="grid min-w-[148px] grid-cols-[6rem_2.25rem] items-center justify-center gap-2">
@@ -150,6 +151,7 @@ export default function NovalogBillingDetailsModal({
                           onEditItem={onEditItem}
                           onDeleteItem={onDeleteItem}
                           onOpenRevenue={onOpenRevenue}
+                          activeItemsCount={activeItemsCount}
                         />
                       </div>
                     </td>
@@ -188,6 +190,7 @@ interface NovalogBillingItemActionsMenuProps {
   onEditItem: (item: NovalogBillingItem) => void;
   onDeleteItem: (item: NovalogBillingItem) => void;
   onOpenRevenue?: (item: NovalogBillingItem) => void;
+  activeItemsCount: number;
 }
 
 function NovalogBillingItemActionsMenu({
@@ -198,6 +201,7 @@ function NovalogBillingItemActionsMenu({
   onEditItem,
   onDeleteItem,
   onOpenRevenue,
+  activeItemsCount,
 }: NovalogBillingItemActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -205,9 +209,10 @@ function NovalogBillingItemActionsMenu({
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const canEditItem = item.status !== 'received' && item.status !== 'partially_received' && item.status !== 'canceled';
+  const canDeleteItem = canEditItem && activeItemsCount > 1;
   const canMarkOverdue = canOperateItems && item.status !== 'overdue' && canEditItem;
   const canOpenRevenue = Boolean(item.linkedRevenueId && onOpenRevenue);
-  const hasActions = canMarkOverdue || canEditItem || canOpenRevenue;
+  const hasActions = canMarkOverdue || canEditItem || canDeleteItem || canOpenRevenue;
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -293,7 +298,7 @@ function NovalogBillingItemActionsMenu({
               onClick={() => runAction(() => onEditItem(item))}
             />
           ) : null}
-          {canEditItem ? (
+          {canDeleteItem ? (
             <ActionMenuItem
               icon={Trash2}
               label="Excluir"

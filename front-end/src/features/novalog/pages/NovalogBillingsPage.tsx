@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, FileText, Filter, Loader2, PackagePlus, Pickaxe, Search, WalletCards } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileSpreadsheet, FileText, Filter, PackagePlus, Pickaxe, Search, WalletCards } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import CustomSelect from '../../../components/CustomSelect';
 import KpiCard from '../../../components/KpiCard';
@@ -12,6 +12,7 @@ import { companiesApi } from '../../companies/services/companies.api';
 import RevenuePaymentModal from '../../revenues/components/RevenuePaymentModal';
 import { revenuesApi } from '../../revenues/services/revenues.api';
 import type { Revenue, RevenuePayment } from '../../revenues/types/revenue.types';
+import DataTable, { type DataTableColumn } from '../../../shared/ui/DataTable';
 import NovalogBillingDetailsModal from '../components/NovalogBillingDetailsModal';
 import NovalogBillingFormModal from '../components/NovalogBillingFormModal';
 import NovalogBillingItemEditModal from '../components/NovalogBillingItemEditModal';
@@ -32,6 +33,13 @@ const statusOptions = [
   { value: 'overdue', label: 'Em atraso' },
   { value: 'canceled', label: 'Cancelado' },
 ];
+
+const itemsPerPage = 10;
+
+interface PendingCloseSubmission {
+  payload: NovalogBillingPayload;
+  billingId: string | null;
+}
 
 export default function NovalogBillingsPage() {
   const queryClient = useQueryClient();
@@ -71,6 +79,10 @@ export default function NovalogBillingsPage() {
   const [paymentError, setPaymentError] = useState('');
   const [payments, setPayments] = useState<RevenuePayment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [closingBilling, setClosingBilling] = useState<NovalogBilling | null>(null);
+  const [pendingCloseSubmission, setPendingCloseSubmission] = useState<PendingCloseSubmission | null>(null);
+  const [overdueItem, setOverdueItem] = useState<NovalogBillingItem | null>(null);
 
   const filteredBillings = useMemo(
     () =>
@@ -100,6 +112,17 @@ export default function NovalogBillingsPage() {
   }, [filteredBillings]);
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, billings.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredBillings.length / itemsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedBillings = filteredBillings.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage,
+  );
+
+  useEffect(() => {
     if (!isDetailsOpen || !selectedBilling?.id) return;
     const refreshed = billings.find((billing) => billing.id === selectedBilling.id);
     if (refreshed && !selectedBilling.items) {
@@ -123,19 +146,24 @@ export default function NovalogBillingsPage() {
     }
   };
 
-  const handleSubmit = async (payload: NovalogBillingPayload, action: 'draft' | 'close') => {
-    const savedBilling = editingBilling
-      ? await updateBilling.mutateAsync({ id: editingBilling.id, payload })
-      : await createBilling.mutateAsync(payload);
+  const persistBilling = async (payload: NovalogBillingPayload, billingId?: string | null) => (
+    billingId
+      ? updateBilling.mutateAsync({ id: billingId, payload })
+      : createBilling.mutateAsync(payload)
+  );
 
+  const handleSubmit = async (payload: NovalogBillingPayload, action: 'draft' | 'close') => {
+    if (action === 'close') {
+      setPendingCloseSubmission({
+        payload,
+        billingId: editingBilling?.id ?? null,
+      });
+      return;
+    }
+
+    await persistBilling(payload, editingBilling?.id);
     setIsFormOpen(false);
     setEditingBilling(null);
-
-    if (action === 'close' && savedBilling?.id) {
-      await closeBilling.mutateAsync(savedBilling.id);
-      setSelectedBilling(null);
-      setIsDetailsOpen(false);
-    }
   };
 
   const handleEdit = (billing: NovalogBilling) => {
@@ -151,6 +179,7 @@ export default function NovalogBillingsPage() {
   const handleCloseBilling = async (billing: NovalogBilling) => {
     const closed = await closeBilling.mutateAsync(billing.id);
     setSelectedBilling(closed);
+    setClosingBilling(null);
   };
 
   const handleReceiveItem = async (itemId: string) => {
@@ -161,6 +190,26 @@ export default function NovalogBillingsPage() {
   const handleOverdueItem = async (itemId: string) => {
     const billing = await markItemOverdue.mutateAsync(itemId);
     await refreshSelectedBilling(billing.id);
+    setOverdueItem(null);
+  };
+
+  const handleRequestOverdueItem = (itemId: string) => {
+    const item = selectedBilling?.items?.find((current) => current.id === itemId);
+    if (!item) return;
+    setOverdueItem(item);
+  };
+
+  const handleConfirmCloseSubmission = async () => {
+    if (!pendingCloseSubmission) return;
+    const savedBilling = await persistBilling(pendingCloseSubmission.payload, pendingCloseSubmission.billingId);
+    if (savedBilling?.id) {
+      await closeBilling.mutateAsync(savedBilling.id);
+    }
+    setPendingCloseSubmission(null);
+    setIsFormOpen(false);
+    setEditingBilling(null);
+    setSelectedBilling(null);
+    setIsDetailsOpen(false);
   };
 
   useEffect(() => {
@@ -246,10 +295,93 @@ export default function NovalogBillingsPage() {
 
   const handleConfirmDeleteItem = async () => {
     if (!deletingItem) return;
-    const billing = await deleteItem.mutateAsync(deletingItem.id);
-    setDeletingItem(null);
-    setSelectedBilling(billing);
+    setDetailsError('');
+    try {
+      const billing = await deleteItem.mutateAsync(deletingItem.id);
+      setDeletingItem(null);
+      setSelectedBilling(billing);
+    } catch (error) {
+      const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: string }).code || '') : '';
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Nao foi possivel excluir este CT-e.';
+      setDetailsError(code === 'novalog_billing_requires_item' || message.includes('Faturamento deve manter ao menos um CT-e')
+        ? 'O faturamento deve manter ao menos um CT-e. Para remover este CT-e, cancele ou exclua o faturamento inteiro.'
+        : message);
+    }
   };
+
+  const billingColumns: Array<DataTableColumn<NovalogBilling>> = [
+    {
+      id: 'billing',
+      header: 'Faturamento',
+      cell: (billing) => (
+        <span className="text-sm font-black text-on-surface">{billing.displayId ? `#${billing.displayId}` : '-'}</span>
+      ),
+    },
+    {
+      id: 'client',
+      header: 'Cliente',
+      cell: (billing) => <span className="text-sm text-on-surface">{billing.companyName}</span>,
+    },
+    {
+      id: 'dueDate',
+      header: 'Vencimento',
+      cell: (billing) => <span className="text-sm text-on-surface-variant">{formatDateOnlyPtBr(billing.dueDate)}</span>,
+    },
+    {
+      id: 'ctes',
+      header: 'CT-es',
+      headerClassName: 'text-center',
+      className: 'text-center',
+      cell: (billing) => <span className="text-sm font-bold text-on-surface">{billing.cteCount}</span>,
+    },
+    {
+      id: 'total',
+      header: 'Total',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (billing) => <span className="text-sm font-black text-primary">{formatNovalogCurrency(billing.totalAmount)}</span>,
+    },
+    {
+      id: 'received',
+      header: 'Recebido',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (billing) => <span className="text-sm font-bold text-on-surface">{formatNovalogCurrency(billing.receivedAmount)}</span>,
+    },
+    {
+      id: 'open',
+      header: 'Aberto',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (billing) => <span className="text-sm font-bold text-on-surface">{formatNovalogCurrency(billing.openAmount + billing.overdueAmount)}</span>,
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      headerClassName: 'text-center',
+      className: 'text-center',
+      cell: (billing) => (
+        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${novalogBillingStatusClass(billing.status)}`}>
+          {novalogBillingStatusLabel(billing.status)}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Acoes',
+      headerClassName: 'text-center',
+      className: 'text-center',
+      cell: (billing) => (
+        <div className="flex justify-center">
+          <button type="button" onClick={() => openDetails(billing)} className="rounded-full border border-outline-variant bg-surface px-4 py-2 text-xs font-bold text-on-surface transition hover:border-primary/20 hover:bg-primary/5">
+            Ver detalhes
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   if (!canAccessNovalogModule) {
     return (
@@ -324,69 +456,22 @@ export default function NovalogBillingsPage() {
           </div>
         ) : null}
 
-        <div className="mt-5 overflow-hidden rounded-[1.8rem] border border-outline-variant/15 bg-surface-container-lowest shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-outline-variant/10 bg-surface-container-low">
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Faturamento</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Cliente</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Vencimento</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">CT-es</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Total</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Recebido</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-right">Aberto</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Status</th>
-                  <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant text-center">Acoes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/5">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={9} className="px-6 py-16 text-center">
-                      <div className="flex flex-col items-center gap-3 text-on-surface-variant">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm font-medium">Carregando faturamentos...</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredBillings.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-6 py-16 text-center text-sm text-on-surface-variant">
-                      Nenhum faturamento Novalog encontrado.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredBillings.map((billing) => (
-                    <tr key={billing.id} className="transition hover:bg-primary-fixed-dim/5">
-                      <td className="px-5 py-4 text-sm font-black text-on-surface">
-                        {billing.displayId ? `#${billing.displayId}` : '-'}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-on-surface">{billing.companyName}</td>
-                      <td className="px-5 py-4 text-sm text-on-surface-variant">{formatDateOnlyPtBr(billing.dueDate)}</td>
-                      <td className="px-5 py-4 text-center text-sm font-bold text-on-surface">{billing.cteCount}</td>
-                      <td className="px-5 py-4 text-right text-sm font-black text-primary">{formatNovalogCurrency(billing.totalAmount)}</td>
-                      <td className="px-5 py-4 text-right text-sm font-bold text-on-surface">{formatNovalogCurrency(billing.receivedAmount)}</td>
-                      <td className="px-5 py-4 text-right text-sm font-bold text-on-surface">{formatNovalogCurrency(billing.openAmount + billing.overdueAmount)}</td>
-                      <td className="px-5 py-4 text-center">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${novalogBillingStatusClass(billing.status)}`}>
-                          {novalogBillingStatusLabel(billing.status)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex justify-center">
-                          <button type="button" onClick={() => openDetails(billing)} className="rounded-full border border-outline-variant bg-surface px-4 py-2 text-xs font-bold text-on-surface transition hover:border-primary/20 hover:bg-primary/5">
-                            Ver detalhes
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          className="mt-5 rounded-[1.8rem]"
+          rows={paginatedBillings}
+          columns={billingColumns}
+          getRowKey={(billing) => billing.id}
+          loading={isLoading}
+          loadingLabel="Carregando faturamentos..."
+          emptyLabel="Nenhum faturamento Novalog encontrado."
+          summary={`Mostrando ${paginatedBillings.length} resultado(s)`}
+          pagination={{
+            currentPage: safeCurrentPage,
+            totalPages,
+            onPreviousPage: () => setCurrentPage((page) => Math.max(1, page - 1)),
+            onNextPage: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
+          }}
+        />
       </section>
 
       <NovalogBillingFormModal
@@ -406,10 +491,10 @@ export default function NovalogBillingsPage() {
         billing={selectedBilling}
         isSubmitting={isSubmitting}
         onClose={() => setIsDetailsOpen(false)}
-        onCloseBilling={handleCloseBilling}
+        onCloseBilling={setClosingBilling}
         onEdit={handleEdit}
         onReceiveItem={handleReceiveItem}
-        onOverdueItem={handleOverdueItem}
+        onOverdueItem={handleRequestOverdueItem}
         onEditItem={setEditingItem}
         onDeleteItem={setDeletingItem}
         onOpenRevenue={openRevenuePayment}
@@ -445,7 +530,7 @@ export default function NovalogBillingsPage() {
         title="Excluir CT-e"
         description={(
           <>
-            Deseja excluir o CT-e <strong className="font-bold text-on-surface">{deletingItem?.cteNumber}</strong>? O recebivel vinculado sera cancelado se ainda nao estiver recebido.
+            Deseja excluir o CT-e <strong className="font-bold text-on-surface">{deletingItem?.cteNumber}</strong>? Esta acao remove o CT-e do faturamento e cancela o recebivel vinculado, se ele ainda nao tiver pagamentos.
           </>
         )}
         confirmLabel="Excluir"
@@ -454,6 +539,50 @@ export default function NovalogBillingsPage() {
         isLoading={deleteItem.isPending}
         onClose={() => setDeletingItem(null)}
         onConfirm={handleConfirmDeleteItem}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(closingBilling)}
+        title="Fechar faturamento?"
+        description="Esta acao gera os recebiveis dos CT-es em Contas a receber e transforma o faturamento em aberto para acompanhamento financeiro."
+        confirmLabel="Fechar e gerar"
+        cancelLabel="Cancelar"
+        tone="warning"
+        isLoading={closeBilling.isPending}
+        onClose={() => setClosingBilling(null)}
+        onConfirm={() => {
+          if (closingBilling) void handleCloseBilling(closingBilling);
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingCloseSubmission)}
+        title="Salvar e gerar recebiveis?"
+        description="O faturamento sera salvo e os recebiveis dos CT-es serao criados em Contas a receber. Revise cliente, valores e vencimentos antes de confirmar."
+        confirmLabel="Salvar e gerar"
+        cancelLabel="Voltar para edicao"
+        tone="warning"
+        isLoading={createBilling.isPending || updateBilling.isPending || closeBilling.isPending}
+        onClose={() => setPendingCloseSubmission(null)}
+        onConfirm={handleConfirmCloseSubmission}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(overdueItem)}
+        title="Marcar CT-e em atraso?"
+        description={(
+          <>
+            O CT-e <strong className="font-bold text-on-surface">{overdueItem?.cteNumber}</strong> sera marcado como em atraso e os indicadores financeiros serao recalculados.
+          </>
+        )}
+        confirmLabel="Marcar em atraso"
+        cancelLabel="Cancelar"
+        tone="danger"
+        isLoading={markItemOverdue.isPending}
+        onClose={() => setOverdueItem(null)}
+        onConfirm={() => {
+          if (overdueItem) void handleOverdueItem(overdueItem.id);
+        }}
       />
     </div>
   );
