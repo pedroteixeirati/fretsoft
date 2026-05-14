@@ -12,8 +12,12 @@ const novalogReportsExportServiceSource = readFileSync(resolve(process.cwd(), 'b
 
 test('repositorio Novalog lista e persiste registros explicitamente por tenant', () => {
   assert.match(novalogRepositorySource, /from novalog_operation_entries/i);
-  assert.match(novalogRepositorySource, /whereClauses = \['tenant_id = \$1'\]/);
-  assert.match(novalogRepositorySource, /reference_month = \$\$\{values\.length\}/);
+  assert.match(novalogRepositorySource, /left join users created_by_user on created_by_user\.id = e\.created_by_user_id/i);
+  assert.match(novalogRepositorySource, /coalesce\(created_by_user\.name, ''\) as created_by_name/i);
+  assert.match(novalogRepositorySource, /whereClauses = \['e\.tenant_id = \$1'\]/);
+  assert.match(novalogRepositorySource, /e\.reference_month = \$\$\{values\.length\}/);
+  assert.match(novalogRepositorySource, /order by e\.created_at desc, e\.id desc/i);
+  assert.match(novalogServiceSource, /createdByName: row\.created_by_name \|\| ''/);
   assert.match(novalogRepositorySource, /insert into novalog_operation_entries/i);
   assert.match(novalogRepositorySource, /update novalog_operation_entries/i);
   assert.match(novalogRepositorySource, /delete from novalog_operation_entries/i);

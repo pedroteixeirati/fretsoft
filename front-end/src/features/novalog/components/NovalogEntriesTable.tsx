@@ -8,17 +8,20 @@ import NovalogFilters from './NovalogFilters';
 interface NovalogEntriesTableProps {
   entries: NovalogEntry[];
   searchTerm: string;
-  originFilter: string;
-  destinationFilter: string;
+  referenceMonthFilter: string;
+  referenceMonthOptions: Array<{ value: string; label: string }>;
+  ticketFilter: string;
   fuelStationFilter: string;
+  operationDateFilter: string;
   filteredCount: number;
   totalCount: number;
   currentPage: number;
   totalPages: number;
   onSearchChange: (value: string) => void;
-  onOriginFilterChange: (value: string) => void;
-  onDestinationFilterChange: (value: string) => void;
+  onReferenceMonthFilterChange: (value: string) => void;
+  onTicketFilterChange: (value: string) => void;
   onFuelStationFilterChange: (value: string) => void;
+  onOperationDateFilterChange: (value: string) => void;
   onPreviousPage: () => void;
   onNextPage: () => void;
   onEdit: (entry: NovalogEntry) => void;
@@ -32,17 +35,20 @@ function getIdentifier(entry: NovalogEntry) {
 export default function NovalogEntriesTable({
   entries,
   searchTerm,
-  originFilter,
-  destinationFilter,
+  referenceMonthFilter,
+  referenceMonthOptions,
+  ticketFilter,
   fuelStationFilter,
+  operationDateFilter,
   filteredCount,
   totalCount,
   currentPage,
   totalPages,
   onSearchChange,
-  onOriginFilterChange,
-  onDestinationFilterChange,
+  onReferenceMonthFilterChange,
+  onTicketFilterChange,
   onFuelStationFilterChange,
+  onOperationDateFilterChange,
   onPreviousPage,
   onNextPage,
   onEdit,
@@ -84,15 +90,16 @@ export default function NovalogEntriesTable({
       <div className="border-b border-outline-variant/10 bg-surface-container-low/50 p-5 sm:p-6">
         <NovalogFilters
           searchTerm={searchTerm}
-          originFilter={originFilter}
-          destinationFilter={destinationFilter}
+          referenceMonthFilter={referenceMonthFilter}
+          referenceMonthOptions={referenceMonthOptions}
+          ticketFilter={ticketFilter}
           fuelStationFilter={fuelStationFilter}
-          filteredCount={filteredCount}
-          totalCount={totalCount}
+          operationDateFilter={operationDateFilter}
           onSearchChange={onSearchChange}
-          onOriginFilterChange={onOriginFilterChange}
-          onDestinationFilterChange={onDestinationFilterChange}
+          onReferenceMonthFilterChange={onReferenceMonthFilterChange}
+          onTicketFilterChange={onTicketFilterChange}
           onFuelStationFilterChange={onFuelStationFilterChange}
+          onOperationDateFilterChange={onOperationDateFilterChange}
         />
       </div>
 

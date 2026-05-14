@@ -91,6 +91,9 @@ function mapNovalogRow(row: NovalogEntryRow) {
     notes: row.notes || '',
     entryMode: row.entry_mode,
     batchKey: row.batch_key || '',
+    createdByUserId: row.created_by_user_id || '',
+    createdByName: row.created_by_name || '',
+    createdAt: row.created_at,
   };
 }
 

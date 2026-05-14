@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Layers3, PackagePlus, Pickaxe } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import KpiCard from '../../../components/KpiCard';
-import CustomSelect from '../../../components/CustomSelect';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { canAccess } from '../../../lib/permissions';
 import { queryKeys } from '../../../shared/lib/query-keys';
@@ -40,22 +39,22 @@ function formatReferenceMonthLabel(value: string) {
 
 export default function NovalogOperationsPage() {
   const { userProfile } = useFirebase();
-  const [selectedReferenceMonth, setSelectedReferenceMonth] = useState(getCurrentReferenceMonth);
+  const [referenceMonthFilter, setReferenceMonthFilter] = useState('all');
   const [knownReferenceMonths, setKnownReferenceMonths] = useState<string[]>(() => [getCurrentReferenceMonth()]);
   const [isStandardModalOpen, setIsStandardModalOpen] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [standardModalMode, setStandardModalMode] = useState<StandardModalMode>('create');
   const [draftEntry, setDraftEntry] = useState<NovalogEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [originFilter, setOriginFilter] = useState('');
-  const [destinationFilter, setDestinationFilter] = useState('');
+  const [ticketFilter, setTicketFilter] = useState('');
   const [fuelStationFilter, setFuelStationFilter] = useState('');
+  const [operationDateFilter, setOperationDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   const canAccessNovalogModule = canAccessNovalogOperations(userProfile);
   const canReadProviders = canAccessNovalogModule && canAccess(userProfile, 'providers', 'read');
   const canReadCompanies = canAccessNovalogModule && canAccess(userProfile, 'companies', 'read');
-  const { entries, isLoading, error } = useNovalogQuery(canAccessNovalogModule, selectedReferenceMonth);
+  const { entries, isLoading, error } = useNovalogQuery(canAccessNovalogModule);
   const referenceMonthsQuery = useQuery({
     queryKey: queryKeys.novalog.referenceMonths(),
     queryFn: novalogApi.listReferenceMonths,
@@ -83,14 +82,12 @@ export default function NovalogOperationsPage() {
   const openEditModal = (entry: NovalogEntry) => {
     setStandardModalMode('edit');
     setDraftEntry(entry);
-    setSelectedReferenceMonth(entry.referenceMonth || entry.operationDate.slice(0, 7));
     setIsStandardModalOpen(true);
   };
 
   const openDuplicateModal = (entry: NovalogEntry) => {
     setStandardModalMode('duplicate');
     setDraftEntry(entry);
-    setSelectedReferenceMonth(entry.referenceMonth || entry.operationDate.slice(0, 7));
     setIsStandardModalOpen(true);
   };
 
@@ -105,14 +102,12 @@ export default function NovalogOperationsPage() {
 
     if (standardModalMode === 'edit' && draftEntry) {
       await updateEntry.mutateAsync({ id: draftEntry.id, payload: entry });
-      setSelectedReferenceMonth(entryReferenceMonth);
       setKnownReferenceMonths((current) => Array.from(new Set([entryReferenceMonth, ...current])));
       closeStandardModal();
       return;
     }
 
     await createEntry.mutateAsync(entry);
-    setSelectedReferenceMonth(entryReferenceMonth);
     setKnownReferenceMonths((current) => Array.from(new Set([entryReferenceMonth, ...current])));
     closeStandardModal();
   };
@@ -136,7 +131,6 @@ export default function NovalogOperationsPage() {
 
     setIsBatchModalOpen(false);
     const batchReferenceMonth = newEntries[0].referenceMonth || newEntries[0].operationDate.slice(0, 7);
-    setSelectedReferenceMonth(batchReferenceMonth);
     setKnownReferenceMonths((current) => Array.from(new Set([batchReferenceMonth, ...current])));
   };
 
@@ -148,38 +142,36 @@ export default function NovalogOperationsPage() {
     const months = new Set(knownReferenceMonths);
     (referenceMonthsQuery.data ?? []).forEach((month) => months.add(month));
     entries.forEach((entry) => months.add(entry.referenceMonth || entry.operationDate.slice(0, 7)));
-    months.add(selectedReferenceMonth);
-
-    return Array.from(months)
+    return [
+      { value: 'all', label: 'Todas as competencias' },
+      ...Array.from(months)
       .filter(Boolean)
       .sort((left, right) => right.localeCompare(left))
       .map((month) => ({
         value: month,
         label: formatReferenceMonthLabel(month),
-      }));
-  }, [entries, knownReferenceMonths, referenceMonthsQuery.data, selectedReferenceMonth]);
-
-  const referenceMonthEntries = useMemo(
-    () => entries,
-    [entries],
-  );
+      })),
+    ];
+  }, [entries, knownReferenceMonths, referenceMonthsQuery.data]);
 
   const filteredEntries = useMemo(
     () =>
-      referenceMonthEntries.filter((entry) => {
+      entries.filter((entry) => {
+        const entryReferenceMonth = entry.referenceMonth || entry.operationDate.slice(0, 7);
         return (
+          (referenceMonthFilter === 'all' || entryReferenceMonth === referenceMonthFilter) &&
           matchesNovalogDisplayIdRange(entry.displayId, searchTerm) &&
-          entry.originName.toLowerCase().includes(originFilter.toLowerCase()) &&
-          entry.destinationName.toLowerCase().includes(destinationFilter.toLowerCase()) &&
-          (entry.fuelStationName ?? '').toLowerCase().includes(fuelStationFilter.toLowerCase())
+          (entry.ticketNumber ?? '').toLowerCase().includes(ticketFilter.toLowerCase()) &&
+          (entry.fuelStationName ?? '').toLowerCase().includes(fuelStationFilter.toLowerCase()) &&
+          (!operationDateFilter || entry.operationDate === operationDateFilter)
         );
       }),
-    [destinationFilter, fuelStationFilter, originFilter, referenceMonthEntries, searchTerm],
+    [entries, fuelStationFilter, operationDateFilter, referenceMonthFilter, searchTerm, ticketFilter],
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedReferenceMonth, searchTerm, originFilter, destinationFilter, fuelStationFilter, entries.length]);
+  }, [referenceMonthFilter, searchTerm, ticketFilter, fuelStationFilter, operationDateFilter, entries.length]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -245,7 +237,7 @@ export default function NovalogOperationsPage() {
           return {
             ...kpi,
             value: formatNovalogCurrency(totalCompanyGross),
-            helperText: 'Calculado pela tabela de operacoes da semana',
+            helperText: 'Calculado pelos lancamentos exibidos nos filtros atuais',
           };
         case 'Total terceiro':
           return {
@@ -312,25 +304,6 @@ export default function NovalogOperationsPage() {
         })}
       </div>
 
-      <section className="rounded-[2rem] border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">Competencia atual</p>
-            <h2 className="mt-2 text-xl font-black capitalize text-on-surface">{formatReferenceMonthLabel(selectedReferenceMonth)}</h2>
-            <p className="mt-1 text-sm text-on-surface-variant">Acompanhe os lancamentos pela competencia da data operacional.</p>
-          </div>
-          <div className="w-full max-w-[280px]">
-            <CustomSelect
-              value={selectedReferenceMonth}
-              onChange={setSelectedReferenceMonth}
-              options={referenceMonthOptions}
-              placeholder="Competencia"
-              buttonClassName="rounded-full bg-surface px-5 py-3 font-bold"
-            />
-          </div>
-        </div>
-      </section>
-
       {error ? (
         <div className="rounded-[2rem] border border-error/15 bg-error/5 px-6 py-5 text-sm font-medium text-error">
           Nao foi possivel carregar os lancamentos Novalog agora.
@@ -347,17 +320,20 @@ export default function NovalogOperationsPage() {
         <NovalogEntriesTable
           entries={paginatedEntries}
           searchTerm={searchTerm}
-          originFilter={originFilter}
-          destinationFilter={destinationFilter}
+          referenceMonthFilter={referenceMonthFilter}
+          referenceMonthOptions={referenceMonthOptions}
+          ticketFilter={ticketFilter}
           fuelStationFilter={fuelStationFilter}
+          operationDateFilter={operationDateFilter}
           filteredCount={filteredEntries.length}
-          totalCount={referenceMonthEntries.length}
+          totalCount={entries.length}
           currentPage={safeCurrentPage}
           totalPages={totalPages}
           onSearchChange={setSearchTerm}
-          onOriginFilterChange={setOriginFilter}
-          onDestinationFilterChange={setDestinationFilter}
+          onReferenceMonthFilterChange={setReferenceMonthFilter}
+          onTicketFilterChange={setTicketFilter}
           onFuelStationFilterChange={setFuelStationFilter}
+          onOperationDateFilterChange={setOperationDateFilter}
           onPreviousPage={() => setCurrentPage((page) => Math.max(1, page - 1))}
           onNextPage={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
           onEdit={openEditModal}

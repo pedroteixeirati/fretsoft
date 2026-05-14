@@ -18,13 +18,13 @@ describe('NovalogStandardEntryModal', () => {
     ticketNumber: '770',
     fuelStationName: 'Campeao',
     entryMode: 'standard' as const,
+    createdByName: 'Maria Jose',
   };
 
   it('preenche os dados quando abre em modo de edicao', () => {
     render(
       <NovalogStandardEntryModal
         isOpen
-        weekNumber={1}
         originOptions={[{ value: 'Minerbrasil', label: 'Minerbrasil' }]}
         destinationOptions={[{ value: 'Gerdau', label: 'Gerdau' }]}
         draftEntry={baseEntry}
@@ -35,6 +35,8 @@ describe('NovalogStandardEntryModal', () => {
     );
 
     expect(screen.getByText('Editar lancamento Novalog')).toBeInTheDocument();
+    expect(screen.getByText(/Criado por:/)).toBeInTheDocument();
+    expect(screen.getByText('MARIA JOSE')).toBeInTheDocument();
     expect(screen.queryByText(/Identificador/i)).not.toBeInTheDocument();
     expect(screen.getByDisplayValue('770')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Salvar alteracoes' })).toBeInTheDocument();
@@ -44,7 +46,6 @@ describe('NovalogStandardEntryModal', () => {
     render(
       <NovalogStandardEntryModal
         isOpen
-        weekNumber={1}
         originOptions={[{ value: 'Minerbrasil', label: 'Minerbrasil' }]}
         destinationOptions={[{ value: 'Gerdau', label: 'Gerdau' }]}
         draftEntry={baseEntry}

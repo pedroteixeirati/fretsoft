@@ -124,9 +124,14 @@ export default function NovalogStandardEntryModal({
   const resolvedEntryMode: NovalogEntryMode = draftEntry?.entryMode ?? 'standard';
   const modalTitle = mode === 'edit' ? 'Editar lancamento Novalog' : mode === 'duplicate' ? 'Duplicar lancamento Novalog' : 'Novo lancamento Novalog';
   const submitLabel = mode === 'edit' ? 'Salvar alteracoes' : mode === 'duplicate' ? 'Salvar copia' : 'Salvar lancamento';
-  const identifierText = mode === 'edit' && draftEntry?.displayId
-    ? `Identificador ${draftEntry.displayId}`
+  const creatorName = mode === 'edit' && draftEntry?.createdByName?.trim()
+    ? draftEntry.createdByName.trim().toLocaleUpperCase('pt-BR')
     : '';
+  const headerSubtitle = creatorName ? (
+    <span>
+      Criado por: <span className="font-black uppercase tracking-[0.08em] text-primary">{creatorName}</span>
+    </span>
+  ) : undefined;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -158,7 +163,7 @@ export default function NovalogStandardEntryModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle}>
+    <Modal isOpen={isOpen} onClose={handleClose} title={modalTitle} subtitle={headerSubtitle}>
       <form onSubmit={handleSubmit} className="space-y-6">
         <FormAlert message={formMessage} variant="error" />
 
