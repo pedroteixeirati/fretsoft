@@ -2,12 +2,14 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../../../shared/lib/query-keys';
 import { novalogApi } from '../services/novalog.api';
+import { getNovalogLiveQueryOptions } from './novalogLiveQueryOptions';
 
 export function useNovalogQuery(enabled: boolean, referenceMonth?: string) {
   const query = useQuery({
     queryKey: queryKeys.novalog.list({ referenceMonth }),
     queryFn: () => novalogApi.list({ referenceMonth }),
     enabled,
+    ...getNovalogLiveQueryOptions(enabled),
   });
 
   const entries = useMemo(() => {

@@ -18,6 +18,7 @@ import NovalogBillingFormModal from '../components/NovalogBillingFormModal';
 import NovalogBillingItemEditModal from '../components/NovalogBillingItemEditModal';
 import { useNovalogBillingsMutations } from '../hooks/useNovalogBillingsMutations';
 import { useNovalogBillingsQuery } from '../hooks/useNovalogBillingsQuery';
+import { getNovalogLiveQueryOptions } from '../hooks/novalogLiveQueryOptions';
 import { novalogBillingsApi } from '../services/novalog-billings.api';
 import { NovalogBilling, NovalogBillingItem, NovalogBillingItemUpdatePayload, NovalogBillingPayload } from '../types/novalog-billing.types';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
@@ -51,6 +52,7 @@ export default function NovalogBillingsPage() {
     queryKey: queryKeys.companies.list(),
     queryFn: companiesApi.list,
     enabled: canReadCompanies,
+    ...getNovalogLiveQueryOptions(canReadCompanies),
   });
   const {
     createBilling,

@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Copy, Layers3, Plus, Trash2 } from 'lucide-react';
 import Modal from '../../../components/Modal';
-import CustomSelect from '../../../components/CustomSelect';
 import Input from '../../../shared/ui/Input';
 import { FieldLabel, FormAlert, FormDatePicker } from '../../../shared/forms';
 import NovalogAutocompleteSelect from './NovalogAutocompleteSelect';
@@ -246,7 +245,7 @@ export default function NovalogBatchEntryModal({
           </div>
           <div className="max-w-[420px] space-y-2">
             <FieldLabel required>Origem</FieldLabel>
-            <CustomSelect value={originName} onChange={(value) => {
+            <NovalogAutocompleteSelect value={originName} onChange={(value) => {
               setOriginName(value);
               setOriginNameError('');
             }} options={originOptions} placeholder="Selecione a mineradora" error={originNameError} />

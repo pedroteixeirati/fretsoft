@@ -181,7 +181,7 @@ export default function NovalogStandardEntryModal({
             />
             <div className="space-y-2">
               <FieldLabel required>Origem</FieldLabel>
-              <CustomSelect
+              <NovalogAutocompleteSelect
                 value={formData.originName}
                 onChange={(value) => updateField('originName', value)}
                 options={resolvedOriginOptions}

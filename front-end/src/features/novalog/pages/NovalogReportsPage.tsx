@@ -13,6 +13,7 @@ import { novalogApi } from '../services/novalog.api';
 import { revenuesApi } from '../../revenues/services/revenues.api';
 import { useNovalogBillingsQuery } from '../hooks/useNovalogBillingsQuery';
 import { useNovalogReportPaymentsQuery } from '../hooks/useNovalogReportsQuery';
+import { getNovalogLiveQueryOptions } from '../hooks/novalogLiveQueryOptions';
 import { novalogReportsApi } from '../services/novalog-reports.api';
 import { formatNovalogCurrency } from '../utils/novalog.calculations';
 import type { Revenue } from '../../revenues/types/revenue.types';
@@ -118,16 +119,20 @@ export default function NovalogReportsPage() {
     queryKey: queryKeys.novalog.referenceMonths(),
     queryFn: novalogApi.listReferenceMonths,
     enabled: canAccessNovalogModule,
+    ...getNovalogLiveQueryOptions(canAccessNovalogModule),
   });
+  const canLoadReferenceMonthData = canAccessNovalogModule && Boolean(referenceMonth);
   const entriesQuery = useQuery({
     queryKey: queryKeys.novalog.list({ referenceMonth }),
     queryFn: () => novalogApi.list({ referenceMonth }),
-    enabled: canAccessNovalogModule && Boolean(referenceMonth),
+    enabled: canLoadReferenceMonthData,
+    ...getNovalogLiveQueryOptions(canLoadReferenceMonthData),
   });
   const revenuesQuery = useQuery({
     queryKey: ['revenues', 'novalogReports'],
     queryFn: revenuesApi.list,
     enabled: canAccessNovalogModule,
+    ...getNovalogLiveQueryOptions(canAccessNovalogModule),
   });
   const { billings } = useNovalogBillingsQuery(canAccessNovalogModule);
   const { payments, isLoading: isLoadingPayments } = useNovalogReportPaymentsQuery(canAccessNovalogModule);
