@@ -18,6 +18,7 @@ import NovalogBatchEntryModal from '../components/NovalogBatchEntryModal';
 import { NovalogEntry } from '../types/novalog.types';
 import { useNovalogQuery } from '../hooks/useNovalogQuery';
 import { useNovalogMutations } from '../hooks/useNovalogMutations';
+import { getNovalogLiveQueryOptions } from '../hooks/novalogLiveQueryOptions';
 
 type StandardModalMode = 'create' | 'edit' | 'duplicate';
 const itemsPerPage = 20;
@@ -59,16 +60,19 @@ export default function NovalogOperationsPage() {
     queryKey: queryKeys.novalog.referenceMonths(),
     queryFn: novalogApi.listReferenceMonths,
     enabled: canAccessNovalogModule,
+    ...getNovalogLiveQueryOptions(canAccessNovalogModule),
   });
   const providersQuery = useQuery({
     queryKey: queryKeys.providers.list(),
     queryFn: providersApi.list,
     enabled: canReadProviders,
+    ...getNovalogLiveQueryOptions(canReadProviders),
   });
   const companiesQuery = useQuery({
     queryKey: queryKeys.companies.list(),
     queryFn: companiesApi.list,
     enabled: canReadCompanies,
+    ...getNovalogLiveQueryOptions(canReadCompanies),
   });
   const { createEntry, createBatch, updateEntry, deleteEntry, isSubmitting } = useNovalogMutations();
   const mutationError = createEntry.error ?? createBatch.error ?? updateEntry.error ?? deleteEntry.error ?? null;
