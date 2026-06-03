@@ -23,8 +23,17 @@ test('validacao de payables exige vencimento valor e origem coerente', () => {
   assert.match(payablesServiceSource, /if \(status === 'paid' && !paidAt\) \{[\s\S]*paidAt = dueDate;[\s\S]*\}/i);
 });
 
+test('payables aceitam metadados financeiros da planilha Novalog com validacao leve', () => {
+  assert.match(payablesServiceSource, /documentNumber = normalizeOptionalField\(body\.documentNumber\)/);
+  assert.match(payablesServiceSource, /invoiceNumber = normalizeOptionalField\(body\.invoiceNumber\)/);
+  assert.match(payablesServiceSource, /invoiceStatus = \(normalizeOptionalField\(body\.invoiceStatus\) \|\| 'not_informed'\)/);
+  assert.match(payablesServiceSource, /referenceMonth && !\/\^\\d\{4\}-\\d\{2\}\$\/\.test\(referenceMonth\)/);
+  assert.match(payablesServiceSource, /invoiceNumber\.toUpperCase\(\)\.includes\('SEM'\) \? 'missing' : 'informed'/);
+});
+
 test('repositorio de payables suporta criacao listagem e transicoes financeiras minimas', () => {
   assert.match(payablesRepositorySource, /insert into payables \(/i);
+  assert.match(payablesRepositorySource, /document_number,\s+invoice_number,\s+invoice_status,\s+reference_month,\s+import_batch_id,\s+import_sheet_name,\s+import_row_number/i);
   assert.match(payablesRepositorySource, /from payables[\s\S]*order by due_date asc, created_at desc/i);
   assert.match(payablesRepositorySource, /set status = 'paid',[\s\S]*where id = \$2[\s\S]*status in \('open', 'overdue'\)/i);
   assert.match(payablesRepositorySource, /set status = 'overdue',[\s\S]*where id = \$2[\s\S]*status = 'open'/i);

@@ -1,6 +1,41 @@
 import type { PoolClient } from 'pg';
 import type { AppUserRow } from '../../auth/dtos/auth-context';
 
+export type TenantUserRow = {
+  id: string;
+  firebase_uid: string;
+  email: string;
+  role: string;
+  name: string | null;
+  status: string;
+  tenant_role: string;
+  tenant_status: string;
+  created_at: string;
+};
+
+export async function listTenantUsers(client: PoolClient, tenantId: string) {
+  const result = await client.query<TenantUserRow>(
+    `select u.id,
+            u.firebase_uid,
+            u.email,
+            coalesce(tu.role, u.role) as role,
+            u.name,
+            u.status,
+            tu.role as tenant_role,
+            tu.status as tenant_status,
+            u.created_at
+       from tenant_users tu
+       join users u on u.id = tu.user_id
+      where tu.tenant_id = $1
+        and tu.status = 'active'
+        and u.status = 'active'
+      order by coalesce(nullif(u.name, ''), u.email) asc`,
+    [tenantId]
+  );
+
+  return result.rows;
+}
+
 export async function findUserByEmail(client: PoolClient, email: string) {
   const result = await client.query<{ id: string }>(
     `select id

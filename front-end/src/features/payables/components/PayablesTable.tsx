@@ -149,6 +149,13 @@ export default function PayablesTable({
                   <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Conta</p>
                   <p className="mt-1 font-medium text-on-surface">{payable.description}</p>
                   <p className="mt-1 text-xs text-on-surface-variant">{payable.providerName || 'Sem fornecedor informado'}</p>
+                  {payable.referenceMonth || payable.documentNumber || payable.invoiceNumber ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      {payable.referenceMonth ? <span>{payable.referenceMonth}</span> : null}
+                      {payable.documentNumber ? <span>Boleto {payable.documentNumber}</span> : null}
+                      {payable.invoiceNumber ? <span>NF {payable.invoiceNumber}</span> : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -248,6 +255,13 @@ export default function PayablesTable({
                     <div className="text-xs text-on-surface-variant">
                       {payable.providerName || 'Sem fornecedor informado'}
                     </div>
+                    {payable.referenceMonth || payable.documentNumber || payable.invoiceNumber ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                        {payable.referenceMonth ? <span>{payable.referenceMonth}</span> : null}
+                        {payable.documentNumber ? <span>Boleto {payable.documentNumber}</span> : null}
+                        {payable.invoiceNumber ? <span>NF {payable.invoiceNumber}</span> : null}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-6 py-5">
                     <span className="inline-flex rounded-full bg-secondary-container px-2.5 py-0.5 text-xs font-medium text-on-secondary-container">

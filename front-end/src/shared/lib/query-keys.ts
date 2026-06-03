@@ -19,6 +19,10 @@ export const queryKeys = {
     all: ['companies'] as const,
     list: () => ['companies', 'list'] as const,
   },
+  users: {
+    all: ['users'] as const,
+    list: () => ['users', 'list'] as const,
+  },
   cargas: {
     all: ['cargas'] as const,
     list: () => ['cargas', 'list'] as const,

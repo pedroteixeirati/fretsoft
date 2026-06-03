@@ -15,4 +15,11 @@ export interface Payable {
   paymentMethod?: string;
   proofUrl?: string;
   notes?: string;
+  documentNumber?: string;
+  invoiceNumber?: string;
+  invoiceStatus?: 'informed' | 'missing' | 'not_informed';
+  referenceMonth?: string;
+  importBatchId?: string | null;
+  importSheetName?: string;
+  importRowNumber?: number | null;
 }

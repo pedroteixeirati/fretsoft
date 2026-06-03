@@ -16,6 +16,10 @@ export interface PayableFormData {
   paymentMethod: string;
   proofUrl: string;
   notes: string;
+  documentNumber: string;
+  invoiceNumber: string;
+  invoiceStatus: NonNullable<Payable['invoiceStatus']>;
+  referenceMonth: string;
 }
 
 export type PayableFormField =
@@ -31,7 +35,11 @@ export type PayableFormField =
   | 'paidAt'
   | 'paymentMethod'
   | 'proofUrl'
-  | 'notes';
+  | 'notes'
+  | 'documentNumber'
+  | 'invoiceNumber'
+  | 'invoiceStatus'
+  | 'referenceMonth';
 
 export function defaultPayableFormData(): PayableFormData {
   const today = new Date().toISOString().split('T')[0];
@@ -50,6 +58,10 @@ export function defaultPayableFormData(): PayableFormData {
     paymentMethod: '',
     proofUrl: '',
     notes: '',
+    documentNumber: '',
+    invoiceNumber: '',
+    invoiceStatus: 'not_informed',
+    referenceMonth: '',
   };
 }
 
@@ -86,6 +98,10 @@ export function usePayableForm() {
       paymentMethod: payable.paymentMethod || '',
       proofUrl: payable.proofUrl || '',
       notes: payable.notes || '',
+      documentNumber: payable.documentNumber || '',
+      invoiceNumber: payable.invoiceNumber || '',
+      invoiceStatus: payable.invoiceStatus || 'not_informed',
+      referenceMonth: payable.referenceMonth || '',
     });
     setSubmitError('');
     setSubmitSuccess('');

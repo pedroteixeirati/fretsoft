@@ -14,6 +14,10 @@ export const payableSchema = z.object({
   paymentMethod: z.string().optional().default(''),
   proofUrl: z.string().optional().default(''),
   notes: z.string().optional().default(''),
+  documentNumber: z.string().optional().default(''),
+  invoiceNumber: z.string().optional().default(''),
+  invoiceStatus: z.enum(['informed', 'missing', 'not_informed']).default('not_informed'),
+  referenceMonth: z.string().optional().default(''),
 }).superRefine((data, ctx) => {
   if (data.sourceType === 'expense' && !data.sourceId) {
     ctx.addIssue({
@@ -28,6 +32,14 @@ export const payableSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['paidAt'],
       message: 'Informe a data do pagamento quando a conta estiver paga.',
+    });
+  }
+
+  if (data.referenceMonth && !/^\d{4}-\d{2}$/.test(data.referenceMonth)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['referenceMonth'],
+      message: 'Informe a competencia no formato AAAA-MM.',
     });
   }
 });

@@ -15,13 +15,14 @@ import Input from '../shared/ui/Input';
 const initialFormData = {
   name: '',
   type: 'Oficina',
+  usageType: 'operational' as 'operational' | 'financial' | 'both',
   status: 'Ativo',
   contact: '',
   email: '',
   address: '',
 };
 
-type SupplierFormField = 'name' | 'type' | 'status' | 'contact' | 'email' | 'address';
+type SupplierFormField = 'name' | 'type' | 'usageType' | 'status' | 'contact' | 'email' | 'address';
 
 function getSupplierFormErrors(formData: typeof initialFormData): FormFieldErrors<SupplierFormField> {
   const errors: FormFieldErrors<SupplierFormField> = {};
@@ -58,6 +59,7 @@ export default function Suppliers() {
   const [submitError, setSubmitError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [usageFilter, setUsageFilter] = useState('all');
   const [formData, setFormData] = useState(initialFormData);
   const [fieldErrors, setFieldErrors] = useState<FormFieldErrors<SupplierFormField>>({});
 
@@ -80,9 +82,10 @@ export default function Suppliers() {
         (provider.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           provider.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
           provider.contact.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        (typeFilter === 'all' || provider.type === typeFilter)
+        (typeFilter === 'all' || provider.type === typeFilter) &&
+        (usageFilter === 'all' || (provider.usageType || 'operational') === usageFilter)
       ),
-    [providers, searchTerm, typeFilter]
+    [providers, searchTerm, typeFilter, usageFilter]
   );
 
   const formValidationErrors = useMemo(() => getSupplierFormErrors(formData), [formData]);
@@ -168,6 +171,7 @@ export default function Suppliers() {
     setFormData({
       name: provider.name,
       type: provider.type,
+      usageType: provider.usageType || 'operational',
       status: provider.status,
       contact: provider.contact,
       email: provider.email,
@@ -226,6 +230,20 @@ export default function Suppliers() {
               />
               <Filter className="w-4 h-4 text-primary" />
             </div>
+            <div className="h-6 w-px bg-outline/20 mx-2" />
+            <div className="flex items-center gap-2 px-2">
+              <CustomSelect
+                value={usageFilter}
+                onChange={setUsageFilter}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todas as finalidades' },
+                  { value: 'operational', label: 'Operacional' },
+                  { value: 'financial', label: 'Financeiro' },
+                  { value: 'both', label: 'Ambos' },
+                ]}
+              />
+            </div>
           </div>
         </div>
 
@@ -259,6 +277,9 @@ export default function Suppliers() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold font-headline text-on-surface">{provider.name}</span>
                         <span className="text-[10px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase tracking-wider font-bold">{provider.type}</span>
+                        <span className="text-[10px] bg-tertiary-container text-on-tertiary-container px-2 py-0.5 rounded uppercase tracking-wider font-bold">
+                          {provider.usageType === 'financial' ? 'Financeiro' : provider.usageType === 'both' ? 'Ambos' : 'Operacional'}
+                        </span>
                       </div>
                       <p className="text-xs text-on-secondary-container flex items-center gap-1 mt-1"><Phone className="w-3.5 h-3.5" />{provider.contact}</p>
                       <p className="text-[11px] text-on-surface-variant mt-1 flex flex-wrap gap-3">
@@ -317,6 +338,19 @@ export default function Suppliers() {
                   onChange={(value) => updateField('status', value)}
                   error={fieldErrors.status}
                   options={['Ativo', 'Inativo'].map((option) => ({ value: option, label: option }))}
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <FieldLabel>Finalidade</FieldLabel>
+                <CustomSelect
+                  value={formData.usageType}
+                  onChange={(value) => updateField('usageType', value)}
+                  error={fieldErrors.usageType}
+                  options={[
+                    { value: 'operational', label: 'Operacional' },
+                    { value: 'financial', label: 'Financeiro' },
+                    { value: 'both', label: 'Ambos' },
+                  ]}
                 />
               </div>
             </div>

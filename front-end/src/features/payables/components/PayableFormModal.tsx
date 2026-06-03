@@ -6,6 +6,7 @@ import { FieldLabel, FormAlert, FormDatePicker, FormFieldError, hasRenderableFie
 import Input from '../../../shared/ui/Input';
 import { FormFieldErrors } from '../../../lib/errors';
 import { Company } from '../../companies/types/company.types';
+import NovalogAutocompleteSelect from '../../novalog/components/NovalogAutocompleteSelect';
 import { Payable } from '../types/payable.types';
 import { Vehicle } from '../../vehicles/types/vehicle.types';
 import { PayableFormData, PayableFormField } from '../hooks/usePayableForm';
@@ -19,6 +20,8 @@ interface PayableFormModalProps {
   isSubmitting: boolean;
   vehicles: Vehicle[];
   companies: Company[];
+  providerOptions: Array<{ value: string; label: string }>;
+  showNovalogFields: boolean;
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onChange: (next: PayableFormData) => void;
@@ -34,6 +37,8 @@ export default function PayableFormModal({
   isSubmitting,
   vehicles,
   companies,
+  providerOptions,
+  showNovalogFields,
   onClose,
   onSubmit,
   onChange,
@@ -41,11 +46,17 @@ export default function PayableFormModal({
 }: PayableFormModalProps) {
   const hasFieldErrors = hasRenderableFieldErrors(fieldErrors);
   const formMessage = submitError || (hasFieldErrors ? 'Revise os campos destacados antes de salvar.' : '');
-  const canSubmit = hasRequiredFieldsFilled(formData, [
-    'description',
-    { field: 'amount', isFilled: (value) => Number(value) > 0 },
-    'dueDate',
-  ]) && (formData.sourceType !== 'expense' || formData.sourceId.trim().length > 0);
+  const canSubmit = showNovalogFields
+    ? hasRequiredFieldsFilled(formData as unknown as Record<string, unknown>, [
+      'providerName',
+      { field: 'amount', isFilled: (value) => Number(value) > 0 },
+      'dueDate',
+    ])
+    : hasRequiredFieldsFilled(formData as unknown as Record<string, unknown>, [
+      'description',
+      { field: 'amount', isFilled: (value) => Number(value) > 0 },
+      'dueDate',
+    ]) && (formData.sourceType !== 'expense' || formData.sourceId.trim().length > 0);
   const { formRef, alertRef } = useFormErrorFocus({
     enabled: isOpen,
     fieldErrors,
@@ -60,98 +71,164 @@ export default function PayableFormModal({
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Input
-            required
-            label="Descricao"
-            error={fieldErrors.description}
-            value={formData.description}
-            onChange={(event) => {
-              onClearFieldError('description');
-              onChange({ ...formData, description: event.target.value });
-            }}
-            placeholder="Ex: Manutencao preventiva"
-          />
+          {!showNovalogFields ? (
+            <Input
+              required
+              label="Descricao"
+              error={fieldErrors.description}
+              value={formData.description}
+              onChange={(event) => {
+                onClearFieldError('description');
+                onChange({ ...formData, description: event.target.value });
+              }}
+              placeholder="Ex: Manutencao preventiva"
+            />
+          ) : null}
 
-          <Input
-            label="Fornecedor"
-            error={fieldErrors.providerName}
-            value={formData.providerName}
-            onChange={(event) => {
-              onClearFieldError('providerName');
-              onChange({ ...formData, providerName: event.target.value });
-            }}
-            placeholder="Ex: Oficina Diesel Centro"
-          />
+          {showNovalogFields ? (
+            <div className="space-y-2">
+              <FieldLabel required>Fornecedor</FieldLabel>
+              <NovalogAutocompleteSelect
+                value={formData.providerName}
+                onChange={(value) => {
+                  onClearFieldError('providerName');
+                  onChange({ ...formData, providerName: value });
+                }}
+                options={providerOptions}
+                placeholder="Selecione o fornecedor"
+                error={fieldErrors.providerName}
+                allowFreeText={false}
+              />
+            </div>
+          ) : (
+            <Input
+              label="Fornecedor"
+              error={fieldErrors.providerName}
+              value={formData.providerName}
+              onChange={(event) => {
+                onClearFieldError('providerName');
+                onChange({ ...formData, providerName: event.target.value });
+              }}
+              placeholder="Ex: Oficina Diesel Centro"
+            />
+          )}
 
-          <div className="space-y-2">
-            <FieldLabel required>Origem</FieldLabel>
-            <CustomSelect
-              value={formData.sourceType}
-              onChange={(value) =>
-                {
-                  onClearFieldError('sourceType');
-                  onClearFieldError('sourceId');
+          {showNovalogFields ? (
+            <>
+              <Input
+                type="month"
+                label="Competencia"
+                error={fieldErrors.referenceMonth}
+                value={formData.referenceMonth}
+                onChange={(event) => {
+                  onClearFieldError('referenceMonth');
+                  onChange({ ...formData, referenceMonth: event.target.value });
+                }}
+              />
+
+              <Input
+                label="No boleto"
+                error={fieldErrors.documentNumber}
+                value={formData.documentNumber}
+                onChange={(event) => {
+                  onClearFieldError('documentNumber');
+                  onChange({ ...formData, documentNumber: event.target.value });
+                }}
+                placeholder="Ex: 4317142, RELATORIO, PARC. 01/05"
+              />
+
+              <Input
+                label="NF"
+                error={fieldErrors.invoiceNumber}
+                value={formData.invoiceNumber}
+                onChange={(event) => {
+                  onClearFieldError('invoiceNumber');
+                  const value = event.target.value;
                   onChange({
                     ...formData,
-                    sourceType: value as PayableFormData['sourceType'],
-                    sourceId: value === 'manual' ? '' : formData.sourceId,
+                    invoiceNumber: value,
+                    invoiceStatus: value.toUpperCase().includes('SEM') ? 'missing' : formData.invoiceStatus,
                   });
-                }
-              }
-              error={fieldErrors.sourceType}
-              options={[
-                { value: 'manual', label: 'Manual' },
-                { value: 'expense', label: 'Custo operacional' },
-              ]}
-            />
-          </div>
+                }}
+                placeholder="Ex: 43984 ou SEM NOTA"
+              />
 
-          <Input
-            label="ID da origem"
-            error={fieldErrors.sourceId}
-            value={formData.sourceId}
-            onChange={(event) => {
-              onClearFieldError('sourceId');
-              onChange({ ...formData, sourceId: event.target.value });
-            }}
-            placeholder="UUID do custo operacional"
-            disabled={formData.sourceType === 'manual'}
-            required={formData.sourceType === 'expense'}
-          />
+            </>
+          ) : null}
 
-          <div className="space-y-2">
-            <FieldLabel>Veiculo</FieldLabel>
-            <CustomSelect
-              value={formData.vehicleId}
-              onChange={(value) => {
-                onClearFieldError('vehicleId');
-                onChange({ ...formData, vehicleId: value });
-              }}
-              error={fieldErrors.vehicleId}
-              placeholder="Nao vincular"
-              options={vehicles.map((vehicle) => ({
-                value: vehicle.id,
-                label: `${vehicle.name} (${vehicle.plate})`,
-              }))}
-            />
-          </div>
+          {!showNovalogFields ? (
+            <>
+              <div className="space-y-2">
+                <FieldLabel required>Origem</FieldLabel>
+                <CustomSelect
+                  value={formData.sourceType}
+                  onChange={(value) =>
+                    {
+                      onClearFieldError('sourceType');
+                      onClearFieldError('sourceId');
+                      onChange({
+                        ...formData,
+                        sourceType: value as PayableFormData['sourceType'],
+                        sourceId: value === 'manual' ? '' : formData.sourceId,
+                      });
+                    }
+                  }
+                  error={fieldErrors.sourceType}
+                  options={[
+                    { value: 'manual', label: 'Manual' },
+                    { value: 'expense', label: 'Custo operacional' },
+                  ]}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <FieldLabel>Empresa</FieldLabel>
-            <CustomSelect
-              value={formData.contractId}
-              onChange={(value) => {
-                onClearFieldError('contractId');
-                onChange({ ...formData, contractId: value });
-              }}
-              error={fieldErrors.contractId}
-              placeholder="Nao vincular"
-              options={companies.map((company) => ({
-                value: company.id,
-                label: company.tradeName,
-              }))}
-            />
-          </div>
+              <Input
+                label="ID da origem"
+                error={fieldErrors.sourceId}
+                value={formData.sourceId}
+                onChange={(event) => {
+                  onClearFieldError('sourceId');
+                  onChange({ ...formData, sourceId: event.target.value });
+                }}
+                placeholder="UUID do custo operacional"
+                disabled={formData.sourceType === 'manual'}
+                required={formData.sourceType === 'expense'}
+              />
+
+              <div className="space-y-2">
+                <FieldLabel>Veiculo</FieldLabel>
+                <CustomSelect
+                  value={formData.vehicleId}
+                  onChange={(value) => {
+                    onClearFieldError('vehicleId');
+                    onChange({ ...formData, vehicleId: value });
+                  }}
+                  error={fieldErrors.vehicleId}
+                  placeholder="Nao vincular"
+                  options={vehicles.map((vehicle) => ({
+                    value: vehicle.id,
+                    label: `${vehicle.name} (${vehicle.plate})`,
+                  }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FieldLabel>Empresa</FieldLabel>
+                <CustomSelect
+                  value={formData.contractId}
+                  onChange={(value) => {
+                    onClearFieldError('contractId');
+                    onChange({ ...formData, contractId: value });
+                  }}
+                  error={fieldErrors.contractId}
+                  placeholder="Nao vincular"
+                  options={companies.map((company) => ({
+                    value: company.id,
+                    label: company.tradeName,
+                  }))}
+                />
+              </div>
+            </>
+          ) : null}
 
           <Input
             required
@@ -177,24 +254,26 @@ export default function PayableFormModal({
             }}
           />
 
-          <div className="space-y-2">
-            <FieldLabel required>Status</FieldLabel>
-            <CustomSelect
-              value={formData.status}
-              onChange={(value) => {
-                onClearFieldError('status');
-                onClearFieldError('paidAt');
-                onChange({ ...formData, status: value as Payable['status'] });
-              }}
-              error={fieldErrors.status}
-              options={[
-                { value: 'open', label: 'Em aberto' },
-                { value: 'paid', label: 'Paga' },
-                { value: 'overdue', label: 'Em atraso' },
-                { value: 'canceled', label: 'Cancelada' },
-              ]}
-            />
-          </div>
+          {!showNovalogFields ? (
+            <div className="space-y-2">
+              <FieldLabel required>Status</FieldLabel>
+              <CustomSelect
+                value={formData.status}
+                onChange={(value) => {
+                  onClearFieldError('status');
+                  onClearFieldError('paidAt');
+                  onChange({ ...formData, status: value as Payable['status'] });
+                }}
+                error={fieldErrors.status}
+                options={[
+                  { value: 'open', label: 'Em aberto' },
+                  { value: 'paid', label: 'Paga' },
+                  { value: 'overdue', label: 'Em atraso' },
+                  { value: 'canceled', label: 'Cancelada' },
+                ]}
+              />
+            </div>
+          ) : null}
 
           <FormDatePicker
             label="Data do pagamento"
@@ -205,11 +284,11 @@ export default function PayableFormModal({
               onChange({ ...formData, paidAt: value });
             }}
             required={false}
-            disabled={formData.status !== 'paid'}
+            disabled={!showNovalogFields && formData.status !== 'paid'}
           />
 
           <Input
-            label="Forma de pagamento"
+            label={showNovalogFields ? 'Banco/Forma de pagamento' : 'Forma de pagamento'}
             error={fieldErrors.paymentMethod}
             value={formData.paymentMethod}
             onChange={(event) => {
@@ -219,16 +298,18 @@ export default function PayableFormModal({
             placeholder="Ex: PIX, boleto, transferencia"
           />
 
-          <Input
-            label="Comprovante (URL)"
-            error={fieldErrors.proofUrl}
-            value={formData.proofUrl}
-            onChange={(event) => {
-              onClearFieldError('proofUrl');
-              onChange({ ...formData, proofUrl: event.target.value });
-            }}
-            placeholder="https://..."
-          />
+          {!showNovalogFields ? (
+            <Input
+              label="Comprovante (URL)"
+              error={fieldErrors.proofUrl}
+              value={formData.proofUrl}
+              onChange={(event) => {
+                onClearFieldError('proofUrl');
+                onChange({ ...formData, proofUrl: event.target.value });
+              }}
+              placeholder="https://..."
+            />
+          ) : null}
 
           <div className="space-y-2 md:col-span-2">
             <FieldLabel required={false}>Observacoes</FieldLabel>

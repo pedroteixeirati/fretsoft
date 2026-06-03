@@ -2,8 +2,19 @@ import { OperationType, handleDataError } from '../../../firebase';
 import { apiRequest } from '../../../shared/lib/api-client';
 import { UserProfile } from '../../../shared/types/common.types';
 
+export interface TenantUserListItem {
+  id: string;
+  email: string;
+  role: UserProfile['role'];
+  name?: string;
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+}
+
 export const usersApi = {
   me: () => apiRequest<UserProfile>('/api/me/profile', {}, OperationType.GET),
+  list: () => apiRequest<TenantUserListItem[]>('/api/users', {}, OperationType.GET),
   meWithToken: async (token: string) => {
     try {
       const response = await fetch('/api/me/profile', {
