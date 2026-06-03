@@ -210,7 +210,10 @@ test('tenants expoe perfil do tenant e administracao de tenants da plataforma', 
   assert.match(tenantsControllerSource, /Transportadora nao encontrada\./);
 });
 
-test('users expoe endpoint para criacao de usuarios no tenant', () => {
+test('users expoe endpoints para listagem e criacao de usuarios no tenant', () => {
+  assert.match(usersControllerSource, /router\.get\('\/users'/);
+  assert.match(usersControllerSource, /Sem permissao para visualizar usuarios deste tenant\./);
+  assert.match(usersControllerSource, /listUsersByTenant\(req\.auth\)/);
   assert.match(usersControllerSource, /router\.post\('\/users'/);
   assert.match(usersControllerSource, /Sem permissao para gerenciar usuarios neste tenant\./);
   assert.match(usersControllerSource, /createTenantUser\(req\.auth, req\.body as CreateTenantUserInput\)/);

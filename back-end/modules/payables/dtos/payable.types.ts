@@ -1,5 +1,6 @@
 export type PayableStatus = 'open' | 'paid' | 'overdue' | 'canceled';
 export type PayableSourceType = 'expense' | 'manual';
+export type PayableInvoiceStatus = 'informed' | 'missing' | 'not_informed';
 
 export type PayableInput = {
   sourceType?: PayableSourceType;
@@ -15,6 +16,13 @@ export type PayableInput = {
   paymentMethod?: string;
   proofUrl?: string;
   notes?: string;
+  documentNumber?: string;
+  invoiceNumber?: string;
+  invoiceStatus?: PayableInvoiceStatus;
+  referenceMonth?: string;
+  importBatchId?: string | null;
+  importSheetName?: string;
+  importRowNumber?: string | number | null;
 };
 
 export type PayablePayload = {
@@ -33,6 +41,13 @@ export type PayablePayload = {
   paymentMethod: string;
   proofUrl: string;
   notes: string;
+  documentNumber: string;
+  invoiceNumber: string;
+  invoiceStatus: PayableInvoiceStatus;
+  referenceMonth: string;
+  importBatchId: string | null;
+  importSheetName: string;
+  importRowNumber: number | null;
 };
 
 export type PayableRow = {
@@ -52,4 +67,11 @@ export type PayableRow = {
   payment_method: string | null;
   proof_url: string | null;
   notes: string | null;
+  document_number: string | null;
+  invoice_number: string | null;
+  invoice_status: PayableInvoiceStatus | null;
+  reference_month: string | null;
+  import_batch_id: string | null;
+  import_sheet_name: string | null;
+  import_row_number: number | null;
 };

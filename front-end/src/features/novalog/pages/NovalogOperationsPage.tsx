@@ -7,6 +7,7 @@ import { canAccess } from '../../../lib/permissions';
 import { queryKeys } from '../../../shared/lib/query-keys';
 import { providersApi } from '../../providers/services/providers.api';
 import { companiesApi } from '../../companies/services/companies.api';
+import { usersApi } from '../../auth/services/auth.api';
 import { canAccessNovalogOperations } from '../utils/novalog.visibility';
 import { novalogInitialKpis, novalogKpiIcons } from '../constants/novalog.constants';
 import { novalogApi } from '../services/novalog.api';
@@ -49,7 +50,9 @@ export default function NovalogOperationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [ticketFilter, setTicketFilter] = useState('');
   const [fuelStationFilter, setFuelStationFilter] = useState('');
-  const [operationDateFilter, setOperationDateFilter] = useState('');
+  const [operationDateFromFilter, setOperationDateFromFilter] = useState('');
+  const [operationDateToFilter, setOperationDateToFilter] = useState('');
+  const [userFilter, setUserFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
 
   const canAccessNovalogModule = canAccessNovalogOperations(userProfile);
@@ -73,6 +76,12 @@ export default function NovalogOperationsPage() {
     queryFn: companiesApi.list,
     enabled: canReadCompanies,
     ...getNovalogLiveQueryOptions(canReadCompanies),
+  });
+  const usersQuery = useQuery({
+    queryKey: queryKeys.users.list(),
+    queryFn: usersApi.list,
+    enabled: canAccessNovalogModule,
+    ...getNovalogLiveQueryOptions(canAccessNovalogModule),
   });
   const { createEntry, createBatch, updateEntry, deleteEntry, isSubmitting } = useNovalogMutations();
   const mutationError = createEntry.error ?? createBatch.error ?? updateEntry.error ?? deleteEntry.error ?? null;
@@ -164,18 +173,20 @@ export default function NovalogOperationsPage() {
         const entryReferenceMonth = entry.referenceMonth || entry.operationDate.slice(0, 7);
         return (
           (referenceMonthFilter === 'all' || entryReferenceMonth === referenceMonthFilter) &&
+          (userFilter === 'all' || entry.createdByUserId === userFilter) &&
           matchesNovalogDisplayIdRange(entry.displayId, searchTerm) &&
           (entry.ticketNumber ?? '').toLowerCase().includes(ticketFilter.toLowerCase()) &&
           (entry.fuelStationName ?? '').toLowerCase().includes(fuelStationFilter.toLowerCase()) &&
-          (!operationDateFilter || entry.operationDate === operationDateFilter)
+          (!operationDateFromFilter || entry.operationDate >= operationDateFromFilter) &&
+          (!operationDateToFilter || entry.operationDate <= operationDateToFilter)
         );
       }),
-    [entries, fuelStationFilter, operationDateFilter, referenceMonthFilter, searchTerm, ticketFilter],
+    [entries, fuelStationFilter, operationDateFromFilter, operationDateToFilter, referenceMonthFilter, searchTerm, ticketFilter, userFilter],
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [referenceMonthFilter, searchTerm, ticketFilter, fuelStationFilter, operationDateFilter, entries.length]);
+  }, [referenceMonthFilter, searchTerm, ticketFilter, fuelStationFilter, operationDateFromFilter, operationDateToFilter, userFilter, entries.length]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / itemsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -188,6 +199,7 @@ export default function NovalogOperationsPage() {
     const optionMap = new Map<string, { value: string; label: string }>();
 
     (providersQuery.data ?? [])
+      .filter((provider) => !provider.usageType || provider.usageType === 'operational' || provider.usageType === 'both')
       .slice()
       .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'))
       .forEach((provider) => {
@@ -223,6 +235,19 @@ export default function NovalogOperationsPage() {
 
     return Array.from(optionMap.values()).sort((left, right) => left.label.localeCompare(right.label, 'pt-BR'));
   }, [companiesQuery.data]);
+
+  const userOptions = useMemo(() => {
+    const operationalUsers = (usersQuery.data ?? [])
+      .filter((user) => user.tenantSlug === 'novalog' && user.role === 'operational')
+      .slice()
+      .sort((left, right) => (left.name || left.email).localeCompare(right.name || right.email, 'pt-BR'))
+      .map((user) => ({
+        value: user.id,
+        label: user.name?.trim() || user.email,
+      }));
+
+    return [{ value: 'all', label: 'Todos usuarios' }, ...operationalUsers];
+  }, [usersQuery.data]);
 
   const dynamicKpis = useMemo(() => {
     const totalWeight = filteredEntries.reduce((sum, entry) => sum + entry.weight, 0);
@@ -326,18 +351,23 @@ export default function NovalogOperationsPage() {
           searchTerm={searchTerm}
           referenceMonthFilter={referenceMonthFilter}
           referenceMonthOptions={referenceMonthOptions}
+          userFilter={userFilter}
+          userOptions={userOptions}
           ticketFilter={ticketFilter}
           fuelStationFilter={fuelStationFilter}
-          operationDateFilter={operationDateFilter}
+          operationDateFromFilter={operationDateFromFilter}
+          operationDateToFilter={operationDateToFilter}
           filteredCount={filteredEntries.length}
           totalCount={entries.length}
           currentPage={safeCurrentPage}
           totalPages={totalPages}
           onSearchChange={setSearchTerm}
           onReferenceMonthFilterChange={setReferenceMonthFilter}
+          onUserFilterChange={setUserFilter}
           onTicketFilterChange={setTicketFilter}
           onFuelStationFilterChange={setFuelStationFilter}
-          onOperationDateFilterChange={setOperationDateFilter}
+          onOperationDateFromFilterChange={setOperationDateFromFilter}
+          onOperationDateToFilterChange={setOperationDateToFilter}
           onPreviousPage={() => setCurrentPage((page) => Math.max(1, page - 1))}
           onNextPage={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
           onEdit={openEditModal}

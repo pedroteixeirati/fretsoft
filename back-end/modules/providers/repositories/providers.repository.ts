@@ -6,6 +6,7 @@ export type ProviderRow = {
   tenant_id: string;
   name: string;
   type: string;
+  usage_type: 'operational' | 'financial' | 'both';
   status: string;
   contact: string | null;
   email: string | null;
@@ -18,6 +19,7 @@ const providerColumns = `
   tenant_id,
   name,
   type,
+  usage_type,
   status,
   contact,
   email,
@@ -48,12 +50,13 @@ export async function insertTenantProvider(
       updated_by_user_id,
       name,
       type,
+      usage_type,
       status,
       contact,
       email,
       address
     )
-    values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     returning ${providerColumns}`,
     [
       tenantId,
@@ -61,6 +64,7 @@ export async function insertTenantProvider(
       userId,
       payload.name,
       payload.type,
+      payload.usageType,
       payload.status,
       payload.contact,
       payload.email,
@@ -81,18 +85,20 @@ export async function updateTenantProvider(
     `update providers
      set name = $1,
          type = $2,
-         status = $3,
-         contact = $4,
-         email = $5,
-         address = $6,
-         updated_by_user_id = $7,
+         usage_type = $3,
+         status = $4,
+         contact = $5,
+         email = $6,
+         address = $7,
+         updated_by_user_id = $8,
          updated_at = now()
-     where id = $8
-       and tenant_id = $9
+     where id = $9
+       and tenant_id = $10
      returning ${providerColumns}`,
     [
       payload.name,
       payload.type,
+      payload.usageType,
       payload.status,
       payload.contact,
       payload.email,

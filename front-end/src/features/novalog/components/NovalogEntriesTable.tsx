@@ -10,18 +10,23 @@ interface NovalogEntriesTableProps {
   searchTerm: string;
   referenceMonthFilter: string;
   referenceMonthOptions: Array<{ value: string; label: string }>;
+  userFilter: string;
+  userOptions: Array<{ value: string; label: string }>;
   ticketFilter: string;
   fuelStationFilter: string;
-  operationDateFilter: string;
+  operationDateFromFilter: string;
+  operationDateToFilter: string;
   filteredCount: number;
   totalCount: number;
   currentPage: number;
   totalPages: number;
   onSearchChange: (value: string) => void;
   onReferenceMonthFilterChange: (value: string) => void;
+  onUserFilterChange: (value: string) => void;
   onTicketFilterChange: (value: string) => void;
   onFuelStationFilterChange: (value: string) => void;
-  onOperationDateFilterChange: (value: string) => void;
+  onOperationDateFromFilterChange: (value: string) => void;
+  onOperationDateToFilterChange: (value: string) => void;
   onPreviousPage: () => void;
   onNextPage: () => void;
   onEdit: (entry: NovalogEntry) => void;
@@ -37,18 +42,23 @@ export default function NovalogEntriesTable({
   searchTerm,
   referenceMonthFilter,
   referenceMonthOptions,
+  userFilter,
+  userOptions,
   ticketFilter,
   fuelStationFilter,
-  operationDateFilter,
+  operationDateFromFilter,
+  operationDateToFilter,
   filteredCount,
   totalCount,
   currentPage,
   totalPages,
   onSearchChange,
   onReferenceMonthFilterChange,
+  onUserFilterChange,
   onTicketFilterChange,
   onFuelStationFilterChange,
-  onOperationDateFilterChange,
+  onOperationDateFromFilterChange,
+  onOperationDateToFilterChange,
   onPreviousPage,
   onNextPage,
   onEdit,
@@ -92,14 +102,19 @@ export default function NovalogEntriesTable({
           searchTerm={searchTerm}
           referenceMonthFilter={referenceMonthFilter}
           referenceMonthOptions={referenceMonthOptions}
+          userFilter={userFilter}
+          userOptions={userOptions}
           ticketFilter={ticketFilter}
           fuelStationFilter={fuelStationFilter}
-          operationDateFilter={operationDateFilter}
+          operationDateFromFilter={operationDateFromFilter}
+          operationDateToFilter={operationDateToFilter}
           onSearchChange={onSearchChange}
           onReferenceMonthFilterChange={onReferenceMonthFilterChange}
+          onUserFilterChange={onUserFilterChange}
           onTicketFilterChange={onTicketFilterChange}
           onFuelStationFilterChange={onFuelStationFilterChange}
-          onOperationDateFilterChange={onOperationDateFilterChange}
+          onOperationDateFromFilterChange={onOperationDateFromFilterChange}
+          onOperationDateToFilterChange={onOperationDateToFilterChange}
         />
       </div>
 

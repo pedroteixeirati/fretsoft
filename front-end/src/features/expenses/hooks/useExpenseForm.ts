@@ -64,7 +64,9 @@ export function useExpenseForm({ providers }: UseExpenseFormOptions) {
   const [formData, setFormData] = useState<ExpenseFormData>(defaultExpenseFormData());
 
   const providerOptions = useMemo(() => {
-    const orderedProviders = [...providers].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
+    const orderedProviders = providers
+      .filter((provider) => !provider.usageType || provider.usageType === 'operational' || provider.usageType === 'both')
+      .sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
 
     const options = orderedProviders.map((provider) => ({
       value: provider.name,

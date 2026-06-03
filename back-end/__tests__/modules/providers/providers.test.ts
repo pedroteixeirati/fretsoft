@@ -10,8 +10,15 @@ const providersServiceSource = readFileSync(resolve(process.cwd(), 'back-end/mod
 test('repositorio de providers lista e persiste registros explicitamente por tenant', () => {
   assert.match(providersRepositorySource, /from providers\s+where tenant_id = \$1/i);
   assert.match(providersRepositorySource, /insert into providers/i);
+  assert.match(providersRepositorySource, /usage_type/i);
   assert.match(providersRepositorySource, /update providers/i);
   assert.match(providersRepositorySource, /delete from providers/i);
+});
+
+test('providers diferenciam finalidade operacional financeira ou ambas', () => {
+  assert.match(providersServiceSource, /usageType: row\.usage_type \|\| 'operational'/);
+  assert.match(providersServiceSource, /!\['operational', 'financial', 'both'\]\.includes\(usageType\)/);
+  assert.match(providersServiceSource, /return \{ name, type, usageType, status, contact, email, address \}/);
 });
 
 test('controller e service de providers usam fluxo explicito sem resources', () => {

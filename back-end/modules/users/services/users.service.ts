@@ -4,7 +4,7 @@ import { pool } from '../../../shared/infra/database/pool';
 import type { AppRole } from '../../../shared/authorization/permissions';
 import { isValidEmail, normalizeRequiredText } from '../../../shared/validation/validation';
 import type { AuthContext } from '../../auth/dtos/auth-context';
-import { findUserByEmail, insertTenantUser, linkUserToTenant } from '../repositories/users.repository';
+import { findUserByEmail, insertTenantUser, linkUserToTenant, listTenantUsers } from '../repositories/users.repository';
 import type { CreateTenantUserInput } from '../dtos/user.types';
 
 function allowedRolesForCreator(role?: AppRole): AppRole[] {
@@ -15,6 +15,34 @@ function allowedRolesForCreator(role?: AppRole): AppRole[] {
 
 export function canCreateTenantUsers(role?: AppRole) {
   return !!role && ['dev', 'owner', 'admin'].includes(role);
+}
+
+export function canListTenantUsers(role?: AppRole) {
+  return !!role && ['dev', 'owner', 'admin', 'financial', 'operational'].includes(role);
+}
+
+export async function listUsersByTenant(auth: AuthContext | undefined) {
+  if (!auth?.tenantId) {
+    throw forbiddenError('Tenant nao identificado para listagem de usuarios.', 'tenant_required');
+  }
+
+  const client = await pool.connect();
+
+  try {
+    const users = await listTenantUsers(client, auth.tenantId);
+
+    return users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      role: user.role as AppRole,
+      name: user.name || '',
+      tenantId: auth.tenantId,
+      tenantName: auth.tenantName,
+      tenantSlug: auth.tenantSlug,
+    }));
+  } finally {
+    client.release();
+  }
 }
 
 export async function createTenantUser(auth: AuthContext | undefined, payload: CreateTenantUserInput) {

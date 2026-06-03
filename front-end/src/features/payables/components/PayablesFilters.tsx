@@ -6,19 +6,31 @@ import { Payable } from '../types/payable.types';
 interface PayablesFiltersProps {
   searchTerm: string;
   statusFilter: 'all' | Payable['status'];
+  referenceMonthFilter: string;
+  referenceMonthOptions: string[];
+  invoiceFilter: 'all' | 'with_invoice' | 'missing';
+  showNovalogFilters: boolean;
   filteredCount: number;
   totalCount: number;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: 'all' | Payable['status']) => void;
+  onReferenceMonthChange: (value: string) => void;
+  onInvoiceFilterChange: (value: 'all' | 'with_invoice' | 'missing') => void;
 }
 
 export default function PayablesFilters({
   searchTerm,
   statusFilter,
+  referenceMonthFilter,
+  referenceMonthOptions,
+  invoiceFilter,
+  showNovalogFilters,
   filteredCount,
   totalCount,
   onSearchChange,
   onStatusChange,
+  onReferenceMonthChange,
+  onInvoiceFilterChange,
 }: PayablesFiltersProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 bg-surface-container-low/50 p-6">
@@ -33,6 +45,35 @@ export default function PayablesFilters({
             onChange={(event) => onSearchChange(event.target.value)}
           />
         </div>
+
+        {showNovalogFilters ? (
+          <>
+            <div className="flex items-center gap-2 rounded-full bg-surface px-4 py-2 ring-1 ring-primary/5">
+              <CustomSelect
+                value={referenceMonthFilter}
+                onChange={onReferenceMonthChange}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todas as competencias' },
+                  ...referenceMonthOptions.map((month) => ({ value: month, label: month })),
+                ]}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 rounded-full bg-surface px-4 py-2 ring-1 ring-primary/5">
+              <CustomSelect
+                value={invoiceFilter}
+                onChange={(value) => onInvoiceFilterChange(value as 'all' | 'with_invoice' | 'missing')}
+                variant="inline"
+                options={[
+                  { value: 'all', label: 'Todas as NFs' },
+                  { value: 'with_invoice', label: 'Com NF' },
+                  { value: 'missing', label: 'Sem nota' },
+                ]}
+              />
+            </div>
+          </>
+        ) : null}
 
         <div className="flex items-center gap-2 rounded-full bg-surface px-4 py-2 ring-1 ring-primary/5">
           <CustomSelect

@@ -26,6 +26,7 @@ function mapProviderRow(row: ProviderRow) {
     displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
     name: row.name,
     type: row.type,
+    usageType: row.usage_type || 'operational',
     status: row.status,
     contact: row.contact || '',
     email: row.email || '',
@@ -36,6 +37,7 @@ function mapProviderRow(row: ProviderRow) {
 export async function validateProviderPayload(body: Record<string, unknown>) {
   const name = normalizeRequiredText(body.name as string);
   const type = normalizeRequiredText(body.type as string);
+  const usageType = (normalizeRequiredText(body.usageType as string) || 'operational') as ProviderRow['usage_type'];
   const status = normalizeRequiredText(body.status as string);
   const contact = normalizeRequiredText(body.contact as string);
   const email = normalizeRequiredText(body.email as string).toLowerCase();
@@ -43,10 +45,13 @@ export async function validateProviderPayload(body: Record<string, unknown>) {
 
   if (name.length < 3) throw validationError('Informe um nome valido para o fornecedor.', 'invalid_provider_name', 'name');
   if (type.length < 2) throw validationError('Informe o tipo do fornecedor.', 'invalid_provider_type', 'type');
+  if (!['operational', 'financial', 'both'].includes(usageType)) {
+    throw validationError('Informe uma finalidade valida para o fornecedor.', 'invalid_provider_usage_type', 'usageType');
+  }
   if (status.length < 2) throw validationError('Informe o status do fornecedor.', 'invalid_provider_status', 'status');
   if (email && !isValidEmail(email)) throw validationError('Informe um e-mail valido para o fornecedor.', 'invalid_provider_email', 'email');
 
-  return { name, type, status, contact, email, address };
+  return { name, type, usageType, status, contact, email, address };
 }
 
 export async function listProviders(auth?: AuthContext) {

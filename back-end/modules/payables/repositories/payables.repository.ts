@@ -1,5 +1,5 @@
 import { pool } from '../../../shared/infra/database/pool';
-import type { PayablePayload, PayableRow } from '../dtos/payable.types';
+import type { PayablePayload, PayableRow, PayableSourceType } from '../dtos/payable.types';
 
 export async function findTenantVehicleForPayable(vehicleId: string, tenantId: string) {
   const result = await pool.query<{ id: string; name: string }>(
@@ -43,7 +43,14 @@ function selectColumns() {
           paid_at,
           payment_method,
           proof_url,
-          notes`;
+          notes,
+          document_number,
+          invoice_number,
+          invoice_status,
+          reference_month,
+          import_batch_id,
+          import_sheet_name,
+          import_row_number`;
 }
 
 export async function listTenantPayables(tenantId?: string) {
@@ -58,7 +65,7 @@ export async function listTenantPayables(tenantId?: string) {
   return result.rows;
 }
 
-export async function findPayableBySource(sourceType: 'expense' | 'manual', sourceId: string, tenantId?: string) {
+export async function findPayableBySource(sourceType: PayableSourceType, sourceId: string, tenantId?: string) {
   const result = await pool.query<PayableRow>(
     `select ${selectColumns()}
      from payables
@@ -90,10 +97,17 @@ export async function createTenantPayable(payload: PayablePayload, tenantId?: st
        payment_method,
        proof_url,
        notes,
+       document_number,
+       invoice_number,
+       invoice_status,
+       reference_month,
+       import_batch_id,
+       import_sheet_name,
+       import_row_number,
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $23)
      returning ${selectColumns()}`,
     [
       tenantId,
@@ -111,6 +125,13 @@ export async function createTenantPayable(payload: PayablePayload, tenantId?: st
       payload.paymentMethod || null,
       payload.proofUrl || null,
       payload.notes || null,
+      payload.documentNumber || null,
+      payload.invoiceNumber || null,
+      payload.invoiceStatus,
+      payload.referenceMonth || null,
+      payload.importBatchId,
+      payload.importSheetName || null,
+      payload.importRowNumber,
       userId,
     ]
   );
@@ -135,10 +156,17 @@ export async function updateTenantPayable(id: string, payload: PayablePayload, t
          payment_method = $12,
          proof_url = $13,
          notes = $14,
-         updated_by_user_id = $15,
+         document_number = $15,
+         invoice_number = $16,
+         invoice_status = $17,
+         reference_month = $18,
+         import_batch_id = $19,
+         import_sheet_name = $20,
+         import_row_number = $21,
+         updated_by_user_id = $22,
          updated_at = now()
-     where id = $16
-       and tenant_id = $17
+     where id = $23
+       and tenant_id = $24
      returning ${selectColumns()}`,
     [
       payload.sourceType,
@@ -155,6 +183,13 @@ export async function updateTenantPayable(id: string, payload: PayablePayload, t
       payload.paymentMethod || null,
       payload.proofUrl || null,
       payload.notes || null,
+      payload.documentNumber || null,
+      payload.invoiceNumber || null,
+      payload.invoiceStatus,
+      payload.referenceMonth || null,
+      payload.importBatchId,
+      payload.importSheetName || null,
+      payload.importRowNumber,
       userId,
       id,
       tenantId,
@@ -176,7 +211,7 @@ export async function deleteTenantPayable(id: string, tenantId?: string) {
   return result.rows[0] || null;
 }
 
-export async function deletePayableBySource(sourceType: 'expense' | 'manual', sourceId: string, tenantId?: string) {
+export async function deletePayableBySource(sourceType: PayableSourceType, sourceId: string, tenantId?: string) {
   const result = await pool.query(
     `delete from payables
      where tenant_id = $1

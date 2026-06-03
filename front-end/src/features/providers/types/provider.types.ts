@@ -3,6 +3,7 @@ export interface Provider {
   displayId?: number;
   name: string;
   type: string;
+  usageType?: 'operational' | 'financial' | 'both';
   status: string;
   contact: string;
   email: string;

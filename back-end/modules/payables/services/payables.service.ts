@@ -1,4 +1,4 @@
-import type { PayableInput, PayablePayload, PayableRow, PayableSourceType, PayableStatus } from '../dtos/payable.types';
+import type { PayableInput, PayableInvoiceStatus, PayablePayload, PayableRow, PayableSourceType, PayableStatus } from '../dtos/payable.types';
 import type { ExpenseSeed } from '../../expenses/dtos/expense.types';
 import {
   isPositiveNumber,
@@ -49,7 +49,19 @@ function mapPayableRow(row: PayableRow) {
     paymentMethod: row.payment_method || '',
     proofUrl: row.proof_url || '',
     notes: row.notes || '',
+    documentNumber: row.document_number || '',
+    invoiceNumber: row.invoice_number || '',
+    invoiceStatus: row.invoice_status || 'not_informed',
+    referenceMonth: row.reference_month || '',
+    importBatchId: row.import_batch_id,
+    importSheetName: row.import_sheet_name || '',
+    importRowNumber: row.import_row_number,
   };
+}
+
+function normalizeOptionalField(value: unknown) {
+  if (value === null || value === undefined) return '';
+  return normalizeOptionalText(String(value)) || '';
 }
 
 export async function validatePayablePayload(body: PayableInput, tenantId: string): Promise<PayablePayload> {
@@ -66,6 +78,15 @@ export async function validatePayablePayload(body: PayableInput, tenantId: strin
   const paymentMethod = normalizeOptionalText(body.paymentMethod) || '';
   const proofUrl = normalizeOptionalText(body.proofUrl) || '';
   const notes = normalizeOptionalText(body.notes) || '';
+  const documentNumber = normalizeOptionalField(body.documentNumber);
+  const invoiceNumber = normalizeOptionalField(body.invoiceNumber);
+  let invoiceStatus = (normalizeOptionalField(body.invoiceStatus) || 'not_informed') as PayableInvoiceStatus;
+  const referenceMonth = normalizeOptionalField(body.referenceMonth);
+  const importBatchId = normalizeOptionalField(body.importBatchId);
+  const importSheetName = normalizeOptionalField(body.importSheetName);
+  const importRowNumberValue = body.importRowNumber === null || body.importRowNumber === undefined || body.importRowNumber === ''
+    ? null
+    : Number(body.importRowNumber);
 
   if (!['expense', 'manual'].includes(sourceType)) throw payableErrors.invalidSourceType();
   if (sourceType === 'expense' && !sourceId) throw payableErrors.expenseSourceRequiresId();
@@ -77,6 +98,12 @@ export async function validatePayablePayload(body: PayableInput, tenantId: strin
   if (!['open', 'paid', 'overdue', 'canceled'].includes(status)) throw payableErrors.invalidStatus();
   if (paidAt && !isValidDate(paidAt)) throw payableErrors.invalidPaidAt();
   if (proofUrl && !isValidProofUrl(proofUrl)) throw payableErrors.invalidProofUrl();
+  if (!['informed', 'missing', 'not_informed'].includes(invoiceStatus)) throw payableErrors.invalidInvoiceStatus();
+  if (referenceMonth && !/^\d{4}-\d{2}$/.test(referenceMonth)) throw payableErrors.invalidReferenceMonth();
+  if (importBatchId && !isValidUuid(importBatchId)) throw payableErrors.invalidImportBatch();
+  if (importRowNumberValue !== null && (!Number.isInteger(importRowNumberValue) || importRowNumberValue <= 0)) {
+    throw payableErrors.invalidImportRowNumber();
+  }
   if (vehicleId && !isValidUuid(vehicleId)) throw payableErrors.invalidVehicle();
   if (contractId && !isValidUuid(contractId)) throw payableErrors.invalidContract();
 
@@ -100,6 +127,10 @@ export async function validatePayablePayload(body: PayableInput, tenantId: strin
     status = 'paid';
   }
 
+  if (invoiceNumber && invoiceStatus === 'not_informed') {
+    invoiceStatus = invoiceNumber.toUpperCase().includes('SEM') ? 'missing' : 'informed';
+  }
+
   return {
     sourceType,
     sourceId: sourceId || null,
@@ -115,6 +146,13 @@ export async function validatePayablePayload(body: PayableInput, tenantId: strin
     paymentMethod,
     proofUrl,
     notes,
+    documentNumber,
+    invoiceNumber,
+    invoiceStatus,
+    referenceMonth,
+    importBatchId: importBatchId || null,
+    importSheetName,
+    importRowNumber: importRowNumberValue,
   };
 }
 

@@ -125,6 +125,7 @@ create table if not exists providers (
   tenant_id uuid not null references tenants(id) on delete cascade,
   name text not null,
   type text not null,
+  usage_type text not null default 'operational' check (usage_type in ('operational', 'financial', 'both')),
   status text not null,
   contact text,
   email text,
@@ -417,6 +418,13 @@ create table if not exists payables (
   payment_method text,
   proof_url text,
   notes text,
+  document_number text,
+  invoice_number text,
+  invoice_status text not null default 'not_informed' check (invoice_status in ('informed', 'missing', 'not_informed')),
+  reference_month text,
+  import_batch_id uuid,
+  import_sheet_name text,
+  import_row_number integer,
   created_by_user_id uuid references users(id) on delete set null,
   updated_by_user_id uuid references users(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -476,6 +484,11 @@ alter table if exists providers add column if not exists tenant_id uuid referenc
 alter table if exists providers add column if not exists display_id bigint;
 alter table if exists providers add column if not exists created_by_user_id uuid references users(id) on delete set null;
 alter table if exists providers add column if not exists updated_by_user_id uuid references users(id) on delete set null;
+alter table if exists providers add column if not exists usage_type text not null default 'operational';
+alter table if exists providers drop constraint if exists providers_usage_type_check;
+alter table if exists providers
+  add constraint providers_usage_type_check
+  check (usage_type in ('operational', 'financial', 'both'));
 alter table if exists providers alter column contact drop not null;
 alter table if exists providers alter column email drop not null;
 alter table if exists providers alter column address drop not null;
@@ -619,10 +632,18 @@ alter table if exists payables add column if not exists paid_at text;
 alter table if exists payables add column if not exists payment_method text;
 alter table if exists payables add column if not exists proof_url text;
 alter table if exists payables add column if not exists notes text;
+alter table if exists payables add column if not exists document_number text;
+alter table if exists payables add column if not exists invoice_number text;
+alter table if exists payables add column if not exists invoice_status text not null default 'not_informed';
+alter table if exists payables add column if not exists reference_month text;
+alter table if exists payables add column if not exists import_batch_id uuid;
+alter table if exists payables add column if not exists import_sheet_name text;
+alter table if exists payables add column if not exists import_row_number integer;
 alter table if exists payables add column if not exists created_by_user_id uuid references users(id) on delete set null;
 alter table if exists payables add column if not exists updated_by_user_id uuid references users(id) on delete set null;
 update payables set source_type = 'manual' where source_type is null;
 update payables set status = 'open' where status is null;
+update payables set invoice_status = 'not_informed' where invoice_status is null;
 alter table if exists payables drop constraint if exists payables_source_type_check;
 alter table if exists payables
   add constraint payables_source_type_check
@@ -631,6 +652,10 @@ alter table if exists payables drop constraint if exists payables_status_check;
 alter table if exists payables
   add constraint payables_status_check
   check (status in ('open', 'paid', 'overdue', 'canceled'));
+alter table if exists payables drop constraint if exists payables_invoice_status_check;
+alter table if exists payables
+  add constraint payables_invoice_status_check
+  check (invoice_status in ('informed', 'missing', 'not_informed'));
 alter table if exists expenses drop constraint if exists expenses_linked_payable_id_fkey;
 alter table if exists expenses
   add constraint expenses_linked_payable_id_fkey
@@ -925,6 +950,7 @@ create unique index if not exists idx_vehicles_tenant_plate
 create index if not exists idx_vehicles_tenant_id on vehicles(tenant_id);
 create unique index if not exists idx_providers_tenant_display_id on providers(tenant_id, display_id) where display_id is not null;
 create index if not exists idx_providers_tenant_id on providers(tenant_id);
+create index if not exists idx_providers_tenant_usage_type on providers(tenant_id, usage_type);
 create unique index if not exists idx_companies_tenant_display_id on companies(tenant_id, display_id) where display_id is not null;
 create unique index if not exists idx_companies_tenant_cnpj
   on companies (tenant_id, regexp_replace(cnpj, '\D', '', 'g'))
@@ -965,3 +991,6 @@ create index if not exists idx_payables_tenant_id on payables(tenant_id);
 create index if not exists idx_payables_tenant_status on payables(tenant_id, status);
 create index if not exists idx_payables_tenant_due_date on payables(tenant_id, due_date);
 create index if not exists idx_payables_source on payables(tenant_id, source_type, source_id);
+create index if not exists idx_payables_tenant_reference_month on payables(tenant_id, reference_month);
+create index if not exists idx_payables_tenant_invoice_number on payables(tenant_id, invoice_number);
+create index if not exists idx_payables_tenant_document_number on payables(tenant_id, document_number);

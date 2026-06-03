@@ -33,15 +33,26 @@ describe('NovalogOperationsPage contract', () => {
     expect(pageSource).not.toMatch(/destinationFilter/);
   });
 
-  it('mantem ordem dos filtros como id, ticket, posto, data lancamento e competencia', () => {
+  it('mantem ordem dos filtros como id, ticket, posto, data, usuario e competencia', () => {
     expect(filtersSource).toMatch(
-      /placeholder="ID"[\s\S]*placeholder="Ticket"[\s\S]*placeholder="Posto"[\s\S]*placeholder="Data"[\s\S]*CustomSelect/,
+      /placeholder="ID"[\s\S]*placeholder="Ticket"[\s\S]*placeholder="Posto"[\s\S]*NovalogDateRangeFilter[\s\S]*UserRound[\s\S]*CustomSelect/,
     );
     expect(pageSource).toMatch(/ticketFilter/);
-    expect(pageSource).toMatch(/operationDateFilter/);
+    expect(pageSource).toMatch(/operationDateFromFilter/);
+    expect(pageSource).toMatch(/operationDateToFilter/);
+    expect(pageSource).toMatch(/userFilter/);
     expect(pageSource).toMatch(/entry\.ticketNumber/);
-    expect(pageSource).toMatch(/entry\.operationDate === operationDateFilter/);
+    expect(pageSource).toMatch(/entry\.operationDate >= operationDateFromFilter/);
+    expect(pageSource).toMatch(/entry\.operationDate <= operationDateToFilter/);
+    expect(pageSource).toMatch(/entry\.createdByUserId === userFilter/);
     expect(filtersSource).not.toMatch(/Mostrando <span/);
+  });
+
+  it('carrega apenas usuarios operacionais da Novalog para o filtro de usuario', () => {
+    expect(pageSource).toMatch(/usersApi\.list/);
+    expect(pageSource).toMatch(/queryKeys\.users\.list/);
+    expect(pageSource).toMatch(/user\.tenantSlug === 'novalog' && user\.role === 'operational'/);
+    expect(filtersSource).toMatch(/placeholder="Usuario"/);
   });
 
   it('exibe autor do lancamento no modal de edicao quando retornado pela API', () => {

@@ -82,3 +82,19 @@ test('schema cria payables com origem financeira rastreavel e vinculo com custos
   assert.match(schema, /create index if not exists idx_payables_tenant_status on payables\(tenant_id, status\)/i);
   assert.match(schema, /create index if not exists idx_payables_tenant_due_date on payables\(tenant_id, due_date\)/i);
 });
+
+test('schema diferencia finalidade de fornecedores para fluxos operacionais e financeiros', () => {
+  assert.match(schema, /create table if not exists providers \([\s\S]*usage_type text not null default 'operational' check \(usage_type in \('operational', 'financial', 'both'\)\)/i);
+  assert.match(schema, /alter table if exists providers add column if not exists usage_type text not null default 'operational';/i);
+  assert.match(schema, /create index if not exists idx_providers_tenant_usage_type on providers\(tenant_id, usage_type\)/i);
+});
+
+test('schema guarda metadados da planilha Novalog em contas a pagar sem criar modulo paralelo', () => {
+  assert.match(schema, /create table if not exists payables \([\s\S]*document_number text,/i);
+  assert.match(schema, /create table if not exists payables \([\s\S]*invoice_number text,/i);
+  assert.match(schema, /create table if not exists payables \([\s\S]*invoice_status text not null default 'not_informed' check \(invoice_status in \('informed', 'missing', 'not_informed'\)\)/i);
+  assert.match(schema, /create table if not exists payables \([\s\S]*reference_month text,/i);
+  assert.match(schema, /create table if not exists payables \([\s\S]*import_sheet_name text,/i);
+  assert.match(schema, /create table if not exists payables \([\s\S]*import_row_number integer,/i);
+  assert.match(schema, /create index if not exists idx_payables_tenant_reference_month on payables\(tenant_id, reference_month\)/i);
+});
