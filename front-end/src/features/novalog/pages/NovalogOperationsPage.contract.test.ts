@@ -42,8 +42,10 @@ describe('NovalogOperationsPage contract', () => {
     expect(pageSource).toMatch(/operationDateToFilter/);
     expect(pageSource).toMatch(/userFilter/);
     expect(pageSource).toMatch(/entry\.ticketNumber/);
-    expect(pageSource).toMatch(/entry\.operationDate >= operationDateFromFilter/);
-    expect(pageSource).toMatch(/entry\.operationDate <= operationDateToFilter/);
+    expect(pageSource).toMatch(/const entryCreationDate = getEntryCreationDate\(entry\)/);
+    expect(pageSource).toMatch(/entryCreationDate >= operationDateFromFilter/);
+    expect(pageSource).toMatch(/entryCreationDate <= operationDateToFilter/);
+    expect(pageSource).toMatch(/timeZone: 'America\/Sao_Paulo'/);
     expect(pageSource).toMatch(/entry\.createdByUserId === userFilter/);
     expect(filtersSource).not.toMatch(/Mostrando <span/);
   });

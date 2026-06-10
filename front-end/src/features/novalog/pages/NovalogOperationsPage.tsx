@@ -39,6 +39,25 @@ function formatReferenceMonthLabel(value: string) {
   }).format(new Date(year, month - 1, 1));
 }
 
+function getEntryCreationDate(entry: NovalogEntry) {
+  if (!entry.createdAt) return '';
+
+  const createdAt = new Date(entry.createdAt);
+  if (Number.isNaN(createdAt.getTime())) return '';
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(createdAt);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+
+  return year && month && day ? `${year}-${month}-${day}` : '';
+}
+
 export default function NovalogOperationsPage() {
   const { userProfile } = useFirebase();
   const [referenceMonthFilter, setReferenceMonthFilter] = useState('all');
@@ -171,14 +190,15 @@ export default function NovalogOperationsPage() {
     () =>
       entries.filter((entry) => {
         const entryReferenceMonth = entry.referenceMonth || entry.operationDate.slice(0, 7);
+        const entryCreationDate = getEntryCreationDate(entry);
         return (
           (referenceMonthFilter === 'all' || entryReferenceMonth === referenceMonthFilter) &&
           (userFilter === 'all' || entry.createdByUserId === userFilter) &&
           matchesNovalogDisplayIdRange(entry.displayId, searchTerm) &&
           (entry.ticketNumber ?? '').toLowerCase().includes(ticketFilter.toLowerCase()) &&
           (entry.fuelStationName ?? '').toLowerCase().includes(fuelStationFilter.toLowerCase()) &&
-          (!operationDateFromFilter || entry.operationDate >= operationDateFromFilter) &&
-          (!operationDateToFilter || entry.operationDate <= operationDateToFilter)
+          (!operationDateFromFilter || entryCreationDate >= operationDateFromFilter) &&
+          (!operationDateToFilter || entryCreationDate <= operationDateToFilter)
         );
       }),
     [entries, fuelStationFilter, operationDateFromFilter, operationDateToFilter, referenceMonthFilter, searchTerm, ticketFilter, userFilter],
