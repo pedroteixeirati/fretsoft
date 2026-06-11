@@ -342,7 +342,7 @@ export function createMockFiscalProviderAdapter(): FiscalProviderAdapter {
           status_sefaz: '100',
           mensagem_sefaz: `Autorizado o uso do ${focusDocumentKind(request.document.document_type)} em mock local`,
           chave: accessKey,
-          protocolo,
+          protocolo: protocol,
           caminho_xml: `mock://fiscal/${reference}/${suffix}.xml`,
           caminho_dacte: request.document.document_type === 'mdfe' ? undefined : `mock://fiscal/${reference}/dacte.pdf`,
           caminho_damdfe: request.document.document_type === 'mdfe' ? `mock://fiscal/${reference}/damdfe.pdf` : undefined,
