@@ -74,6 +74,13 @@ test('integracao fiscal prepara provider e registra tentativas de emissao sem si
   assert.match(serviceSource, /createFiscalCommunicationLog/);
   assert.match(serviceSource, /updateFiscalDocumentAfterProviderAttempt/);
   assert.match(providerServiceSource, /process\.env\.FISCAL_PROVIDER/);
+  assert.match(providerServiceSource, /FOCUS_NFE_TOKEN/);
+  assert.match(providerServiceSource, /FOCUS_NFE_BASE_URL/);
+  assert.match(providerServiceSource, /https:\/\/homologacao\.focusnfe\.com\.br\/v2/);
+  assert.match(providerServiceSource, /Authorization: focusAuthHeader\(token\)/);
+  assert.match(providerServiceSource, /\/\$\{endpoint\}\?ref=\$\{encodeURIComponent\(reference\)\}/);
+  assert.match(providerServiceSource, /createFocusNfeProviderAdapter/);
+  assert.match(providerServiceSource, /focusProviderAliases\.has\(providerName\)/);
   assert.match(providerServiceSource, /throw fiscalErrors\.providerNotConfigured\(\)/);
   assert.match(repositorySource, /insert into fiscal_communication_logs/i);
   assert.match(repositorySource, /update fiscal_documents[\s\S]*provider_document_id = coalesce/i);
