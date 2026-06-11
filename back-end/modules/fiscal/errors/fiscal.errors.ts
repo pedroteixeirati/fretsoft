@@ -1,4 +1,4 @@
-import { conflictError, validationError } from '../../../shared/errors/app-error';
+import { AppError, conflictError, validationError } from '../../../shared/errors/app-error';
 
 export const fiscalErrors = {
   invalidDocumentType: () => validationError('Tipo de documento fiscal invalido.', 'invalid_fiscal_document_type', 'documentType'),
@@ -16,4 +16,6 @@ export const fiscalErrors = {
   invalidPartyState: () => validationError('UF da parte fiscal invalida.', 'invalid_fiscal_party_state', 'parties'),
   duplicatedDocument: () => conflictError('Ja existe um documento fiscal com este tipo, serie e numero.', 'duplicated_fiscal_document', 'number'),
   duplicatedAccessKey: () => conflictError('Ja existe um documento fiscal com esta chave de acesso.', 'duplicated_fiscal_access_key', 'accessKey'),
+  documentNotEmittable: () => conflictError('Apenas documentos em rascunho, rejeitados ou com erro podem ser enviados para emissao.', 'fiscal_document_not_emittable', 'status'),
+  providerNotConfigured: () => new AppError('Nenhum provider fiscal foi configurado para emissao automatica.', { statusCode: 503, code: 'fiscal_provider_not_configured' }),
 };

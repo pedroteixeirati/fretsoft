@@ -19,14 +19,21 @@ import type {
 import { fiscalErrors } from '../errors/fiscal.errors';
 import {
   createTenantFiscalDocument,
+  createFiscalCommunicationLog,
   deleteTenantFiscalDocument,
   findFiscalDocumentByAccessKey,
   findFiscalDocumentDuplicate,
   findTenantFiscalDocument,
   listFiscalDocumentParties,
   listTenantFiscalDocuments as listTenantFiscalDocumentRows,
+  updateFiscalDocumentAfterProviderAttempt,
   updateTenantFiscalDocument,
 } from '../repositories/fiscal-documents.repository';
+import {
+  buildFiscalProviderRequest,
+  getFiscalProviderAdapter,
+  serializeFiscalProviderRequest,
+} from './fiscal-provider.service';
 
 const documentTypes: FiscalDocumentType[] = ['cte', 'cte_os', 'mdfe'];
 const statuses: FiscalDocumentStatus[] = ['draft', 'processing', 'authorized', 'rejected', 'canceled', 'denied', 'inutilized', 'error'];
@@ -203,4 +210,65 @@ export async function updateFiscalDocument(id: string, tenantId: string | undefi
 export async function removeFiscalDocument(id: string, tenantId?: string) {
   const deleted = await deleteTenantFiscalDocument(id, tenantId);
   return !!deleted;
+}
+
+export async function emitFiscalDocument(id: string, tenantId: string | undefined, userId: string | undefined) {
+  const document = await findTenantFiscalDocument(id, tenantId);
+  if (!document) return null;
+  if (!['draft', 'rejected', 'error'].includes(document.status)) {
+    throw fiscalErrors.documentNotEmittable();
+  }
+
+  const parties = await listFiscalDocumentParties(id, tenantId);
+  const request = buildFiscalProviderRequest(document, parties);
+  const requestPayload = serializeFiscalProviderRequest(request);
+  const startedAt = Date.now();
+  let providerName = document.provider || 'unconfigured';
+
+  try {
+    const provider = getFiscalProviderAdapter();
+    providerName = provider.name;
+    const response = await provider.emitDocument(request);
+    const durationMs = Date.now() - startedAt;
+
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: request.operation,
+      requestPayload,
+      responsePayload: response.responsePayload || {},
+      httpStatus: response.httpStatus || null,
+      durationMs,
+    });
+
+    await updateFiscalDocumentAfterProviderAttempt({
+      id,
+      tenantId,
+      userId,
+      provider: providerName,
+      providerDocumentId: response.providerDocumentId,
+      status: response.status,
+      accessKey: response.accessKey,
+      protocol: response.protocol,
+      authorizedAt: response.authorizedAt,
+      xml: response.xml,
+      dacteUrl: response.dacteUrl,
+    });
+
+    return getFiscalDocument(id, tenantId);
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: request.operation,
+      requestPayload,
+      responsePayload: {},
+      errorMessage: error instanceof Error ? error.message : 'Falha desconhecida na emissao fiscal.',
+      durationMs,
+    });
+    throw error;
+  }
 }

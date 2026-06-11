@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FileCheck2, FilePlus2, Pencil, Search, Trash2 } from 'lucide-react';
+import { FileCheck2, FilePlus2, Pencil, Search, Send, Trash2 } from 'lucide-react';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { getErrorMessage } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
@@ -63,7 +63,7 @@ export default function FiscalDocumentsPage() {
   const canUpdate = canAccess(userProfile, 'fiscal', 'update');
   const canDelete = canAccess(userProfile, 'fiscal', 'delete');
   const { documents, isLoading, error } = useFiscalDocumentsQuery(Boolean(user));
-  const { createDocument, updateDocument, deleteDocument, isSubmitting } = useFiscalDocumentMutations();
+  const { createDocument, updateDocument, emitDocument, deleteDocument, isSubmitting } = useFiscalDocumentMutations();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FiscalDocumentStatus>('all');
@@ -183,6 +183,17 @@ export default function FiscalDocumentsPage() {
     }
   };
 
+  const handleEmit = async (document: FiscalDocument) => {
+    try {
+      setSubmitError('');
+      setSuccessMessage('');
+      await emitDocument.mutateAsync(document.id);
+      setSuccessMessage(`${documentLabel(document)} enviado para emissao fiscal.`);
+    } catch (emitError) {
+      setSubmitError(getErrorMessage(emitError, 'Nao foi possivel enviar o documento fiscal para emissao.'));
+    }
+  };
+
   const columns: Array<DataTableColumn<FiscalDocument>> = [
     { id: 'document', header: 'Documento', cell: (document) => <span className="text-sm font-bold text-on-surface">{documentLabel(document)}</span> },
     { id: 'issueDate', header: 'Emissao', cell: (document) => <span className="text-sm text-on-surface">{formatDate(document.issueDate)}</span> },
@@ -196,6 +207,17 @@ export default function FiscalDocumentsPage() {
       className: 'text-right',
       cell: (document) => (
         <div className="flex justify-end gap-2">
+          {canUpdate && ['draft', 'rejected', 'error'].includes(document.status) ? (
+            <button
+              type="button"
+              aria-label={`Emitir ${documentLabel(document)}`}
+              onClick={() => handleEmit(document)}
+              disabled={emitDocument.isPending}
+              className="rounded-full p-2 text-primary hover:bg-primary/10 disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          ) : null}
           {canUpdate ? (
             <button type="button" aria-label={`Editar ${documentLabel(document)}`} onClick={() => openEdit(document)} className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container">
               <Pencil className="h-4 w-4" />

@@ -22,10 +22,16 @@ export function useFiscalDocumentMutations() {
     onSuccess: invalidate,
   });
 
+  const emitDocument = useMutation({
+    mutationFn: (id: string) => fiscalApi.emitDocument(id),
+    onSuccess: invalidate,
+  });
+
   return {
     createDocument,
     updateDocument,
+    emitDocument,
     deleteDocument,
-    isSubmitting: createDocument.isPending || updateDocument.isPending || deleteDocument.isPending,
+    isSubmitting: createDocument.isPending || updateDocument.isPending || emitDocument.isPending || deleteDocument.isPending,
   };
 }

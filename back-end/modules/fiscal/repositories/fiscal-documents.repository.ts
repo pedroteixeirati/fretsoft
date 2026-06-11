@@ -1,5 +1,10 @@
+import type { PoolClient } from 'pg';
 import { pool } from '../../../shared/infra/database/pool';
 import type { FiscalDocumentPayload, FiscalDocumentRow, FiscalPartyPayload, FiscalPartyRow } from '../dtos/fiscal-document.types';
+
+function db(client?: PoolClient) {
+  return client || pool;
+}
 
 function selectDocumentColumns() {
   return `id,
@@ -288,6 +293,93 @@ export async function deleteTenantFiscalDocument(id: string, tenantId?: string) 
        and status in ('draft', 'rejected', 'error')
      returning id`,
     [id, tenantId]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function updateFiscalDocumentAfterProviderAttempt(params: {
+  id: string;
+  tenantId?: string;
+  userId?: string;
+  provider: string;
+  providerDocumentId?: string | null;
+  status: FiscalDocumentRow['status'];
+  accessKey?: string | null;
+  protocol?: string | null;
+  authorizedAt?: string | null;
+  xml?: string | null;
+  dacteUrl?: string | null;
+}) {
+  const result = await pool.query<FiscalDocumentRow>(
+    `update fiscal_documents
+     set provider = $1,
+         provider_document_id = coalesce($2, provider_document_id),
+         status = $3,
+         access_key = coalesce($4, access_key),
+         protocol = coalesce($5, protocol),
+         authorized_at = coalesce($6, authorized_at),
+         xml = coalesce($7, xml),
+         dacte_url = coalesce($8, dacte_url),
+         updated_by_user_id = $9,
+         updated_at = now()
+     where id = $10
+       and tenant_id = $11
+     returning ${selectDocumentColumns()}`,
+    [
+      params.provider,
+      params.providerDocumentId || null,
+      params.status,
+      params.accessKey || null,
+      params.protocol || null,
+      params.authorizedAt || null,
+      params.xml || null,
+      params.dacteUrl || null,
+      params.userId || null,
+      params.id,
+      params.tenantId,
+    ],
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function createFiscalCommunicationLog(params: {
+  tenantId?: string;
+  fiscalDocumentId?: string | null;
+  provider: string;
+  operation: string;
+  requestPayload?: Record<string, unknown>;
+  responsePayload?: Record<string, unknown>;
+  httpStatus?: number | null;
+  errorMessage?: string | null;
+  durationMs?: number | null;
+}) {
+  const result = await pool.query<{ id: string }>(
+    `insert into fiscal_communication_logs (
+       tenant_id,
+       fiscal_document_id,
+       provider,
+       operation,
+       request_payload,
+       response_payload,
+       http_status,
+       error_message,
+       duration_ms
+     )
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     returning id`,
+    [
+      params.tenantId,
+      params.fiscalDocumentId || null,
+      params.provider,
+      params.operation,
+      params.requestPayload || {},
+      params.responsePayload || {},
+      params.httpStatus || null,
+      params.errorMessage || null,
+      params.durationMs || null,
+    ],
   );
 
   return result.rows[0] || null;

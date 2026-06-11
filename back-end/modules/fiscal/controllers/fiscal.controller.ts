@@ -8,7 +8,7 @@ import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { fiscalPermissions } from '../fiscal.resource';
 import type { FiscalDocumentInput } from '../dtos/fiscal-document.types';
 import { serializeFiscalDocument, serializeFiscalDocuments } from '../serializers/fiscal-documents.serializer';
-import { createFiscalDocument, getFiscalDocument, listTenantFiscalDocuments, removeFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
+import { createFiscalDocument, emitFiscalDocument, getFiscalDocument, listTenantFiscalDocuments, removeFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
 
 const router = express.Router();
 
@@ -49,6 +49,24 @@ router.post('/fiscal/documents', loadAuthContext, async (req: AuthenticatedReque
     }
 
     res.status(201).json(serializeFiscalDocument(await createFiscalDocument(req.auth?.tenantId, req.auth?.userId, req.body as FiscalDocumentInput) || {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/fiscal/documents/:id/emit', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para emitir documentos fiscais.')) {
+      return;
+    }
+
+    const document = await emitFiscalDocument(req.params.id, req.auth?.tenantId, req.auth?.userId);
+    if (!document) {
+      sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
+      return;
+    }
+
+    res.json(serializeFiscalDocument(document));
   } catch (error) {
     next(error);
   }

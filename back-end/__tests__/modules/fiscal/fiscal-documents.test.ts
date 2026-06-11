@@ -5,8 +5,13 @@ import { resolve } from 'node:path';
 
 const migrationSource = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713412800000_fiscal_documents.sql'), 'utf8');
 const novalogLinkMigrationSource = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713416400000_fiscal_novalog_revenue_links.sql'), 'utf8');
+const controllerSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/controllers/fiscal.controller.ts'), 'utf8');
 const serviceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/services/fiscal-documents.service.ts'), 'utf8');
+const providerServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/services/fiscal-provider.service.ts'), 'utf8');
 const repositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/repositories/fiscal-documents.repository.ts'), 'utf8');
+const fiscalApiSource = readFileSync(resolve(process.cwd(), 'front-end/src/features/fiscal/services/fiscal.api.ts'), 'utf8');
+const fiscalHookSource = readFileSync(resolve(process.cwd(), 'front-end/src/features/fiscal/hooks/useFiscalDocumentMutations.ts'), 'utf8');
+const fiscalPageSource = readFileSync(resolve(process.cwd(), 'front-end/src/features/fiscal/pages/FiscalDocumentsPage.tsx'), 'utf8');
 
 test('migration cria documentos fiscais como modulo generico multi-tenant', () => {
   assert.match(migrationSource, /create table if not exists fiscal_documents/i);
@@ -59,4 +64,20 @@ test('vinculo fiscal conecta CT-e Novalog e recebiveis sem duplicar documento', 
   assert.match(repositorySource, /export async function upsertFiscalDocumentFromNovalogBillingItem/);
   assert.match(repositorySource, /on conflict \(tenant_id, document_type, series, number\) where status <> 'canceled' do update/i);
   assert.match(repositorySource, /normalizedAccessKey \? 'authorized' : 'draft'/);
+});
+
+test('integracao fiscal prepara provider e registra tentativas de emissao sem simular autorizacao', () => {
+  assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/emit'/);
+  assert.match(controllerSource, /emitFiscalDocument\(req\.params\.id, req\.auth\?\.tenantId, req\.auth\?\.userId\)/);
+  assert.match(serviceSource, /export async function emitFiscalDocument/);
+  assert.match(serviceSource, /\['draft', 'rejected', 'error'\]\.includes\(document\.status\)/);
+  assert.match(serviceSource, /createFiscalCommunicationLog/);
+  assert.match(serviceSource, /updateFiscalDocumentAfterProviderAttempt/);
+  assert.match(providerServiceSource, /process\.env\.FISCAL_PROVIDER/);
+  assert.match(providerServiceSource, /throw fiscalErrors\.providerNotConfigured\(\)/);
+  assert.match(repositorySource, /insert into fiscal_communication_logs/i);
+  assert.match(repositorySource, /update fiscal_documents[\s\S]*provider_document_id = coalesce/i);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/emit/);
+  assert.match(fiscalHookSource, /emitDocument/);
+  assert.match(fiscalPageSource, /aria-label=\{`Emitir \$\{documentLabel\(document\)\}`\}/);
 });

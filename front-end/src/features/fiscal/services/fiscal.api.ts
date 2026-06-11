@@ -7,5 +7,6 @@ export const fiscalApi = {
   getDocument: (id: string) => apiRequest<FiscalDocument>(`/api/fiscal/documents/${id}`, {}, OperationType.GET),
   createDocument: (payload: FiscalDocumentDraft) => apiRequest<FiscalDocument>('/api/fiscal/documents', { method: 'POST', body: JSON.stringify(payload) }, OperationType.CREATE),
   updateDocument: (id: string, payload: FiscalDocumentDraft) => apiRequest<FiscalDocument>(`/api/fiscal/documents/${id}`, { method: 'PUT', body: JSON.stringify(payload) }, OperationType.UPDATE),
+  emitDocument: (id: string) => apiRequest<FiscalDocument>(`/api/fiscal/documents/${id}/emit`, { method: 'POST' }, OperationType.UPDATE),
   removeDocument: (id: string) => apiRequest<void>(`/api/fiscal/documents/${id}`, { method: 'DELETE' }, OperationType.DELETE),
 };
