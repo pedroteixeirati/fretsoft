@@ -292,3 +292,76 @@ export async function deleteTenantFiscalDocument(id: string, tenantId?: string) 
 
   return result.rows[0] || null;
 }
+
+export async function upsertFiscalDocumentFromNovalogBillingItem(params: {
+  tenantId: string;
+  userId?: string | null;
+  series: string;
+  number: string;
+  accessKey?: string | null;
+  issueDate: string;
+  dueDate?: string | null;
+  amount: number;
+  originName?: string | null;
+  destinationName?: string | null;
+  takerName?: string | null;
+  notes?: string | null;
+}, client?: PoolClient) {
+  const accessKey = (params.accessKey || '').replace(/\D/g, '');
+  const normalizedAccessKey = accessKey.length === 44 ? accessKey : null;
+  const result = await db(client).query<{ id: string }>(
+    `insert into fiscal_documents (
+       tenant_id,
+       document_type,
+       model,
+       series,
+       number,
+       access_key,
+       status,
+       issue_date,
+       due_date,
+       amount,
+       origin_name,
+       destination_name,
+       taker_name,
+       notes,
+       created_by_user_id,
+       updated_by_user_id
+     )
+     values ($1, 'cte', '57', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
+     on conflict (tenant_id, document_type, series, number) where status <> 'canceled' do update set
+       access_key = coalesce(excluded.access_key, fiscal_documents.access_key),
+       status = case
+         when fiscal_documents.status in ('canceled', 'denied', 'inutilized') then fiscal_documents.status
+         when excluded.access_key is not null then 'authorized'
+         else fiscal_documents.status
+       end,
+       issue_date = excluded.issue_date,
+       due_date = excluded.due_date,
+       amount = excluded.amount,
+       origin_name = excluded.origin_name,
+       destination_name = excluded.destination_name,
+       taker_name = excluded.taker_name,
+       notes = excluded.notes,
+       updated_by_user_id = excluded.updated_by_user_id,
+       updated_at = now()
+     returning id`,
+    [
+      params.tenantId,
+      params.series,
+      params.number,
+      normalizedAccessKey,
+      normalizedAccessKey ? 'authorized' : 'draft',
+      params.issueDate,
+      params.dueDate || null,
+      params.amount,
+      params.originName || null,
+      params.destinationName || null,
+      params.takerName || null,
+      params.notes || null,
+      params.userId || null,
+    ],
+  );
+
+  return result.rows[0]?.id || null;
+}

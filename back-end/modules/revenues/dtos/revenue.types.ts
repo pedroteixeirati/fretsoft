@@ -10,6 +10,7 @@ export type RevenueRow = {
   freight_id: string | null;
   novalog_billing_id: string | null;
   novalog_billing_item_id: string | null;
+  fiscal_document_id: string | null;
   competence_month: number;
   competence_year: number;
   competence_label: string;
@@ -87,6 +88,7 @@ export function mapRevenue(row: RevenueRow) {
     freightId: row.freight_id || undefined,
     novalogBillingId: row.novalog_billing_id || undefined,
     novalogBillingItemId: row.novalog_billing_item_id || undefined,
+    fiscalDocumentId: row.fiscal_document_id || undefined,
     competenceMonth: row.competence_month,
     competenceYear: row.competence_year,
     competenceLabel: row.competence_label,
