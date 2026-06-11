@@ -39,6 +39,24 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('MDF-e: dados estruturados, agregacao de CT-es e encerramento', () => {
+  const mdfeMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713441600000_mdfe_data.sql'), 'utf8');
+  assert.match(mdfeMigration, /add column if not exists mdfe_data jsonb/i);
+
+  assert.match(serviceSource, /function normalizeMdfeData/);
+  assert.match(serviceSource, /export async function closeMdfeDocument/);
+  assert.match(serviceSource, /document\.document_type !== 'mdfe' \|\| document\.status !== 'authorized' \|\| mdfe\.encerrado === true/);
+  assert.match(serviceSource, /setFiscalDocumentMdfeData/);
+
+  assert.match(providerServiceSource, /closeDocument\(request: FiscalProviderRequest\)/);
+  assert.match(providerServiceSource, /\/mdfe\/\$\{encodeURIComponent\(reference\)\}\/encerramento/);
+  assert.match(providerServiceSource, /veiculo_tracao: veiculoTracao/);
+  assert.match(providerServiceSource, /chave_cte: String\(chave\)/);
+
+  assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/close'/);
+  assert.match(controllerSource, /closeMdfeDocument\(req\.params\.id/);
+});
+
 test('tomador derivado de tomadorTipo e cliente do contrato pre-preenche destinatario', () => {
   assert.match(providerServiceSource, /const tomadorCodes: Record<string, string> = \{ remetente: '0'/);
   assert.match(providerServiceSource, /tomador: tomadorCode \?\? document\.tax_data\?\.tomador/);

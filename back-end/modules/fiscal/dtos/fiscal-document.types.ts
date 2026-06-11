@@ -4,6 +4,25 @@ export type FiscalPartyRole = 'taker' | 'sender' | 'recipient' | 'dispatcher' | 
 export type FiscalExecutionMode = 'own_fleet' | 'third_party';
 export type FiscalPaymentComponent = '01' | '02' | '03' | '04';
 
+export interface FiscalMdfeData {
+  vehiclePlate?: string;
+  vehicleRenavam?: string;
+  vehicleUf?: string;
+  vehicleTara?: number;
+  condutorNome?: string;
+  condutorCpf?: string;
+  ufInicio?: string;
+  ufFim?: string;
+  percurso?: string[];
+  cteKeys?: string[];
+  municipioFimIbge?: string;
+  pesoTotal?: number;
+  valorTotal?: number;
+  produtoPredominante?: string;
+  encerrado?: boolean;
+  encerradoEm?: string;
+}
+
 export interface FiscalPaymentInput {
   payeeName?: string | null;
   payeeDocument?: string | null;
@@ -100,6 +119,7 @@ export interface FiscalDocumentInput {
   rntrc?: string | null;
   transportPartnerId?: string | null;
   cteData?: FiscalCteData | null;
+  mdfeData?: FiscalMdfeData | null;
   payments?: FiscalPaymentInput[] | null;
   parties?: FiscalPartyInput[] | null;
 }
@@ -147,6 +167,7 @@ export interface FiscalDocumentPayload {
   ciot: string;
   rntrc: string;
   cteData: FiscalCteData;
+  mdfeData: FiscalMdfeData;
   payments: FiscalPaymentPayload[];
   parties: FiscalPartyPayload[];
 }
@@ -181,6 +202,7 @@ export interface FiscalDocumentRow {
   ciot: string | null;
   rntrc: string | null;
   cte_data: FiscalCteData | null;
+  mdfe_data: FiscalMdfeData | null;
   created_at: string;
   updated_at: string;
 }

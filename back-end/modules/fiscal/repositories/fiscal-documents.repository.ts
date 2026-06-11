@@ -36,6 +36,7 @@ function selectDocumentColumns() {
           ciot,
           rntrc,
           cte_data,
+          mdfe_data,
           created_at,
           updated_at`;
 }
@@ -337,10 +338,11 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
        ciot,
        rntrc,
        cte_data,
+       mdfe_data,
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $29)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $30)
      returning ${selectDocumentColumns()}`,
     [
       tenantId,
@@ -371,6 +373,7 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
       payload.ciot || null,
       payload.rntrc || null,
       payload.cteData || {},
+      payload.mdfeData || {},
       userId,
     ]
   );
@@ -414,10 +417,11 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
          ciot = $25,
          rntrc = $26,
          cte_data = $27,
-         updated_by_user_id = $28,
+         mdfe_data = $28,
+         updated_by_user_id = $29,
          updated_at = now()
-     where id = $29
-       and tenant_id = $30
+     where id = $30
+       and tenant_id = $31
      returning ${selectDocumentColumns()}`,
     [
       payload.documentType,
@@ -447,6 +451,7 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
       payload.ciot || null,
       payload.rntrc || null,
       payload.cteData || {},
+      payload.mdfeData || {},
       userId,
       id,
       tenantId,
@@ -516,6 +521,21 @@ export async function updateFiscalDocumentAfterProviderAttempt(params: {
       params.id,
       params.tenantId,
     ],
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function setFiscalDocumentMdfeData(id: string, tenantId: string | undefined, mdfeData: Record<string, unknown>, userId?: string) {
+  const result = await pool.query<FiscalDocumentRow>(
+    `update fiscal_documents
+     set mdfe_data = $1,
+         updated_by_user_id = $2,
+         updated_at = now()
+     where id = $3
+       and tenant_id = $4
+     returning ${selectDocumentColumns()}`,
+    [mdfeData, userId || null, id, tenantId]
   );
 
   return result.rows[0] || null;

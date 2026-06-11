@@ -10,5 +10,6 @@ export const fiscalApi = {
   updateDocument: (id: string, payload: FiscalDocumentDraft) => apiRequest<FiscalDocument>(`/api/fiscal/documents/${id}`, { method: 'PUT', body: JSON.stringify(payload) }, OperationType.UPDATE),
   emitDocument: (id: string) => apiRequest<FiscalDocument>(`/api/fiscal/documents/${id}/emit`, { method: 'POST' }, OperationType.UPDATE),
   syncDocument: (id: string) => apiRequest<FiscalDocument>(`/api/fiscal/documents/${id}/sync`, { method: 'POST' }, OperationType.UPDATE),
+  closeDocument: (id: string) => apiRequest<FiscalDocument>(`/api/fiscal/documents/${id}/close`, { method: 'POST' }, OperationType.UPDATE),
   removeDocument: (id: string) => apiRequest<void>(`/api/fiscal/documents/${id}`, { method: 'DELETE' }, OperationType.DELETE),
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileCheck2, FilePlus2, Lock, Pencil, RefreshCw, Search, Send, Trash2, Upload } from 'lucide-react';
+import { FileCheck2, FilePlus2, Flag, Lock, Pencil, RefreshCw, Search, Send, Trash2, Upload } from 'lucide-react';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { getErrorMessage } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
@@ -11,7 +11,7 @@ import { DEFAULT_ICMS_CST, suggestCfop } from '../utils/cfop';
 import { parseNfeXml } from '../utils/nfe-import';
 import { useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
-import type { FiscalCteData, FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalExecutionMode, FiscalParty, FiscalPayment } from '../types/fiscal.types';
+import type { FiscalCteData, FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalExecutionMode, FiscalMdfeData, FiscalParty, FiscalPayment } from '../types/fiscal.types';
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -54,6 +54,7 @@ const emptyDraft: FiscalDocumentDraft = {
   ciot: '',
   rntrc: '',
   cteData: {},
+  mdfeData: {},
   parties: [],
   payments: [],
 };
@@ -81,7 +82,7 @@ export default function FiscalDocumentsPage() {
   const canDelete = canAccess(userProfile, 'fiscal', 'delete');
   const canUseTac = canUseFiscalThirdParty(userProfile);
   const { documents, isLoading, error } = useFiscalDocumentsQuery(Boolean(user));
-  const { createDocument, updateDocument, emitDocument, syncDocument, deleteDocument, isSubmitting } = useFiscalDocumentMutations();
+  const { createDocument, updateDocument, emitDocument, syncDocument, closeDocument, deleteDocument, isSubmitting } = useFiscalDocumentMutations();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FiscalDocumentStatus>('all');
@@ -92,6 +93,7 @@ export default function FiscalDocumentsPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [warningMessages, setWarningMessages] = useState<string[]>([]);
   const [documentToDelete, setDocumentToDelete] = useState<FiscalDocument | null>(null);
+  const [documentToClose, setDocumentToClose] = useState<FiscalDocument | null>(null);
   const [nfeImportMsg, setNfeImportMsg] = useState('');
   const [nfeImportError, setNfeImportError] = useState('');
   const nfeInputRef = useRef<HTMLInputElement | null>(null);
@@ -160,6 +162,7 @@ export default function FiscalDocumentsPage() {
       ciot: document.ciot || '',
       rntrc: document.rntrc || '',
       cteData: document.cteData || {},
+      mdfeData: document.mdfeData || {},
       parties: document.parties || [],
       payments: document.payments || [],
     });
@@ -217,6 +220,27 @@ export default function FiscalDocumentsPage() {
   };
 
   const isCte = draft.documentType !== 'mdfe';
+  const isMdfe = draft.documentType === 'mdfe';
+
+  const authorizedCtes = useMemo(
+    () => documents.filter((current) => current.documentType === 'cte' && current.status === 'authorized' && current.accessKey),
+    [documents],
+  );
+
+  const updateMdfeData = <K extends keyof FiscalMdfeData>(key: K, value: FiscalMdfeData[K]) => {
+    setDraft((current) => ({ ...current, mdfeData: { ...current.mdfeData, [key]: value } }));
+  };
+
+  const toggleCte = (document: FiscalDocument) => {
+    setDraft((current) => {
+      const keys = current.mdfeData.cteKeys || [];
+      const cteKeys = keys.includes(document.accessKey) ? keys.filter((key) => key !== document.accessKey) : [...keys, document.accessKey];
+      const valorTotal = authorizedCtes.filter((cte) => cteKeys.includes(cte.accessKey)).reduce((sum, cte) => sum + Number(cte.amount || 0), 0);
+      return { ...current, mdfeData: { ...current.mdfeData, cteKeys, valorTotal } };
+    });
+  };
+
+  const selectedCteKeys = draft.mdfeData.cteKeys || [];
 
   const handleNfeImport = (file?: File | null) => {
     if (!file) return;
@@ -349,6 +373,19 @@ export default function FiscalDocumentsPage() {
     }
   };
 
+  const confirmClose = async () => {
+    if (!documentToClose) return;
+    try {
+      setSubmitError('');
+      await closeDocument.mutateAsync(documentToClose.id);
+      setSuccessMessage('MDF-e encerrado com sucesso.');
+      setDocumentToClose(null);
+    } catch (closeError) {
+      setDocumentToClose(null);
+      setSubmitError(getErrorMessage(closeError, 'Nao foi possivel encerrar o MDF-e.'));
+    }
+  };
+
   const confirmDelete = async () => {
     if (!documentToDelete) return;
 
@@ -418,6 +455,17 @@ export default function FiscalDocumentsPage() {
               className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container disabled:opacity-50"
             >
               <RefreshCw className="h-4 w-4" />
+            </button>
+          ) : null}
+          {canUpdate && document.documentType === 'mdfe' && document.status === 'authorized' && !document.mdfeData?.encerrado ? (
+            <button
+              type="button"
+              aria-label={`Encerrar ${documentLabel(document)}`}
+              onClick={() => setDocumentToClose(document)}
+              disabled={closeDocument.isPending}
+              className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container disabled:opacity-50"
+            >
+              <Flag className="h-4 w-4" />
             </button>
           ) : null}
           {canUpdate ? (
@@ -610,6 +658,52 @@ export default function FiscalDocumentsPage() {
             </div>
           ) : null}
 
+          {isMdfe ? (
+            <div className="space-y-4">
+              <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container/40 p-4">
+                <p className="text-sm font-bold text-on-surface">Veiculo de tracao e condutor</p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Input label="Placa" value={draft.mdfeData.vehiclePlate || ''} onChange={(event) => updateMdfeData('vehiclePlate', event.target.value)} />
+                  <Input label="RENAVAM" value={draft.mdfeData.vehicleRenavam || ''} onChange={(event) => updateMdfeData('vehicleRenavam', event.target.value)} />
+                  <Input label="UF do veiculo" value={draft.mdfeData.vehicleUf || ''} onChange={(event) => updateMdfeData('vehicleUf', event.target.value)} maxLength={2} />
+                  <Input label="Tara (kg)" type="number" value={draft.mdfeData.vehicleTara ?? ''} onChange={(event) => updateMdfeData('vehicleTara', event.target.value === '' ? undefined : Number(event.target.value))} />
+                  <Input label="Condutor" value={draft.mdfeData.condutorNome || ''} onChange={(event) => updateMdfeData('condutorNome', event.target.value)} />
+                  <Input label="CPF do condutor" value={draft.mdfeData.condutorCpf || ''} onChange={(event) => updateMdfeData('condutorCpf', event.target.value)} />
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container/40 p-4">
+                <p className="text-sm font-bold text-on-surface">Percurso</p>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Input label="UF inicio" value={draft.mdfeData.ufInicio || ''} onChange={(event) => updateMdfeData('ufInicio', event.target.value)} maxLength={2} />
+                  <Input label="UF fim" value={draft.mdfeData.ufFim || ''} onChange={(event) => updateMdfeData('ufFim', event.target.value)} maxLength={2} />
+                  <Input label="UFs do percurso" value={(draft.mdfeData.percurso || []).join(', ')} onChange={(event) => updateMdfeData('percurso', event.target.value.split(/[\s,;]+/).map((uf) => uf.toUpperCase()).filter(Boolean))} placeholder="MG, SP" />
+                  <Input label="IBGE municipio fim (encerramento)" value={draft.mdfeData.municipioFimIbge || ''} onChange={(event) => updateMdfeData('municipioFimIbge', event.target.value)} placeholder="7 digitos" />
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-2xl border border-outline-variant bg-surface-container/40 p-4">
+                <p className="text-sm font-bold text-on-surface">CT-es da viagem <span className="font-normal text-on-surface-variant">(autorizados)</span></p>
+                {authorizedCtes.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant">Nenhum CT-e autorizado disponivel para agregar.</p>
+                ) : (
+                  authorizedCtes.map((cte) => (
+                    <label key={cte.id} className="flex items-center gap-3 border-t border-outline-variant/60 py-2 text-sm first:border-t-0">
+                      <input type="checkbox" checked={selectedCteKeys.includes(cte.accessKey)} onChange={() => toggleCte(cte)} />
+                      <span className="font-bold text-on-surface">CT-e {cte.series}/{cte.number}</span>
+                      <span className="flex-1 text-on-surface-variant">{[cte.originName, cte.destinationName].filter(Boolean).join(' -> ')}</span>
+                      <span className="font-bold text-primary">{currency.format(cte.amount)}</span>
+                    </label>
+                  ))
+                )}
+                <div className="mt-1 flex items-center gap-2 rounded-xl bg-info/5 px-3 py-2 text-sm text-info">
+                  <FileCheck2 className="h-4 w-4" />
+                  <span>{selectedCteKeys.length} CT-e(s) · {currency.format(Number(draft.mdfeData.valorTotal || 0))} somados para o manifesto.</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {canUseTac ? (
             <div className="space-y-4">
               <div className="md:w-1/2">
@@ -664,6 +758,17 @@ export default function FiscalDocumentsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={Boolean(documentToClose)}
+        tone="warning"
+        title="Encerrar MDF-e"
+        message={documentToClose ? `Encerrar ${documentLabel(documentToClose)}? O encerramento informa o fim da viagem a SEFAZ e nao pode ser desfeito.` : ''}
+        confirmLabel="Encerrar"
+        isLoading={closeDocument.isPending}
+        onConfirm={confirmClose}
+        onCancel={() => setDocumentToClose(null)}
+      />
 
       <ConfirmDialog
         isOpen={Boolean(documentToDelete)}

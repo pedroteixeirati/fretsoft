@@ -32,12 +32,18 @@ export function useFiscalDocumentMutations() {
     onSuccess: invalidate,
   });
 
+  const closeDocument = useMutation({
+    mutationFn: (id: string) => fiscalApi.closeDocument(id),
+    onSuccess: invalidate,
+  });
+
   return {
     createDocument,
     updateDocument,
     emitDocument,
     syncDocument,
+    closeDocument,
     deleteDocument,
-    isSubmitting: createDocument.isPending || updateDocument.isPending || emitDocument.isPending || syncDocument.isPending || deleteDocument.isPending,
+    isSubmitting: createDocument.isPending || updateDocument.isPending || emitDocument.isPending || syncDocument.isPending || closeDocument.isPending || deleteDocument.isPending,
   };
 }

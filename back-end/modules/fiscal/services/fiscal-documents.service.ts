@@ -17,6 +17,7 @@ import type {
   FiscalDocumentStatus,
   FiscalDocumentType,
   FiscalCteData,
+  FiscalMdfeData,
   FiscalExecutionMode,
   FiscalPartyInput,
   FiscalPartyPayload,
@@ -41,6 +42,7 @@ import {
   listFiscalDocumentParties,
   listFiscalDocumentPayments,
   listTenantFiscalDocuments as listTenantFiscalDocumentRows,
+  setFiscalDocumentMdfeData,
   updateFiscalDocumentAfterProviderAttempt,
   updateTenantFiscalDocument,
 } from '../repositories/fiscal-documents.repository';
@@ -194,6 +196,7 @@ function mapDocumentRow(row: FiscalDocumentRow, parties: FiscalPartyRow[] = [], 
     ciot: row.ciot || '',
     rntrc: row.rntrc || '',
     cteData: row.cte_data || {},
+    mdfeData: row.mdfe_data || {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     parties: parties.map(mapPartyRow),
@@ -247,6 +250,36 @@ function normalizeCteData(value: unknown): FiscalCteData {
     municipioInicioIbge: (normalizeOptionalText(data.municipioInicioIbge as string) || '').replace(/\D/g, '') || undefined,
     municipioFimIbge: (normalizeOptionalText(data.municipioFimIbge as string) || '').replace(/\D/g, '') || undefined,
     nfeKeys,
+  };
+}
+
+function normalizeMdfeData(value: unknown): FiscalMdfeData {
+  const data = (value && typeof value === 'object' && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
+  const toNumber = (input: unknown) => (input === undefined || input === null || input === '' ? undefined : Number(input));
+  const ufArray = Array.isArray(data.percurso)
+    ? (data.percurso as unknown[]).map((uf) => String(uf).trim().toUpperCase()).filter((uf) => /^[A-Z]{2}$/.test(uf))
+    : undefined;
+  const cteKeys = Array.isArray(data.cteKeys)
+    ? (data.cteKeys as unknown[]).map((key) => String(key).replace(/\D/g, '')).filter((key) => key.length === 44)
+    : undefined;
+
+  return {
+    vehiclePlate: (normalizeOptionalText(data.vehiclePlate as string) || '').toUpperCase() || undefined,
+    vehicleRenavam: (normalizeOptionalText(data.vehicleRenavam as string) || '').replace(/\D/g, '') || undefined,
+    vehicleUf: (normalizeOptionalText(data.vehicleUf as string) || '').toUpperCase() || undefined,
+    vehicleTara: toNumber(data.vehicleTara),
+    condutorNome: normalizeOptionalText(data.condutorNome as string) || undefined,
+    condutorCpf: (normalizeOptionalText(data.condutorCpf as string) || '').replace(/\D/g, '') || undefined,
+    ufInicio: (normalizeOptionalText(data.ufInicio as string) || '').toUpperCase() || undefined,
+    ufFim: (normalizeOptionalText(data.ufFim as string) || '').toUpperCase() || undefined,
+    percurso: ufArray,
+    cteKeys,
+    municipioFimIbge: (normalizeOptionalText(data.municipioFimIbge as string) || '').replace(/\D/g, '') || undefined,
+    pesoTotal: toNumber(data.pesoTotal),
+    valorTotal: toNumber(data.valorTotal),
+    produtoPredominante: normalizeOptionalText(data.produtoPredominante as string) || undefined,
+    encerrado: data.encerrado === true || undefined,
+    encerradoEm: normalizeOptionalText(data.encerradoEm as string) || undefined,
   };
 }
 
@@ -316,6 +349,7 @@ export async function validateFiscalDocumentPayload(body: FiscalDocumentInput): 
     ciot,
     rntrc,
     cteData: normalizeCteData(body.cteData),
+    mdfeData: normalizeMdfeData(body.mdfeData),
     payments,
     parties,
   };
@@ -574,6 +608,54 @@ export async function syncFiscalDocument(id: string, tenantId: string | undefine
       requestPayload,
       responsePayload: {},
       errorMessage: error instanceof Error ? error.message : 'Falha desconhecida ao consultar documento fiscal.',
+      durationMs,
+    });
+    throw error;
+  }
+}
+
+export async function closeMdfeDocument(id: string, tenantId: string | undefined, userId: string | undefined) {
+  const document = await findTenantFiscalDocument(id, tenantId);
+  if (!document) return null;
+  const mdfe = (document.mdfe_data || {}) as { encerrado?: boolean };
+  if (document.document_type !== 'mdfe' || document.status !== 'authorized' || mdfe.encerrado === true) {
+    throw fiscalErrors.mdfeNotClosable();
+  }
+
+  const request = buildFiscalProviderRequest(document, [], []);
+  const requestPayload = serializeFiscalProviderRequest({ ...request, operation: 'close_document' });
+  const startedAt = Date.now();
+  let providerName = document.provider || 'focus_nfe';
+
+  try {
+    const provider = getFiscalProviderAdapter();
+    providerName = provider.name;
+    const response = await provider.closeDocument({ ...request, operation: 'close_document' });
+    const durationMs = Date.now() - startedAt;
+
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'close_document',
+      requestPayload,
+      responsePayload: response.responsePayload || {},
+      httpStatus: response.httpStatus || null,
+      durationMs,
+    });
+
+    await setFiscalDocumentMdfeData(id, tenantId, { ...(document.mdfe_data || {}), encerrado: true, encerradoEm: new Date().toISOString() }, userId);
+    return getFiscalDocument(id, tenantId);
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'close_document',
+      requestPayload,
+      responsePayload: {},
+      errorMessage: error instanceof Error ? error.message : 'Falha desconhecida ao encerrar o MDF-e.',
       durationMs,
     });
     throw error;

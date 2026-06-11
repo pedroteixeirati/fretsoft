@@ -26,6 +26,7 @@ export const fiscalErrors = {
   duplicatedSourceFreight: () => conflictError('Ja existe um documento fiscal ativo para este frete.', 'duplicated_fiscal_source_freight', 'sourceFreightId'),
   documentNotEmittable: () => conflictError('Apenas documentos em rascunho, rejeitados ou com erro podem ser enviados para emissao.', 'fiscal_document_not_emittable', 'status'),
   documentNotEditable: () => conflictError('Documento fiscal autorizado ou em processamento nao pode ser editado.', 'fiscal_document_not_editable', 'status'),
+  mdfeNotClosable: () => conflictError('Apenas um MDF-e autorizado e ainda nao encerrado pode ser encerrado.', 'fiscal_mdfe_not_closable', 'status'),
   providerNotConfigured: () => new AppError('Nenhum provider fiscal foi configurado para emissao automatica.', { statusCode: 503, code: 'fiscal_provider_not_configured' }),
   providerTokenMissing: () => new AppError('Token da Focus NFe nao configurado.', { statusCode: 503, code: 'focus_nfe_token_missing' }),
   providerRequestFailed: (message: string, details?: Record<string, unknown>) => new AppError(message, { statusCode: 502, code: 'fiscal_provider_request_failed', details: details || null }),

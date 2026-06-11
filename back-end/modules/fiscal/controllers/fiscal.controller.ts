@@ -10,7 +10,7 @@ import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { fiscalPermissions } from '../fiscal.resource';
 import type { FiscalDocumentInput } from '../dtos/fiscal-document.types';
 import { serializeFiscalDocument, serializeFiscalDocuments } from '../serializers/fiscal-documents.serializer';
-import { buildFiscalDraftFromFreight, createFiscalDocument, emitFiscalDocument, getFiscalDocument, listTenantFiscalDocuments, removeFiscalDocument, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
+import { buildFiscalDraftFromFreight, closeMdfeDocument, createFiscalDocument, emitFiscalDocument, getFiscalDocument, listTenantFiscalDocuments, removeFiscalDocument, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
 
 const router = express.Router();
 
@@ -106,6 +106,24 @@ router.post('/fiscal/documents/:id/sync', loadAuthContext, requireFiscalFeature,
     }
 
     const document = await syncFiscalDocument(req.params.id, req.auth?.tenantId, req.auth?.userId);
+    if (!document) {
+      sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
+      return;
+    }
+
+    res.json(serializeFiscalDocument(document));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/fiscal/documents/:id/close', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para encerrar documentos fiscais.')) {
+      return;
+    }
+
+    const document = await closeMdfeDocument(req.params.id, req.auth?.tenantId, req.auth?.userId);
     if (!document) {
       sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
       return;

@@ -1,7 +1,7 @@
 import type { FiscalDocumentRow, FiscalPartyRow, FiscalPaymentRow } from '../dtos/fiscal-document.types';
 import { fiscalErrors } from '../errors/fiscal.errors';
 
-export type FiscalProviderOperation = 'emit_document' | 'consult_document';
+export type FiscalProviderOperation = 'emit_document' | 'consult_document' | 'close_document';
 
 export interface FiscalProviderRequest {
   operation: FiscalProviderOperation;
@@ -41,6 +41,7 @@ export interface FiscalProviderAdapter {
   name: string;
   emitDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
   consultDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
+  closeDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
 }
 
 const focusProviderAliases = new Set(['focus', 'focus_nfe', 'focusnfe']);
@@ -198,7 +199,21 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
 function mapFocusMdfePayload(request: FiscalProviderRequest) {
   const document = request.document;
   const taxData = document.tax_data || {};
+  const mdfe = (document.mdfe_data || {}) as Record<string, unknown>;
   const emitter = document.emitter_snapshot || {};
+
+  const veiculoTracao = (mdfe.vehiclePlate || mdfe.vehicleRenavam)
+    ? onlyDefinedEntries({
+        placa: mdfe.vehiclePlate,
+        RENAVAM: mdfe.vehicleRenavam,
+        uf: mdfe.vehicleUf,
+        tara: mdfe.vehicleTara,
+        condutores: mdfe.condutorNome ? [onlyDefinedEntries({ nome: mdfe.condutorNome, cpf: mdfe.condutorCpf })] : undefined,
+      })
+    : taxData.veiculo_tracao;
+  const ctes = Array.isArray(mdfe.cteKeys) && (mdfe.cteKeys as unknown[]).length
+    ? (mdfe.cteKeys as unknown[]).map((chave) => ({ chave_cte: String(chave) }))
+    : taxData.ctes;
 
   return onlyDefinedEntries({
     ...emitter,
@@ -206,14 +221,17 @@ function mapFocusMdfePayload(request: FiscalProviderRequest) {
     data_emissao: document.issue_date,
     modal: taxData.modal || '1',
     tipo_emitente: taxData.tipo_emitente || '1',
-    uf_inicio: taxData.uf_inicio,
-    uf_fim: taxData.uf_fim,
-    veiculo_tracao: taxData.veiculo_tracao,
-    percurso: taxData.percurso,
+    uf_inicio: mdfe.ufInicio || taxData.uf_inicio,
+    uf_fim: mdfe.ufFim || taxData.uf_fim,
+    veiculo_tracao: veiculoTracao,
+    percurso: mdfe.percurso || taxData.percurso,
     municipios_carregamento: taxData.municipios_carregamento,
     municipios_descarregamento: taxData.municipios_descarregamento,
-    ctes: taxData.ctes,
+    ctes,
     nfes: taxData.nfes,
+    valor_total: mdfe.valorTotal ?? taxData.valor_total,
+    peso_bruto_total: mdfe.pesoTotal ?? taxData.peso_bruto_total,
+    produto_predominante: mdfe.produtoPredominante || taxData.produto_predominante,
     ciot: document.ciot || taxData.ciot || undefined,
     rntrc: document.rntrc || taxData.rntrc || undefined,
     infPag: buildInfPag(request.payments) || taxData.infPag,
@@ -347,6 +365,42 @@ export function createFocusNfeProviderAdapter(): FiscalProviderAdapter {
         clearTimeout(timeout);
       }
     },
+    async closeDocument(request) {
+      const token = focusTokenFromEnv();
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      const mdfe = request.document.mdfe_data || {};
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const response = await fetch(`${focusBaseUrlFromEnv()}/mdfe/${encodeURIComponent(reference)}/encerramento`, {
+          method: 'POST',
+          headers: {
+            Authorization: focusAuthHeader(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(onlyDefinedEntries({
+            data_encerramento: new Date().toISOString().slice(0, 10),
+            uf: mdfe.ufFim,
+            codigo_municipio: mdfe.municipioFimIbge,
+          })),
+          signal: controller.signal,
+        });
+        const responsePayload = await readJsonResponse(response);
+
+        if (!response.ok) {
+          throw fiscalErrors.providerRequestFailed('Falha ao encerrar o MDF-e na Focus NFe.', {
+            provider: 'focus_nfe',
+            httpStatus: response.status,
+            response: responsePayload,
+          });
+        }
+
+        return { status: 'authorized', provider: 'focus_nfe', responsePayload, httpStatus: response.status };
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
   };
 }
 
@@ -392,6 +446,20 @@ export function createMockFiscalProviderAdapter(): FiscalProviderAdapter {
           caminho_xml: `mock://fiscal/${reference}/${suffix}.xml`,
           caminho_dacte: request.document.document_type === 'mdfe' ? undefined : `mock://fiscal/${reference}/dacte.pdf`,
           caminho_damdfe: request.document.document_type === 'mdfe' ? `mock://fiscal/${reference}/damdfe.pdf` : undefined,
+        },
+        httpStatus: 200,
+      };
+    },
+    async closeDocument(request) {
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      return {
+        status: 'authorized',
+        provider: 'mock_fiscal',
+        providerDocumentId: reference,
+        responsePayload: {
+          ref: reference,
+          status: 'encerrado',
+          mensagem: 'MDF-e encerrado em mock local.',
         },
         httpStatus: 200,
       };

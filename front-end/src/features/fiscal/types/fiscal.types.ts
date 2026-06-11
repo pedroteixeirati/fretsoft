@@ -19,6 +19,25 @@ export interface FiscalParty {
   cityIbgeCode: string;
 }
 
+export interface FiscalMdfeData {
+  vehiclePlate?: string;
+  vehicleRenavam?: string;
+  vehicleUf?: string;
+  vehicleTara?: number;
+  condutorNome?: string;
+  condutorCpf?: string;
+  ufInicio?: string;
+  ufFim?: string;
+  percurso?: string[];
+  cteKeys?: string[];
+  municipioFimIbge?: string;
+  pesoTotal?: number;
+  valorTotal?: number;
+  produtoPredominante?: string;
+  encerrado?: boolean;
+  encerradoEm?: string;
+}
+
 export interface FiscalCteData {
   tomadorTipo?: 'remetente' | 'destinatario' | 'outros' | string;
   cfop?: string;
@@ -77,6 +96,7 @@ export interface FiscalDocument {
   ciot: string;
   rntrc: string;
   cteData: FiscalCteData;
+  mdfeData: FiscalMdfeData;
   createdAt: string;
   updatedAt: string;
   parties: FiscalParty[];
