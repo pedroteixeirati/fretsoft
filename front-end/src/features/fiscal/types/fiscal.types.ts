@@ -1,6 +1,8 @@
 export type FiscalDocumentType = 'cte' | 'cte_os' | 'mdfe';
 export type FiscalDocumentStatus = 'draft' | 'processing' | 'authorized' | 'rejected' | 'canceled' | 'denied' | 'inutilized' | 'error';
 
+export type FiscalExecutionMode = 'own_fleet' | 'third_party';
+
 export interface FiscalParty {
   id?: string;
   role: 'taker' | 'sender' | 'recipient' | 'dispatcher' | 'receiver';
@@ -9,6 +11,18 @@ export interface FiscalParty {
   stateRegistration: string;
   city: string;
   state: string;
+}
+
+export interface FiscalPayment {
+  id?: string;
+  payeeName: string;
+  payeeDocument: string;
+  componentType: '01' | '02' | '03' | '04';
+  amount: number;
+  bankName: string;
+  bankBranch: string;
+  bankAccount: string;
+  pixKey: string;
 }
 
 export interface FiscalDocument {
@@ -37,9 +51,13 @@ export interface FiscalDocument {
   emitterSnapshot: Record<string, unknown>;
   notes: string;
   sourceFreightId: string;
+  executionMode: FiscalExecutionMode;
+  ciot: string;
+  rntrc: string;
   createdAt: string;
   updatedAt: string;
   parties: FiscalParty[];
+  payments: FiscalPayment[];
 }
 
 export type FiscalDocumentDraft = Omit<FiscalDocument, 'id' | 'displayId' | 'createdAt' | 'updatedAt'>;

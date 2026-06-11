@@ -4,11 +4,12 @@ import { FileCheck2, FilePlus2, Lock, Pencil, RefreshCw, Search, Send, Trash2 } 
 import { useFirebase } from '../../../context/FirebaseContext';
 import { getErrorMessage } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
+import { canUseFiscalThirdParty } from '../../../lib/features';
 import { Alert, Button, ConfirmDialog, DataTable, Input, KpiCard, Modal, PageHeader, Select, type DataTableColumn } from '../../../shared/ui';
 import { fiscalApi } from '../services/fiscal.api';
 import { useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
-import type { FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType } from '../types/fiscal.types';
+import type { FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalExecutionMode, FiscalPayment } from '../types/fiscal.types';
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -47,7 +48,11 @@ const emptyDraft: FiscalDocumentDraft = {
   emitterSnapshot: {},
   notes: '',
   sourceFreightId: '',
+  executionMode: 'own_fleet',
+  ciot: '',
+  rntrc: '',
   parties: [],
+  payments: [],
 };
 
 function formatDate(value: string) {
@@ -65,6 +70,7 @@ export default function FiscalDocumentsPage() {
   const canCreate = canAccess(userProfile, 'fiscal', 'create');
   const canUpdate = canAccess(userProfile, 'fiscal', 'update');
   const canDelete = canAccess(userProfile, 'fiscal', 'delete');
+  const canUseTac = canUseFiscalThirdParty(userProfile);
   const { documents, isLoading, error } = useFiscalDocumentsQuery(Boolean(user));
   const { createDocument, updateDocument, emitDocument, syncDocument, deleteDocument, isSubmitting } = useFiscalDocumentMutations();
 
@@ -137,7 +143,11 @@ export default function FiscalDocumentsPage() {
       emitterSnapshot: document.emitterSnapshot || {},
       notes: document.notes,
       sourceFreightId: document.sourceFreightId || '',
+      executionMode: document.executionMode || 'own_fleet',
+      ciot: document.ciot || '',
+      rntrc: document.rntrc || '',
       parties: document.parties || [],
+      payments: document.payments || [],
     });
     setSubmitError('');
     setIsModalOpen(true);
@@ -145,6 +155,17 @@ export default function FiscalDocumentsPage() {
 
   const updateDraft = <K extends keyof FiscalDocumentDraft>(key: K, value: FiscalDocumentDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
+  };
+
+  const payment: FiscalPayment = draft.payments[0] || {
+    payeeName: '', payeeDocument: '', componentType: '04', amount: 0, bankName: '', bankBranch: '', bankAccount: '', pixKey: '',
+  };
+
+  const updatePayment = <K extends keyof FiscalPayment>(key: K, value: FiscalPayment[K]) => {
+    setDraft((current) => {
+      const base = current.payments[0] || { payeeName: '', payeeDocument: '', componentType: '04' as const, amount: 0, bankName: '', bankBranch: '', bankAccount: '', pixKey: '' };
+      return { ...current, payments: [{ ...base, [key]: value }] };
+    });
   };
 
   useEffect(() => {
@@ -385,6 +406,44 @@ export default function FiscalDocumentsPage() {
             <Input label="Origem" value={draft.originName} onChange={(event) => updateDraft('originName', event.target.value)} placeholder="Origem" />
             <Input label="Destino" value={draft.destinationName} onChange={(event) => updateDraft('destinationName', event.target.value)} placeholder="Destino" />
           </div>
+
+          {canUseTac ? (
+            <div className="space-y-4">
+              <div className="md:w-1/2">
+                <span className="mb-1 block text-sm font-medium text-on-surface-variant">Execucao do transporte</span>
+                <Select
+                  value={draft.executionMode}
+                  onChange={(value) => updateDraft('executionMode', value as FiscalExecutionMode)}
+                  options={[
+                    { value: 'own_fleet', label: 'Frota propria' },
+                    { value: 'third_party', label: 'Terceiro (TAC)' },
+                  ]}
+                  placeholder="Execucao"
+                />
+              </div>
+
+              {draft.executionMode === 'third_party' ? (
+                <div className="space-y-4 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                  <p className="text-sm font-bold text-primary">Pagamento ao transportador (TAC) — obrigatorio para terceiro</p>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Input label="CIOT" value={draft.ciot} onChange={(event) => updateDraft('ciot', event.target.value)} placeholder="Gerar na ANTT/IPEF" />
+                    <Input label="RNTRC" value={draft.rntrc} onChange={(event) => updateDraft('rntrc', event.target.value)} placeholder="Registro ANTT" />
+                    <Input label="Valor pago (frete)" type="number" step="0.01" min="0" value={payment.amount || ''} onChange={(event) => updatePayment('amount', Number(event.target.value))} />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Input label="Beneficiario" value={payment.payeeName} onChange={(event) => updatePayment('payeeName', event.target.value)} placeholder="Nome do TAC" />
+                    <Input label="CPF/CNPJ do beneficiario" value={payment.payeeDocument} onChange={(event) => updatePayment('payeeDocument', event.target.value)} />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <Input label="Banco" value={payment.bankName} onChange={(event) => updatePayment('bankName', event.target.value)} />
+                    <Input label="Agencia" value={payment.bankBranch} onChange={(event) => updatePayment('bankBranch', event.target.value)} />
+                    <Input label="Conta" value={payment.bankAccount} onChange={(event) => updatePayment('bankAccount', event.target.value)} />
+                    <Input label="Chave PIX" value={payment.pixKey} onChange={(event) => updatePayment('pixKey', event.target.value)} />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <Input label="Chave de acesso" value={draft.accessKey} onChange={(event) => updateDraft('accessKey', event.target.value)} placeholder="44 digitos" maxLength={60} />
 

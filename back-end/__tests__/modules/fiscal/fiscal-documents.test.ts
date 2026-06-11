@@ -39,6 +39,23 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('frete de terceiro exige CIOT/RNTRC/infPag e mapeia para o provider', () => {
+  const ciotMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713434400000_fiscal_ciot_payments.sql'), 'utf8');
+  assert.match(ciotMigration, /add column if not exists ciot text/i);
+  assert.match(ciotMigration, /add column if not exists execution_mode text/i);
+  assert.match(ciotMigration, /create table if not exists fiscal_document_payments/i);
+  assert.match(ciotMigration, /check \(component_type in \('01', '02', '03', '04'\)\)/i);
+
+  assert.match(serviceSource, /if \(executionMode === 'third_party'\)/);
+  assert.match(serviceSource, /throw fiscalErrors\.ciotRequiredForThirdParty\(\)/);
+  assert.match(serviceSource, /throw fiscalErrors\.rntrcRequiredForThirdParty\(\)/);
+  assert.match(serviceSource, /throw fiscalErrors\.paymentRequiredForThirdParty\(\)/);
+
+  assert.match(providerServiceSource, /function buildInfPag/);
+  assert.match(providerServiceSource, /infPag: buildInfPag\(request\.payments\)/);
+  assert.match(providerServiceSource, /ciot: document\.ciot/);
+});
+
 test('documento fiscal nasce de um frete com idempotencia por frete', () => {
   const sourceMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713430800000_fiscal_source_freight.sql'), 'utf8');
   assert.match(sourceMigration, /add column if not exists source_freight_id uuid references freights\(id\)/i);

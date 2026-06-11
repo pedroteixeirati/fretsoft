@@ -1,6 +1,44 @@
 export type FiscalDocumentType = 'cte' | 'cte_os' | 'mdfe';
 export type FiscalDocumentStatus = 'draft' | 'processing' | 'authorized' | 'rejected' | 'canceled' | 'denied' | 'inutilized' | 'error';
 export type FiscalPartyRole = 'taker' | 'sender' | 'recipient' | 'dispatcher' | 'receiver';
+export type FiscalExecutionMode = 'own_fleet' | 'third_party';
+export type FiscalPaymentComponent = '01' | '02' | '03' | '04';
+
+export interface FiscalPaymentInput {
+  payeeName?: string | null;
+  payeeDocument?: string | null;
+  componentType?: FiscalPaymentComponent | string | null;
+  amount?: number | string | null;
+  bankName?: string | null;
+  bankBranch?: string | null;
+  bankAccount?: string | null;
+  pixKey?: string | null;
+}
+
+export interface FiscalPaymentPayload {
+  payeeName: string;
+  payeeDocument: string;
+  componentType: FiscalPaymentComponent;
+  amount: number;
+  bankName: string;
+  bankBranch: string;
+  bankAccount: string;
+  pixKey: string;
+}
+
+export interface FiscalPaymentRow {
+  id: string;
+  display_id: string | number | null;
+  fiscal_document_id: string;
+  payee_name: string | null;
+  payee_document: string | null;
+  component_type: FiscalPaymentComponent;
+  amount: string | number;
+  bank_name: string | null;
+  bank_branch: string | null;
+  bank_account: string | null;
+  pix_key: string | null;
+}
 
 export interface FiscalPartyInput {
   role?: FiscalPartyRole | string | null;
@@ -35,6 +73,11 @@ export interface FiscalDocumentInput {
   emitterSnapshot?: Record<string, unknown> | null;
   notes?: string | null;
   sourceFreightId?: string | null;
+  executionMode?: FiscalExecutionMode | string | null;
+  ciot?: string | null;
+  rntrc?: string | null;
+  transportPartnerId?: string | null;
+  payments?: FiscalPaymentInput[] | null;
   parties?: FiscalPartyInput[] | null;
 }
 
@@ -71,6 +114,10 @@ export interface FiscalDocumentPayload {
   emitterSnapshot: Record<string, unknown>;
   notes: string;
   sourceFreightId: string | null;
+  executionMode: FiscalExecutionMode;
+  ciot: string;
+  rntrc: string;
+  payments: FiscalPaymentPayload[];
   parties: FiscalPartyPayload[];
 }
 
@@ -100,6 +147,9 @@ export interface FiscalDocumentRow {
   emitter_snapshot: Record<string, unknown> | null;
   notes: string | null;
   source_freight_id: string | null;
+  execution_mode: FiscalExecutionMode;
+  ciot: string | null;
+  rntrc: string | null;
   created_at: string;
   updated_at: string;
 }

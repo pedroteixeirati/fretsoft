@@ -1,4 +1,4 @@
-import type { FiscalDocumentRow, FiscalPartyRow } from '../dtos/fiscal-document.types';
+import type { FiscalDocumentRow, FiscalPartyRow, FiscalPaymentRow } from '../dtos/fiscal-document.types';
 import { fiscalErrors } from '../errors/fiscal.errors';
 
 export type FiscalProviderOperation = 'emit_document' | 'consult_document';
@@ -7,6 +7,21 @@ export interface FiscalProviderRequest {
   operation: FiscalProviderOperation;
   document: FiscalDocumentRow;
   parties: FiscalPartyRow[];
+  payments: FiscalPaymentRow[];
+}
+
+function buildInfPag(payments: FiscalPaymentRow[]) {
+  if (!payments || payments.length === 0) return undefined;
+  return payments.map((payment) => onlyDefinedEntries({
+    nome: payment.payee_name || undefined,
+    cpf_cnpj: payment.payee_document || undefined,
+    valor: Number(payment.amount || 0),
+    componentes: [onlyDefinedEntries({ tipo_componente: payment.component_type, valor_componente: Number(payment.amount || 0) })],
+    banco: payment.bank_name || undefined,
+    agencia: payment.bank_branch || undefined,
+    conta: payment.bank_account || undefined,
+    pix: payment.pix_key || undefined,
+  }));
 }
 
 export interface FiscalProviderResponse {
@@ -78,7 +93,7 @@ function numericHash(value: string) {
 }
 
 function mockAccessKey(document: FiscalDocumentRow) {
-  const seed = `${document.tenant_id || '31'}${document.document_type}${document.series}${document.number}${document.id}`;
+  const seed = `${document.document_type}${document.series}${document.number}${document.id}`;
   return `${numericHash(seed)}${numericHash(seed.split('').reverse().join(''))}${numericHash(`${seed}:cte`)}${numericHash(`${seed}:mdfe`)}${numericHash(`${seed}:focus`).slice(0, 8)}`.slice(0, 44);
 }
 
@@ -147,6 +162,9 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
     nfes: taxData.nfes,
     modal_rodoviario: taxData.modal_rodoviario,
     observacao: document.notes || taxData.observacao,
+    ciot: document.ciot || taxData.ciot || undefined,
+    rntrc: document.rntrc || taxData.rntrc || undefined,
+    infPag: buildInfPag(request.payments) || taxData.infPag,
     ...focusPartyFields('remetente', sender),
     ...focusPartyFields('destinatario', recipient),
     ...focusPartyFields('expedidor', dispatcher),
@@ -173,6 +191,9 @@ function mapFocusMdfePayload(request: FiscalProviderRequest) {
     municipios_descarregamento: taxData.municipios_descarregamento,
     ctes: taxData.ctes,
     nfes: taxData.nfes,
+    ciot: document.ciot || taxData.ciot || undefined,
+    rntrc: document.rntrc || taxData.rntrc || undefined,
+    infPag: buildInfPag(request.payments) || taxData.infPag,
     observacoes: document.notes || taxData.observacoes,
   });
 }
@@ -355,11 +376,12 @@ export function createMockFiscalProviderAdapter(): FiscalProviderAdapter {
   };
 }
 
-export function buildFiscalProviderRequest(document: FiscalDocumentRow, parties: FiscalPartyRow[]): FiscalProviderRequest {
+export function buildFiscalProviderRequest(document: FiscalDocumentRow, parties: FiscalPartyRow[], payments: FiscalPaymentRow[] = []): FiscalProviderRequest {
   return {
     operation: 'emit_document',
     document,
     parties,
+    payments,
   };
 }
 
@@ -378,6 +400,9 @@ export function serializeFiscalProviderRequest(request: FiscalProviderRequest) {
       originName: request.document.origin_name,
       destinationName: request.document.destination_name,
       takerName: request.document.taker_name,
+      executionMode: request.document.execution_mode,
+      ciot: request.document.ciot,
+      rntrc: request.document.rntrc,
       taxData: request.document.tax_data || {},
       emitterSnapshot: request.document.emitter_snapshot || {},
     },
@@ -388,6 +413,12 @@ export function serializeFiscalProviderRequest(request: FiscalProviderRequest) {
       stateRegistration: party.state_registration,
       city: party.city,
       state: party.state,
+    })),
+    payments: request.payments.map((payment) => ({
+      payeeName: payment.payee_name,
+      payeeDocument: payment.payee_document,
+      componentType: payment.component_type,
+      amount: Number(payment.amount || 0),
     })),
   };
 }

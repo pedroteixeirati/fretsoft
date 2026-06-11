@@ -8,16 +8,22 @@ import {
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
 import { findTenantFreightById } from '../../freights/repositories/freights.repository';
+import { findTenantTransportPartner } from '../../transport-partners/repositories/transport-partners.repository';
 import type {
   FiscalDocumentInput,
   FiscalDocumentPayload,
   FiscalDocumentRow,
   FiscalDocumentStatus,
   FiscalDocumentType,
+  FiscalExecutionMode,
   FiscalPartyInput,
   FiscalPartyPayload,
   FiscalPartyRole,
   FiscalPartyRow,
+  FiscalPaymentComponent,
+  FiscalPaymentInput,
+  FiscalPaymentPayload,
+  FiscalPaymentRow,
 } from '../dtos/fiscal-document.types';
 import { fiscalErrors } from '../errors/fiscal.errors';
 import {
@@ -29,6 +35,7 @@ import {
   findFiscalDocumentDuplicate,
   findTenantFiscalDocument,
   listFiscalDocumentParties,
+  listFiscalDocumentPayments,
   listTenantFiscalDocuments as listTenantFiscalDocumentRows,
   updateFiscalDocumentAfterProviderAttempt,
   updateTenantFiscalDocument,
@@ -42,6 +49,46 @@ import {
 const documentTypes: FiscalDocumentType[] = ['cte', 'cte_os', 'mdfe'];
 const statuses: FiscalDocumentStatus[] = ['draft', 'processing', 'authorized', 'rejected', 'canceled', 'denied', 'inutilized', 'error'];
 const partyRoles: FiscalPartyRole[] = ['taker', 'sender', 'recipient', 'dispatcher', 'receiver'];
+const executionModes: FiscalExecutionMode[] = ['own_fleet', 'third_party'];
+const paymentComponents: FiscalPaymentComponent[] = ['01', '02', '03', '04'];
+
+function mapPaymentRow(row: FiscalPaymentRow) {
+  return {
+    id: row.id,
+    displayId: row.display_id ?? undefined,
+    payeeName: row.payee_name || '',
+    payeeDocument: row.payee_document || '',
+    componentType: row.component_type,
+    amount: Number(row.amount || 0),
+    bankName: row.bank_name || '',
+    bankBranch: row.bank_branch || '',
+    bankAccount: row.bank_account || '',
+    pixKey: row.pix_key || '',
+  };
+}
+
+function normalizePayment(payment: FiscalPaymentInput, index: number): FiscalPaymentPayload {
+  const componentType = (normalizeOptionalText(payment.componentType as string) || '04') as FiscalPaymentComponent;
+  const amount = Number(payment.amount);
+
+  if (!paymentComponents.includes(componentType)) {
+    throw fiscalErrors.invalidPaymentComponent(index);
+  }
+  if (!isPositiveNumber(amount)) {
+    throw fiscalErrors.invalidPaymentAmount(index);
+  }
+
+  return {
+    payeeName: normalizeOptionalText(payment.payeeName) || '',
+    payeeDocument: normalizeDocumentNumber(payment.payeeDocument),
+    componentType,
+    amount,
+    bankName: normalizeOptionalText(payment.bankName) || '',
+    bankBranch: normalizeOptionalText(payment.bankBranch) || '',
+    bankAccount: normalizeOptionalText(payment.bankAccount) || '',
+    pixKey: normalizeOptionalText(payment.pixKey) || '',
+  };
+}
 
 function normalizeDigits(value?: string | null) {
   return (value || '').replace(/\D/g, '');
@@ -80,7 +127,7 @@ function mapPartyRow(row: FiscalPartyRow) {
   };
 }
 
-function mapDocumentRow(row: FiscalDocumentRow, parties: FiscalPartyRow[] = []) {
+function mapDocumentRow(row: FiscalDocumentRow, parties: FiscalPartyRow[] = [], payments: FiscalPaymentRow[] = []) {
   return {
     id: row.id,
     displayId: row.display_id ?? undefined,
@@ -107,9 +154,13 @@ function mapDocumentRow(row: FiscalDocumentRow, parties: FiscalPartyRow[] = []) 
     emitterSnapshot: row.emitter_snapshot || {},
     notes: row.notes || '',
     sourceFreightId: row.source_freight_id || '',
+    executionMode: row.execution_mode || 'own_fleet',
+    ciot: row.ciot || '',
+    rntrc: row.rntrc || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     parties: parties.map(mapPartyRow),
+    payments: payments.map(mapPaymentRow),
   };
 }
 
@@ -150,6 +201,20 @@ export async function validateFiscalDocumentPayload(body: FiscalDocumentInput): 
   if (!/^[0-9A-Za-z-]{1,20}$/.test(number)) throw fiscalErrors.invalidNumber();
   const sourceFreightId = normalizeOptionalText(body.sourceFreightId) || '';
   if (sourceFreightId && !isValidUuid(sourceFreightId)) throw fiscalErrors.invalidSourceFreight();
+
+  const executionMode = (normalizeOptionalText(body.executionMode as string) || 'own_fleet') as FiscalExecutionMode;
+  if (!executionModes.includes(executionMode)) throw fiscalErrors.invalidExecutionMode();
+  const ciot = (normalizeOptionalText(body.ciot) || '').replace(/\D/g, '');
+  const rntrc = (normalizeOptionalText(body.rntrc) || '').replace(/\D/g, '');
+  const payments = Array.isArray(body.payments) ? body.payments.map(normalizePayment) : [];
+
+  // Regra fiscal: frete de terceiro (TAC) exige CIOT, RNTRC e ao menos um pagamento de frete (componente 04).
+  if (executionMode === 'third_party') {
+    if (!ciot) throw fiscalErrors.ciotRequiredForThirdParty();
+    if (!rntrc) throw fiscalErrors.rntrcRequiredForThirdParty();
+    if (!payments.some((payment) => payment.componentType === '04')) throw fiscalErrors.paymentRequiredForThirdParty();
+  }
+
   if (accessKey && !/^\d{44}$/.test(accessKey)) throw fiscalErrors.invalidAccessKey();
   if (!statuses.includes(status)) throw fiscalErrors.invalidStatus();
   if (!isValidDate(issueDate)) throw fiscalErrors.invalidIssueDate();
@@ -180,6 +245,10 @@ export async function validateFiscalDocumentPayload(body: FiscalDocumentInput): 
     emitterSnapshot: normalizeJsonObject(body.emitterSnapshot),
     notes: normalizeOptionalText(body.notes) || '',
     sourceFreightId: sourceFreightId || null,
+    executionMode,
+    ciot,
+    rntrc,
+    payments,
     parties,
   };
 }
@@ -194,7 +263,8 @@ export async function getFiscalDocument(id: string, tenantId?: string) {
   if (!row) return null;
 
   const parties = await listFiscalDocumentParties(id, tenantId);
-  return mapDocumentRow(row, parties);
+  const payments = await listFiscalDocumentPayments(id, tenantId);
+  return mapDocumentRow(row, parties, payments);
 }
 
 const editableStatuses: FiscalDocumentStatus[] = ['draft', 'rejected', 'error'];
@@ -218,6 +288,8 @@ export async function buildFiscalDraftFromFreight(freightId: string, tenantId: s
   if (!freight) return null;
 
   const existing = await findFiscalDocumentBySourceFreight(freight.id, tenantId);
+  const partner = freight.transport_partner_id ? await findTenantTransportPartner(freight.transport_partner_id, tenantId || '') : null;
+  const amount = Number(freight.amount || 0);
 
   return {
     existingDocumentId: existing?.id || null,
@@ -226,13 +298,27 @@ export async function buildFiscalDraftFromFreight(freightId: string, tenantId: s
       model: '57',
       issueDate: freight.date || '',
       dueDate: '',
-      amount: Number(freight.amount || 0),
+      amount,
       originName: freight.origin || '',
       destinationName: freight.destination || '',
       takerName: freight.contract_name || '',
       executionMode: freight.execution_mode || 'own_fleet',
       transportPartnerId: freight.transport_partner_id || '',
+      ciot: '',
+      rntrc: partner?.rntrc || '',
       sourceFreightId: freight.id,
+      payments: partner
+        ? [{
+            payeeName: partner.name,
+            payeeDocument: partner.document_number,
+            componentType: '04',
+            amount,
+            bankName: partner.bank_name || '',
+            bankBranch: partner.bank_branch || '',
+            bankAccount: partner.bank_account || '',
+            pixKey: partner.pix_key || '',
+          }]
+        : [],
     },
   };
 }
@@ -266,7 +352,8 @@ export async function emitFiscalDocument(id: string, tenantId: string | undefine
   }
 
   const parties = await listFiscalDocumentParties(id, tenantId);
-  const request = buildFiscalProviderRequest(document, parties);
+  const payments = await listFiscalDocumentPayments(id, tenantId);
+  const request = buildFiscalProviderRequest(document, parties, payments);
   const requestPayload = serializeFiscalProviderRequest(request);
   const startedAt = Date.now();
   let providerName = document.provider || 'unconfigured';
@@ -324,7 +411,8 @@ export async function syncFiscalDocument(id: string, tenantId: string | undefine
   if (!document) return null;
 
   const parties = await listFiscalDocumentParties(id, tenantId);
-  const request = buildFiscalProviderRequest(document, parties);
+  const payments = await listFiscalDocumentPayments(id, tenantId);
+  const request = buildFiscalProviderRequest(document, parties, payments);
   const requestPayload = serializeFiscalProviderRequest({ ...request, operation: 'consult_document' });
   const startedAt = Date.now();
   let providerName = document.provider || 'focus_nfe';

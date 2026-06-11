@@ -268,7 +268,7 @@ export default function Freights() {
       destination: formData.destination.trim(),
       amount: requiresAmount ? Number(formData.amount) : 0,
       hasCargo: formData.hasCargo === 'true',
-      executionMode: canUseTac ? formData.executionMode : 'own_fleet',
+      executionMode: (canUseTac ? formData.executionMode : 'own_fleet') as 'own_fleet' | 'third_party',
       transportPartnerId: canUseTac && formData.executionMode === 'third_party' ? formData.transportPartnerId || undefined : undefined,
     };
 

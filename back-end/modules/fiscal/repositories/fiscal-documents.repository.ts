@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { pool } from '../../../shared/infra/database/pool';
-import type { FiscalDocumentPayload, FiscalDocumentRow, FiscalPartyPayload, FiscalPartyRow } from '../dtos/fiscal-document.types';
+import type { FiscalDocumentPayload, FiscalDocumentRow, FiscalPartyPayload, FiscalPartyRow, FiscalPaymentRow } from '../dtos/fiscal-document.types';
 
 function db(client?: PoolClient) {
   return client || pool;
@@ -32,6 +32,9 @@ function selectDocumentColumns() {
           emitter_snapshot,
           notes,
           source_freight_id,
+          execution_mode,
+          ciot,
+          rntrc,
           created_at,
           updated_at`;
 }
@@ -131,6 +134,68 @@ export async function findFiscalDocumentBySourceFreight(freightId: string, tenan
   return result.rows[0] || null;
 }
 
+export async function listFiscalDocumentPayments(documentId: string, tenantId?: string) {
+  const result = await pool.query<FiscalPaymentRow>(
+    `select id,
+            display_id,
+            fiscal_document_id,
+            payee_name,
+            payee_document,
+            component_type,
+            amount,
+            bank_name,
+            bank_branch,
+            bank_account,
+            pix_key
+     from fiscal_document_payments
+     where fiscal_document_id = $1
+       and tenant_id = $2
+     order by display_id asc, created_at asc`,
+    [documentId, tenantId]
+  );
+
+  return result.rows;
+}
+
+async function replaceDocumentPayments(documentId: string, payload: FiscalDocumentPayload, tenantId?: string) {
+  await pool.query(
+    `delete from fiscal_document_payments
+     where fiscal_document_id = $1
+       and tenant_id = $2`,
+    [documentId, tenantId]
+  );
+
+  for (const payment of payload.payments) {
+    await pool.query(
+      `insert into fiscal_document_payments (
+         tenant_id,
+         fiscal_document_id,
+         payee_name,
+         payee_document,
+         component_type,
+         amount,
+         bank_name,
+         bank_branch,
+         bank_account,
+         pix_key
+       )
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        tenantId,
+        documentId,
+        payment.payeeName || null,
+        payment.payeeDocument || null,
+        payment.componentType,
+        payment.amount,
+        payment.bankName || null,
+        payment.bankBranch || null,
+        payment.bankAccount || null,
+        payment.pixKey || null,
+      ]
+    );
+  }
+}
+
 async function replaceDocumentParties(documentId: string, payload: FiscalDocumentPayload, tenantId?: string) {
   await pool.query(
     `delete from fiscal_document_parties
@@ -193,10 +258,13 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
        emitter_snapshot,
        notes,
        source_freight_id,
+       execution_mode,
+       ciot,
+       rntrc,
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $25)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $28)
      returning ${selectDocumentColumns()}`,
     [
       tenantId,
@@ -223,6 +291,9 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
       payload.emitterSnapshot,
       payload.notes || null,
       payload.sourceFreightId || null,
+      payload.executionMode,
+      payload.ciot || null,
+      payload.rntrc || null,
       userId,
     ]
   );
@@ -230,6 +301,7 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
   const document = result.rows[0] || null;
   if (document) {
     await replaceDocumentParties(document.id, payload, tenantId);
+    await replaceDocumentPayments(document.id, payload, tenantId);
   }
 
   return document;
@@ -261,10 +333,13 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
          emitter_snapshot = $21,
          notes = $22,
          source_freight_id = $23,
-         updated_by_user_id = $24,
+         execution_mode = $24,
+         ciot = $25,
+         rntrc = $26,
+         updated_by_user_id = $27,
          updated_at = now()
-     where id = $25
-       and tenant_id = $26
+     where id = $28
+       and tenant_id = $29
      returning ${selectDocumentColumns()}`,
     [
       payload.documentType,
@@ -290,6 +365,9 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
       payload.emitterSnapshot,
       payload.notes || null,
       payload.sourceFreightId || null,
+      payload.executionMode,
+      payload.ciot || null,
+      payload.rntrc || null,
       userId,
       id,
       tenantId,
@@ -299,6 +377,7 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
   const document = result.rows[0] || null;
   if (document) {
     await replaceDocumentParties(document.id, payload, tenantId);
+    await replaceDocumentPayments(document.id, payload, tenantId);
   }
 
   return document;
