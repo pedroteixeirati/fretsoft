@@ -68,8 +68,11 @@ test('vinculo fiscal conecta CT-e Novalog e recebiveis sem duplicar documento', 
 
 test('integracao fiscal prepara provider e registra tentativas de emissao sem simular autorizacao', () => {
   assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/emit'/);
+  assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/sync'/);
   assert.match(controllerSource, /emitFiscalDocument\(req\.params\.id, req\.auth\?\.tenantId, req\.auth\?\.userId\)/);
+  assert.match(controllerSource, /syncFiscalDocument\(req\.params\.id, req\.auth\?\.tenantId, req\.auth\?\.userId\)/);
   assert.match(serviceSource, /export async function emitFiscalDocument/);
+  assert.match(serviceSource, /export async function syncFiscalDocument/);
   assert.match(serviceSource, /\['draft', 'rejected', 'error'\]\.includes\(document\.status\)/);
   assert.match(serviceSource, /createFiscalCommunicationLog/);
   assert.match(serviceSource, /updateFiscalDocumentAfterProviderAttempt/);
@@ -79,12 +82,20 @@ test('integracao fiscal prepara provider e registra tentativas de emissao sem si
   assert.match(providerServiceSource, /https:\/\/homologacao\.focusnfe\.com\.br\/v2/);
   assert.match(providerServiceSource, /Authorization: focusAuthHeader\(token\)/);
   assert.match(providerServiceSource, /\/\$\{endpoint\}\?ref=\$\{encodeURIComponent\(reference\)\}/);
+  assert.match(providerServiceSource, /\/\$\{endpoint\}\/\$\{encodeURIComponent\(reference\)\}\?completa=1/);
+  assert.match(providerServiceSource, /caminho_xml/);
+  assert.match(providerServiceSource, /caminho_dacte/);
+  assert.match(providerServiceSource, /caminho_damdfe/);
+  assert.match(providerServiceSource, /processando_autorizacao/);
   assert.match(providerServiceSource, /createFocusNfeProviderAdapter/);
   assert.match(providerServiceSource, /focusProviderAliases\.has\(providerName\)/);
   assert.match(providerServiceSource, /throw fiscalErrors\.providerNotConfigured\(\)/);
   assert.match(repositorySource, /insert into fiscal_communication_logs/i);
   assert.match(repositorySource, /update fiscal_documents[\s\S]*provider_document_id = coalesce/i);
   assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/emit/);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/sync/);
   assert.match(fiscalHookSource, /emitDocument/);
+  assert.match(fiscalHookSource, /syncDocument/);
   assert.match(fiscalPageSource, /aria-label=\{`Emitir \$\{documentLabel\(document\)\}`\}/);
+  assert.match(fiscalPageSource, /aria-label=\{`Sincronizar \$\{documentLabel\(document\)\}`\}/);
 });

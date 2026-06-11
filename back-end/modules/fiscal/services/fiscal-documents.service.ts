@@ -272,3 +272,61 @@ export async function emitFiscalDocument(id: string, tenantId: string | undefine
     throw error;
   }
 }
+
+export async function syncFiscalDocument(id: string, tenantId: string | undefined, userId: string | undefined) {
+  const document = await findTenantFiscalDocument(id, tenantId);
+  if (!document) return null;
+
+  const parties = await listFiscalDocumentParties(id, tenantId);
+  const request = buildFiscalProviderRequest(document, parties);
+  const requestPayload = serializeFiscalProviderRequest({ ...request, operation: 'consult_document' });
+  const startedAt = Date.now();
+  let providerName = document.provider || 'focus_nfe';
+
+  try {
+    const provider = getFiscalProviderAdapter();
+    providerName = provider.name;
+    const response = await provider.consultDocument({ ...request, operation: 'consult_document' });
+    const durationMs = Date.now() - startedAt;
+
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'consult_document',
+      requestPayload,
+      responsePayload: response.responsePayload || {},
+      httpStatus: response.httpStatus || null,
+      durationMs,
+    });
+
+    await updateFiscalDocumentAfterProviderAttempt({
+      id,
+      tenantId,
+      userId,
+      provider: providerName,
+      providerDocumentId: response.providerDocumentId,
+      status: response.status,
+      accessKey: response.accessKey,
+      protocol: response.protocol,
+      authorizedAt: response.authorizedAt,
+      xml: response.xml,
+      dacteUrl: response.dacteUrl,
+    });
+
+    return getFiscalDocument(id, tenantId);
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'consult_document',
+      requestPayload,
+      responsePayload: {},
+      errorMessage: error instanceof Error ? error.message : 'Falha desconhecida ao consultar documento fiscal.',
+      durationMs,
+    });
+    throw error;
+  }
+}

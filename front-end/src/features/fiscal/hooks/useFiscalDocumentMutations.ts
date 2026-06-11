@@ -27,11 +27,17 @@ export function useFiscalDocumentMutations() {
     onSuccess: invalidate,
   });
 
+  const syncDocument = useMutation({
+    mutationFn: (id: string) => fiscalApi.syncDocument(id),
+    onSuccess: invalidate,
+  });
+
   return {
     createDocument,
     updateDocument,
     emitDocument,
+    syncDocument,
     deleteDocument,
-    isSubmitting: createDocument.isPending || updateDocument.isPending || emitDocument.isPending || deleteDocument.isPending,
+    isSubmitting: createDocument.isPending || updateDocument.isPending || emitDocument.isPending || syncDocument.isPending || deleteDocument.isPending,
   };
 }
