@@ -30,6 +30,7 @@ export type NovalogBillingPayload = {
 };
 
 export type NovalogBillingItemPayload = {
+  fiscalDocumentId: string | null;
   cteNumber: string;
   cteKey: string | null;
   issueDate: string | null;

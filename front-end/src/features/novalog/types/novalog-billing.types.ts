@@ -5,6 +5,7 @@ export interface NovalogBillingItem {
   id: string;
   displayId?: number;
   billingId: string;
+  fiscalDocumentId?: string;
   cteNumber: string;
   cteKey: string;
   issueDate: string;

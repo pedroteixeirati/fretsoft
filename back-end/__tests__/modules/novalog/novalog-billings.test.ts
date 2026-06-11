@@ -19,6 +19,7 @@ test('schema cria faturamentos Novalog e itens CT-e com rastreabilidade financei
   assert.match(schemaSource, /billing_id uuid not null references novalog_billings\(id\) on delete cascade/i);
   assert.match(schemaSource, /due_date text/i);
   assert.match(schemaSource, /linked_revenue_id uuid references revenues\(id\) on delete set null/i);
+  assert.match(schemaSource, /fiscal_document_id uuid references fiscal_documents\(id\) on delete set null/i);
   assert.match(schemaSource, /create unique index if not exists idx_novalog_billing_items_tenant_cte_number/i);
 });
 
@@ -72,9 +73,19 @@ test('fechamento do faturamento gera uma revenue individual para cada CT-e', () 
   assert.match(novalogBillingServiceSource, /insert into revenues \(/);
   assert.match(novalogBillingServiceSource, /const itemDueDate = item\.due_date \|\| billing\.due_date/);
   assert.match(novalogBillingServiceSource, /novalog_billing_id,\s*novalog_billing_item_id/i);
+  assert.match(novalogBillingServiceSource, /fiscal_document_id/i);
   assert.match(novalogBillingServiceSource, /source_type,[\s\S]*'novalog_billing_item'/);
   assert.match(novalogBillingServiceSource, /on conflict \(novalog_billing_item_id\) where novalog_billing_item_id is not null do update/i);
   assert.match(novalogBillingServiceSource, /linkRevenueToNovalogBillingItem\(item\.id, billing\.tenant_id, revenueId, userId, client\)/);
+});
+
+test('CT-e Novalog cria ou reaproveita documento fiscal e propaga o vinculo para receitas', () => {
+  assert.match(novalogBillingRepositorySource, /upsertFiscalDocumentFromNovalogBillingItem/);
+  assert.match(novalogBillingRepositorySource, /ensureFiscalDocumentForNovalogItem/);
+  assert.match(novalogBillingRepositorySource, /fiscal_document_id = coalesce\(\$9, fiscal_document_id\)/);
+  assert.match(novalogBillingServiceSource, /fiscalDocumentId: row\.fiscal_document_id \|\| undefined/);
+  assert.match(novalogBillingServiceSource, /fiscalDocumentId: item\.fiscal_document_id \|\| null/);
+  assert.match(revenuesRepositorySource, /fiscal_document_id = \$5/);
 });
 
 test('baixa de CT-e exige faturamento fechado e sincroniza a revenue vinculada', () => {
@@ -90,7 +101,7 @@ test('edicao e exclusao de CT-e bloqueiam recebidos e sincronizam recebiveis', (
   assert.match(novalogBillingServiceSource, /export async function deleteNovalogBillingItem/);
   assert.match(novalogBillingServiceSource, /item\.status === 'received' \|\| item\.status === 'partially_received'[\s\S]*novalog_billing_item_received_not_editable/);
   assert.match(novalogBillingServiceSource, /item\.status === 'received' \|\| item\.status === 'partially_received'[\s\S]*novalog_billing_item_received_not_deletable/);
-  assert.match(novalogBillingServiceSource, /updateTenantNovalogBillingItem\(itemId, tenantId, payload, auth\?\.userId, client\)/);
+  assert.match(novalogBillingServiceSource, /updateTenantNovalogBillingItem\(itemId, tenantId, payload,[\s\S]*billingDate: billing\.billing_date,[\s\S]*companyName: billing\.company_name,[\s\S]*auth\?\.userId, client\)/);
   assert.match(novalogBillingServiceSource, /syncRevenueFromBillingItem\(billing, updatedItem, auth\?\.userId, client\)/);
   assert.match(novalogBillingServiceSource, /countActiveTenantNovalogBillingItems\(item\.billing_id, tenantId, client\)/);
   assert.match(novalogBillingServiceSource, /updateTenantNovalogBillingItemStatus\(itemId, tenantId, 'canceled', auth\?\.userId, client\)/);
@@ -125,6 +136,8 @@ test('repository lista faturamentos com totais agregados e persiste itens em tra
 test('revenues mapeia origem CT-e Novalog para o front com vinculos de rastreabilidade', () => {
   assert.match(revenuesRepositorySource, /novalog_billing_id/);
   assert.match(revenuesRepositorySource, /novalog_billing_item_id/);
+  assert.match(revenuesRepositorySource, /fiscal_document_id/);
   assert.match(revenuesRepositorySource, /source_type = 'novalog_billing_item'/);
   assert.match(readFileSync(resolve(process.cwd(), 'back-end/modules/revenues/dtos/revenue.types.ts'), 'utf8'), /novalogBillingId/);
+  assert.match(readFileSync(resolve(process.cwd(), 'back-end/modules/revenues/dtos/revenue.types.ts'), 'utf8'), /fiscalDocumentId/);
 });

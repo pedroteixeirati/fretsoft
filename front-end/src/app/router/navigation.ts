@@ -1,5 +1,6 @@
 import { NavItem, UserProfile } from '../../shared/types/common.types';
 import { canAccess, type Section } from '../../lib/permissions';
+import { canAccessFiscal, canUseFiscalThirdParty } from '../../lib/features';
 import { canAccessNovalogOperations } from '../../features/novalog/utils/novalog.visibility';
 
 export const navItemToPath: Record<NavItem, string> = {
@@ -8,11 +9,13 @@ export const navItemToPath: Record<NavItem, string> = {
   tenantProfile: '/transportadora',
   revenues: '/contas-a-receber',
   payables: '/contas-a-pagar',
+  fiscal: '/fiscal',
   expenses: '/custos-operacionais',
   vehicles: '/veiculos',
   suppliers: '/fornecedores',
   companies: '/empresas',
   contracts: '/contratos',
+  transportPartners: '/transportadores-autonomos',
   freights: '/fretes',
   novalogOperations: '/novalog/lancamentos',
   novalogBillings: '/novalog/faturamentos',
@@ -43,11 +46,13 @@ export function getFirstAllowedTab(profile: UserProfile): NavItem {
   if (canAccess(profile, 'providers', 'read')) return 'suppliers';
   if (canAccess(profile, 'companies', 'read')) return 'companies';
   if (canAccess(profile, 'freights', 'read')) return 'freights';
+  if (canAccess(profile, 'fiscal', 'read') && canAccessFiscal(profile)) return 'fiscal';
   if (canAccessNovalogOperations(profile)) return 'novalogOperations';
   if (canAccessNovalogOperations(profile)) return 'novalogBillings';
   if (canAccessNovalogOperations(profile)) return 'novalogReports';
   if (canAccess(profile, 'cargas', 'read')) return 'cargas';
   if (canAccess(profile, 'contracts', 'read')) return 'contracts';
+  if (canAccess(profile, 'transportPartners', 'read') && canUseFiscalThirdParty(profile)) return 'transportPartners';
   if (canAccess(profile, 'expenses', 'read')) return 'expenses';
   if (canAccess(profile, 'tenantProfile', 'read')) return 'tenantProfile';
   if (canAccess(profile, 'settings', 'read')) return 'settings';
@@ -64,6 +69,10 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
     case 'payables':
     case 'reports':
       return activeTab;
+    case 'fiscal':
+      return canAccess(profile, 'fiscal', 'read') && canAccessFiscal(profile) ? activeTab : getFirstAllowedTab(profile);
+    case 'transportPartners':
+      return canAccess(profile, 'transportPartners', 'read') && canUseFiscalThirdParty(profile) ? activeTab : getFirstAllowedTab(profile);
     case 'expenses':
       return canAccess(profile, 'expenses', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'vehicles':
@@ -100,11 +109,13 @@ export const navItemSectionMap: Partial<Record<NavItem, Section>> = {
   tenantProfile: 'tenantProfile',
   revenues: 'revenues',
   payables: 'payables',
+  fiscal: 'fiscal',
   expenses: 'expenses',
   vehicles: 'vehicles',
   suppliers: 'providers',
   companies: 'companies',
   contracts: 'contracts',
+  transportPartners: 'transportPartners',
   freights: 'freights',
   novalogOperations: 'freights',
   novalogBillings: 'revenues',

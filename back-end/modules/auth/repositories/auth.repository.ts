@@ -38,6 +38,17 @@ export async function createUserFromIdentity(firebaseUid: string, email: string,
   return result.rows[0];
 }
 
+export async function findTenantFeatures(tenantId: string) {
+  const result = await pool.query<{ feature_key: string; enabled: boolean }>(
+    `select feature_key, enabled
+     from tenant_features
+     where tenant_id = $1`,
+    [tenantId]
+  );
+
+  return result.rows;
+}
+
 export async function findTenantMembership(userId: string) {
   const result = await pool.query<TenantMembershipRow>(
     `select tu.tenant_id,

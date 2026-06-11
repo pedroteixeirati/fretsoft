@@ -19,6 +19,7 @@ type CustomSelectProps = {
   className?: string;
   buttonClassName?: string;
   menuClassName?: string;
+  matchTriggerWidth?: boolean;
   error?: string;
   hint?: string;
 };
@@ -33,6 +34,7 @@ export default function CustomSelect({
   className,
   buttonClassName,
   menuClassName,
+  matchTriggerWidth = true,
   error,
   hint,
 }: CustomSelectProps) {
@@ -63,9 +65,10 @@ export default function CustomSelect({
       top,
       left,
       minWidth: buttonRect.width,
+      width: matchTriggerWidth ? buttonRect.width : undefined,
       zIndex: 1100,
     });
-  }, []);
+  }, [matchTriggerWidth]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -126,7 +129,7 @@ export default function CustomSelect({
           style={dropdownStyle}
           className={cn(
             'overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-[0_24px_60px_rgba(26,28,21,0.12)]',
-            variant === 'inline' ? 'w-[14rem]' : 'w-full',
+            variant === 'inline' ? 'w-[14rem]' : matchTriggerWidth ? '' : 'w-full',
             menuClassName,
           )}
         >

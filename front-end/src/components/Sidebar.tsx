@@ -7,6 +7,8 @@ import {
   Users,
   Building2,
   FileText,
+  FileCheck2,
+  IdCard,
   Route,
   Package,
   BarChart3,
@@ -24,6 +26,7 @@ import { NavItem } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../context/FirebaseContext';
 import { canAccess } from '../lib/permissions';
+import { canAccessFiscal, canUseFiscalThirdParty } from '../lib/features';
 import { canAccessNovalogOperations } from '../features/novalog/utils/novalog.visibility';
 
 interface SidebarProps {
@@ -78,6 +81,7 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       items: [
         { id: 'revenues', label: 'Contas a receber', icon: WalletCards, allowed: true },
         { id: 'payables', label: 'Contas a pagar', icon: CreditCard, allowed: true },
+        { id: 'fiscal', label: 'Fiscal', icon: FileCheck2, allowed: canAccess(userProfile, 'fiscal', 'read') && canAccessFiscal(userProfile) },
         { id: 'reports', label: 'Relatorios', icon: BarChart3, allowed: userProfile?.tenantSlug !== 'novalog' },
       ],
     },
@@ -87,6 +91,7 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       icon: FolderKanban,
       items: [
         { id: 'vehicles', label: 'Veiculos', icon: Truck, allowed: canAccess(userProfile, 'vehicles', 'read') },
+        { id: 'transportPartners', label: 'Transportadores (TAC)', icon: IdCard, allowed: canAccess(userProfile, 'transportPartners', 'read') && canUseFiscalThirdParty(userProfile) },
         { id: 'suppliers', label: 'Fornecedores', icon: Users, allowed: canAccess(userProfile, 'providers', 'read') },
         { id: 'companies', label: 'Empresas', icon: Building2, allowed: canAccess(userProfile, 'companies', 'read') },
       ],

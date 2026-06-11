@@ -281,6 +281,7 @@ export function listRevenuesByTenant(tenantId: string) {
             r.freight_id,
             r.novalog_billing_id,
             r.novalog_billing_item_id,
+            r.fiscal_document_id,
             r.competence_month,
             r.competence_year,
             r.competence_label,
@@ -325,6 +326,7 @@ export function markRevenueAsCharged(chargeReference: string, actorUserId: strin
                freight_id,
                novalog_billing_id,
                novalog_billing_item_id,
+               fiscal_document_id,
                competence_month,
                competence_year,
                competence_label,
@@ -360,6 +362,7 @@ export function markRevenueAsReceived(actorUserId: string | undefined, revenueId
                freight_id,
                novalog_billing_id,
                novalog_billing_item_id,
+               fiscal_document_id,
                competence_month,
                competence_year,
                competence_label,
@@ -394,6 +397,7 @@ export function markRevenueAsOverdue(actorUserId: string | undefined, revenueId:
                freight_id,
                novalog_billing_id,
                novalog_billing_item_id,
+               fiscal_document_id,
                competence_month,
                competence_year,
                competence_label,
@@ -430,6 +434,7 @@ export function updateNovalogBillingRevenueStatus(revenueId: string, tenantId: s
                freight_id,
                novalog_billing_id,
                novalog_billing_item_id,
+               fiscal_document_id,
                competence_month,
                competence_year,
                competence_label,
@@ -453,6 +458,7 @@ export function updateNovalogBillingRevenueFromItem(params: {
   companyName: string;
   billingId: string;
   billingItemId: string;
+  fiscalDocumentId?: string | null;
   competenceMonth: number;
   competenceYear: number;
   competenceLabel: string;
@@ -467,16 +473,17 @@ export function updateNovalogBillingRevenueFromItem(params: {
          company_name = $2,
          novalog_billing_id = $3,
          novalog_billing_item_id = $4,
-         competence_month = $5,
-         competence_year = $6,
-         competence_label = $7,
-         description = $8,
-         amount = $9,
-         due_date = $10,
-         updated_by_user_id = $11,
+         fiscal_document_id = $5,
+         competence_month = $6,
+         competence_year = $7,
+         competence_label = $8,
+         description = $9,
+         amount = $10,
+         due_date = $11,
+         updated_by_user_id = $12,
          updated_at = now()
-     where id = $12
-       and tenant_id = $13
+     where id = $13
+       and tenant_id = $14
        and source_type = 'novalog_billing_item'
        and status not in ('received', 'partially_received')
      returning id,
@@ -488,6 +495,7 @@ export function updateNovalogBillingRevenueFromItem(params: {
                freight_id,
                novalog_billing_id,
                novalog_billing_item_id,
+               fiscal_document_id,
                competence_month,
                competence_year,
                competence_label,
@@ -505,6 +513,7 @@ export function updateNovalogBillingRevenueFromItem(params: {
       params.companyName,
       params.billingId,
       params.billingItemId,
+      params.fiscalDocumentId || null,
       params.competenceMonth,
       params.competenceYear,
       params.competenceLabel,

@@ -16,6 +16,7 @@ router.get('/me/profile', loadAuthContext, async (req: AuthenticatedRequest, res
     tenantName: auth.tenantName,
     tenantSlug: auth.tenantSlug,
     tenantLogoUrl: auth.tenantLogoUrl || '',
+    features: auth.features || {},
   });
 });
 

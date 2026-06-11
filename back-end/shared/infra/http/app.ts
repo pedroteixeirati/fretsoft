@@ -5,6 +5,7 @@ import companiesRouter from '../../../modules/companies/controllers/companies.co
 import contractsRouter from '../../../modules/contracts/controllers/contracts.controller';
 import cargasRouter from '../../../modules/cargas/controllers/cargas.controller';
 import expensesRouter from '../../../modules/expenses/controllers/expenses.controller';
+import fiscalRouter from '../../../modules/fiscal/controllers/fiscal.controller';
 import freightsRouter from '../../../modules/freights/controllers/freights.controller';
 import novalogRouter from '../../../modules/novalog/controllers/novalog.controller';
 import payablesRouter from '../../../modules/payables/controllers/payables.controller';
@@ -13,6 +14,8 @@ import revenuesRouter from '../../../modules/revenues/controllers/revenues.contr
 import resourcesRouter from '../../../modules/resources/controllers/resources.controller';
 import { errorHandler } from '../../http/error-handler';
 import tenantsRouter from '../../../modules/tenants/controllers/tenants.controller';
+import tenantFeaturesRouter from '../../../modules/tenant-features/controllers/tenant-features.controller';
+import transportPartnersRouter from '../../../modules/transport-partners/controllers/transport-partners.controller';
 import usersRouter from '../../../modules/users/controllers/users.controller';
 import vehiclesRouter from '../../../modules/vehicles/controllers/vehicles.controller';
 
@@ -34,6 +37,9 @@ app.use('/api', cargasRouter);
 app.use('/api', freightsRouter);
 app.use('/api', novalogRouter);
 app.use('/api', expensesRouter);
+app.use('/api', fiscalRouter);
+app.use('/api', tenantFeaturesRouter);
+app.use('/api', transportPartnersRouter);
 app.use('/api', payablesRouter);
 app.use('/api', providersRouter);
 app.use('/api/revenues', revenuesRouter);

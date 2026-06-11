@@ -12,6 +12,7 @@ import {
 import {
   deleteTenantFreight,
   findTenantContractForFreight,
+  findTenantTransportPartnerForFreight,
   findTenantVehicleForFreight,
   insertTenantFreight,
   listTenantFreights,
@@ -43,6 +44,8 @@ function mapFreightRow(row: FreightRow) {
     destination: row.destination,
     amount: Number(row.amount || 0),
     hasCargo: row.has_carga,
+    executionMode: row.execution_mode || 'own_fleet',
+    transportPartnerId: row.transport_partner_id || null,
   };
 }
 
@@ -91,6 +94,20 @@ export async function validateFreightPayload(body: FreightInput, tenantId: strin
     throw freightErrors.standaloneAmountRequired();
   }
 
+  const executionMode = (normalizeOptionalText((body.executionMode as string | undefined) || '') || 'own_fleet') as 'own_fleet' | 'third_party';
+  if (executionMode !== 'own_fleet' && executionMode !== 'third_party') {
+    throw freightErrors.invalidExecutionMode();
+  }
+
+  let transportPartnerId: string | null = null;
+  if (executionMode === 'third_party') {
+    const partnerIdInput = normalizeOptionalText((body.transportPartnerId as string | undefined) || '');
+    if (!partnerIdInput || !isValidUuid(partnerIdInput)) throw freightErrors.invalidTransportPartner();
+    const partner = await findTenantTransportPartnerForFreight(partnerIdInput, tenantId);
+    if (!partner) throw freightErrors.transportPartnerNotFound();
+    transportPartnerId = partner.id;
+  }
+
   return {
     vehicleId,
     plate: vehicle.plate,
@@ -102,6 +119,8 @@ export async function validateFreightPayload(body: FreightInput, tenantId: strin
     destination,
     amount,
     hasCargo,
+    executionMode,
+    transportPartnerId,
   };
 }
 

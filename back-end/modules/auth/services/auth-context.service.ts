@@ -1,10 +1,35 @@
 import type { DecodedIdToken } from 'firebase-admin/auth';
+import { config } from '../../../shared/config/env';
 import {
   createUserFromIdentity,
+  findTenantFeatures,
   findTenantMembership,
   findUserByFirebaseUid,
   updateUserProfile,
 } from '../repositories/auth.repository';
+
+async function resolveTenantFeatures(tenantId: string) {
+  const features: Record<string, boolean> = {};
+
+  let rows: Awaited<ReturnType<typeof findTenantFeatures>>;
+  try {
+    rows = await findTenantFeatures(tenantId);
+  } catch (error) {
+    // Resiliencia: se a tabela tenant_features ainda nao existe (migration pendente),
+    // a autenticacao nao deve quebrar — apenas nenhuma feature fica ligada.
+    console.warn('Nao foi possivel carregar feature flags do tenant; assumindo nenhuma ativa.', error);
+    return features;
+  }
+
+  for (const row of rows) {
+    if (!row.enabled) continue;
+    // Kill-switch global: desliga todo o modulo fiscal independente do flag por tenant.
+    if (!config.fiscalModuleEnabled && row.feature_key.startsWith('fiscal')) continue;
+    features[row.feature_key] = true;
+  }
+
+  return features;
+}
 
 export async function ensureUser(decoded: DecodedIdToken) {
   const existing = await findUserByFirebaseUid(decoded.uid);
@@ -30,6 +55,8 @@ export async function resolveAuthContext(decoded: DecodedIdToken) {
     return null;
   }
 
+  const features = await resolveTenantFeatures(membership.tenant_id);
+
   return {
     uid: decoded.uid,
     userId: user.id,
@@ -40,5 +67,6 @@ export async function resolveAuthContext(decoded: DecodedIdToken) {
     tenantName: membership.tenant_name,
     tenantSlug: membership.tenant_slug,
     tenantLogoUrl: membership.tenant_logo_url,
+    features,
   };
 }

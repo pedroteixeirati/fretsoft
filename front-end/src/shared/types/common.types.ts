@@ -4,11 +4,13 @@ export type NavItem =
   | 'tenantProfile'
   | 'revenues'
   | 'payables'
+  | 'fiscal'
   | 'expenses'
   | 'vehicles'
   | 'suppliers'
   | 'companies'
   | 'contracts'
+  | 'transportPartners'
   | 'freights'
   | 'novalogOperations'
   | 'novalogBillings'
@@ -27,4 +29,5 @@ export interface UserProfile {
   tenantName: string;
   tenantSlug: string;
   tenantLogoUrl?: string;
+  features?: Record<string, boolean>;
 }

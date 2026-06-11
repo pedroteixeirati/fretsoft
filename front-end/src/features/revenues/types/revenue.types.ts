@@ -8,6 +8,7 @@ export interface Revenue {
   freightId?: string;
   novalogBillingId?: string;
   novalogBillingItemId?: string;
+  fiscalDocumentId?: string;
   competenceMonth: number;
   competenceYear: number;
   competenceLabel: string;

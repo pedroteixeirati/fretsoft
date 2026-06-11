@@ -1,3 +1,5 @@
+export type FreightExecutionMode = 'own_fleet' | 'third_party';
+
 export type FreightInput = {
   vehicleId: string;
   contractId?: string | null;
@@ -6,6 +8,8 @@ export type FreightInput = {
   destination: string;
   amount?: number | string | null;
   hasCargo?: boolean | 'true' | 'false';
+  executionMode?: FreightExecutionMode | string | null;
+  transportPartnerId?: string | null;
 };
 
 export type FreightPayload = {
@@ -20,4 +24,6 @@ export type FreightPayload = {
   destination: string;
   amount: number;
   hasCargo: boolean;
+  executionMode: FreightExecutionMode;
+  transportPartnerId: string | null;
 };

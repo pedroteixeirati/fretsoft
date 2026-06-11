@@ -5,12 +5,14 @@ import PlatformTenants from '../../pages/PlatformTenants';
 import TenantProfile from '../../pages/TenantProfile';
 import Revenues from '../../pages/Revenues';
 import Payables from '../../pages/Payables';
+import Fiscal from '../../pages/Fiscal';
 import Expenses from '../../pages/Expenses';
 import Vehicles from '../../pages/Vehicles';
 import Reports from '../../pages/Reports';
 import Suppliers from '../../pages/Suppliers';
 import Companies from '../../pages/Companies';
 import Contracts from '../../pages/Contracts';
+import TransportPartners from '../../pages/TransportPartners';
 import Cargas from '../../pages/Cargas';
 import Freights from '../../pages/Freights';
 import NovalogOperations from '../../pages/NovalogOperations';
@@ -20,6 +22,7 @@ import Settings from '../../pages/Settings';
 import Support from '../../pages/Support';
 import LoginPage from '../../features/auth/pages/LoginPage';
 import AccessPendingPage from '../../features/auth/pages/AccessPendingPage';
+import PublicTacRegistrationPage from '../../features/transport-partners/pages/PublicTacRegistrationPage';
 import PrivateLayout from '../layouts/PrivateLayout';
 import PublicLayout from '../layouts/PublicLayout';
 import PrivateRoute from './PrivateRoute';
@@ -45,6 +48,8 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/cadastro-tac/:tenantSlug" element={<PublicTacRegistrationPage />} />
+
         <Route element={<PublicRoute />}>
           <Route element={<PublicLayout />}>
             <Route path="/login" element={<LoginPage />} />
@@ -59,11 +64,13 @@ export default function AppRouter() {
             <Route path="/transportadora" element={<TenantProfile />} />
             <Route path="/contas-a-receber" element={<Revenues />} />
             <Route path="/contas-a-pagar" element={<PayablesRoute />} />
+            <Route path="/fiscal" element={<Fiscal />} />
             <Route path="/custos-operacionais" element={<ExpensesRoute />} />
             <Route path="/veiculos" element={<Vehicles />} />
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/empresas" element={<Companies />} />
             <Route path="/contratos" element={<Contracts />} />
+            <Route path="/transportadores-autonomos" element={<TransportPartners />} />
             <Route path="/fretes" element={<Freights />} />
             <Route path="/novalog/lancamentos" element={<NovalogOperations />} />
             <Route path="/novalog/faturamentos" element={<NovalogBillings />} />

@@ -11,6 +11,7 @@ export type AuthContext = {
   tenantName: string;
   tenantSlug: string;
   tenantLogoUrl?: string | null;
+  features: Record<string, boolean>;
 };
 
 export type AuthenticatedRequest = express.Request & {

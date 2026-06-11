@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { pool } from '../../../shared/infra/database/pool';
+import { upsertFiscalDocumentFromNovalogBillingItem } from '../../fiscal/repositories/fiscal-documents.repository';
 import type { NovalogBillingItemPayload, NovalogBillingItemStatus, NovalogBillingPayload, NovalogBillingStatus } from '../dtos/novalog-billing.types';
 
 export type NovalogBillingRow = {
@@ -40,6 +41,7 @@ export type NovalogBillingItemRow = {
   last_payment_at?: string | null;
   notes: string | null;
   linked_revenue_id: string | null;
+  fiscal_document_id: string | null;
   created_at: string;
 };
 
@@ -111,6 +113,7 @@ const itemColumns = `id,
        received_at,
        notes,
        linked_revenue_id,
+       fiscal_document_id,
        created_at`;
 
 function db(client?: PoolClient) {
@@ -206,6 +209,7 @@ export async function listTenantNovalogBillingItems(billingId: string, tenantId:
             rp.last_payment_at,
             i.notes,
             i.linked_revenue_id,
+            i.fiscal_document_id,
             i.created_at
      from novalog_billing_items i
      left join (
@@ -261,7 +265,7 @@ export async function insertTenantNovalogBilling(payload: NovalogBillingPayload,
 
     const billingId = billingResult.rows[0]?.id;
     for (const item of payload.items) {
-      await insertTenantNovalogBillingItem(billingId, tenantId, item, userId, client);
+      await insertTenantNovalogBillingItem(billingId, tenantId, item, payload, userId, client);
     }
 
     await client.query('commit');
@@ -274,7 +278,7 @@ export async function insertTenantNovalogBilling(payload: NovalogBillingPayload,
   }
 }
 
-export async function replaceTenantNovalogBillingItems(billingId: string, tenantId: string, items: NovalogBillingItemPayload[], userId?: string) {
+export async function replaceTenantNovalogBillingItems(billingId: string, tenantId: string, payload: NovalogBillingPayload, userId?: string) {
   const client = await pool.connect();
 
   try {
@@ -286,8 +290,8 @@ export async function replaceTenantNovalogBillingItems(billingId: string, tenant
       [billingId, tenantId],
     );
 
-    for (const item of items) {
-      await insertTenantNovalogBillingItem(billingId, tenantId, item, userId, client);
+    for (const item of payload.items) {
+      await insertTenantNovalogBillingItem(billingId, tenantId, item, payload, userId, client);
     }
 
     await client.query(
@@ -308,11 +312,46 @@ export async function replaceTenantNovalogBillingItems(billingId: string, tenant
   }
 }
 
-async function insertTenantNovalogBillingItem(billingId: string, tenantId: string, item: NovalogBillingItemPayload, userId?: string, client?: PoolClient) {
+async function ensureFiscalDocumentForNovalogItem(
+  tenantId: string,
+  item: NovalogBillingItemPayload,
+  context: { billingDate: string; companyName: string },
+  userId?: string,
+  client?: PoolClient,
+) {
+  if (item.fiscalDocumentId) return item.fiscalDocumentId;
+
+  return upsertFiscalDocumentFromNovalogBillingItem({
+    tenantId,
+    userId,
+    series: '1',
+    number: item.cteNumber,
+    accessKey: item.cteKey,
+    issueDate: item.issueDate || context.billingDate,
+    dueDate: item.dueDate,
+    amount: item.amount,
+    originName: item.originName,
+    destinationName: item.destinationName,
+    takerName: context.companyName,
+    notes: item.notes,
+  }, client);
+}
+
+async function insertTenantNovalogBillingItem(
+  billingId: string,
+  tenantId: string,
+  item: NovalogBillingItemPayload,
+  context: { billingDate: string; companyName: string },
+  userId?: string,
+  client?: PoolClient,
+) {
+  const fiscalDocumentId = await ensureFiscalDocumentForNovalogItem(tenantId, item, context, userId, client);
+
   return db(client).query(
     `insert into novalog_billing_items (
        tenant_id,
        billing_id,
+       fiscal_document_id,
        cte_number,
        cte_key,
        issue_date,
@@ -325,10 +364,11 @@ async function insertTenantNovalogBillingItem(billingId: string, tenantId: strin
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10, $11, $11)`,
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12, $12)`,
     [
       tenantId,
       billingId,
+      fiscalDocumentId,
       item.cteNumber,
       item.cteKey,
       item.issueDate,
@@ -408,7 +448,16 @@ export function updateTenantNovalogBillingItemStatus(id: string, tenantId: strin
   );
 }
 
-export function updateTenantNovalogBillingItem(id: string, tenantId: string, item: NovalogBillingItemPayload, userId?: string, client?: PoolClient) {
+export async function updateTenantNovalogBillingItem(
+  id: string,
+  tenantId: string,
+  item: NovalogBillingItemPayload,
+  context: { billingDate: string; companyName: string },
+  userId?: string,
+  client?: PoolClient,
+) {
+  const fiscalDocumentId = await ensureFiscalDocumentForNovalogItem(tenantId, item, context, userId, client);
+
   return db(client).query<NovalogBillingItemRow>(
     `update novalog_billing_items
      set cte_number = $1,
@@ -419,10 +468,11 @@ export function updateTenantNovalogBillingItem(id: string, tenantId: string, ite
          destination_name = $6,
          amount = $7,
          notes = $8,
-         updated_by_user_id = $9,
+         fiscal_document_id = coalesce($9, fiscal_document_id),
+         updated_by_user_id = $10,
          updated_at = now()
-     where id = $10
-       and tenant_id = $11
+     where id = $11
+       and tenant_id = $12
        and status not in ('received', 'partially_received', 'canceled')
      returning ${itemColumns}`,
     [
@@ -434,6 +484,7 @@ export function updateTenantNovalogBillingItem(id: string, tenantId: string, ite
       item.destinationName,
       item.amount,
       item.notes,
+      fiscalDocumentId,
       userId || null,
       id,
       tenantId,

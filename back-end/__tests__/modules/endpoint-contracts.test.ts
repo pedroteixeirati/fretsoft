@@ -13,6 +13,7 @@ const cargasControllerSource = readModule('back-end/modules/cargas/controllers/c
 const companiesControllerSource = readModule('back-end/modules/companies/controllers/companies.controller.ts');
 const contractsControllerSource = readModule('back-end/modules/contracts/controllers/contracts.controller.ts');
 const expensesControllerSource = readModule('back-end/modules/expenses/controllers/expenses.controller.ts');
+const fiscalControllerSource = readModule('back-end/modules/fiscal/controllers/fiscal.controller.ts');
 const freightsControllerSource = readModule('back-end/modules/freights/controllers/freights.controller.ts');
 const novalogControllerSource = readModule('back-end/modules/novalog/controllers/novalog.controller.ts');
 const payablesControllerSource = readModule('back-end/modules/payables/controllers/payables.controller.ts');
@@ -39,6 +40,7 @@ test('app HTTP registra todos os routers principais da API', () => {
   assert.match(appSource, /app\.use\('\/api', freightsRouter\)/);
   assert.match(appSource, /app\.use\('\/api', novalogRouter\)/);
   assert.match(appSource, /app\.use\('\/api', expensesRouter\)/);
+  assert.match(appSource, /app\.use\('\/api', fiscalRouter\)/);
   assert.match(appSource, /app\.use\('\/api', payablesRouter\)/);
   assert.match(appSource, /app\.use\('\/api', providersRouter\)/);
   assert.match(appSource, /app\.use\('\/api\/revenues', revenuesRouter\)/);
@@ -159,6 +161,19 @@ test('payables expoe CRUD e acoes financeiras minimas com guardas consistentes',
   assert.match(payablesControllerSource, /Sem permissao para registrar pagamento\./);
   assert.match(payablesControllerSource, /Sem permissao para marcar atraso\./);
   assert.match(payablesControllerSource, /Conta a pagar nao encontrada\./);
+});
+
+test('fiscal expoe CRUD inicial de documentos fiscais com guardas consistentes', () => {
+  assert.match(fiscalControllerSource, /router\.get\('\/fiscal\/documents'/);
+  assert.match(fiscalControllerSource, /router\.get\('\/fiscal\/documents\/:id'/);
+  assert.match(fiscalControllerSource, /router\.post\('\/fiscal\/documents'/);
+  assert.match(fiscalControllerSource, /router\.put\('\/fiscal\/documents\/:id'/);
+  assert.match(fiscalControllerSource, /router\.delete\('\/fiscal\/documents\/:id'/);
+  assert.match(fiscalControllerSource, /Sem permissao para visualizar documentos fiscais\./);
+  assert.match(fiscalControllerSource, /Sem permissao para criar documentos fiscais\./);
+  assert.match(fiscalControllerSource, /Sem permissao para editar documentos fiscais\./);
+  assert.match(fiscalControllerSource, /Sem permissao para excluir documentos fiscais\./);
+  assert.match(fiscalControllerSource, /Documento fiscal nao encontrado/);
 });
 
 test('providers expoe CRUD proprio com serializer e guardas consistentes', () => {

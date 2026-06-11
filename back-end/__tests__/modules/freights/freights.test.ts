@@ -13,6 +13,16 @@ test('servico de fretes expoe permissoes explicitas do dominio', () => {
   assert.match(freightsServiceSource, /delete: \['dev', 'owner', 'admin', 'operational'\]/);
 });
 
+test('frete marca execucao propria/terceiro e exige TAC quando terceiro', () => {
+  assert.match(freightsServiceSource, /executionMode !== 'own_fleet' && executionMode !== 'third_party'/);
+  assert.match(freightsServiceSource, /throw freightErrors\.invalidExecutionMode\(\)/);
+  assert.match(freightsServiceSource, /if \(executionMode === 'third_party'\)/);
+  assert.match(freightsServiceSource, /findTenantTransportPartnerForFreight/);
+  assert.match(freightsServiceSource, /throw freightErrors\.transportPartnerNotFound\(\)/);
+  assert.match(freightsRepositorySource, /execution_mode/);
+  assert.match(freightsRepositorySource, /transport_partner_id/);
+});
+
 test('servico de fretes valida origem e destino explicitamente no dominio', () => {
   assert.doesNotMatch(freightsServiceSource, /resolveOriginAndDestination|buildFreightRoute/);
   assert.match(freightsServiceSource, /const origin = normalizeRequiredText\(body\.origin\);/);

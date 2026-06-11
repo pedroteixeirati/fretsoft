@@ -3,8 +3,10 @@ export { tenantProfileApi } from '../features/tenant-profile/services/tenantProf
 export { platformTenantsApi } from '../features/platform-tenants/services/platformTenants.api';
 export { revenuesApi } from '../features/revenues/services/revenues.api';
 export { payablesApi } from '../features/payables/services/payables.api';
+export { fiscalApi } from '../features/fiscal/services/fiscal.api';
 export { vehiclesApi } from '../features/vehicles/services/vehicles.api';
 export { providersApi } from '../features/providers/services/providers.api';
+export { transportPartnersApi } from '../features/transport-partners/services/transport-partners.api';
 export { companiesApi } from '../features/companies/services/companies.api';
 export { contractsApi } from '../features/contracts/services/contracts.api';
 export { freightsApi } from '../features/freights/services/freights.api';

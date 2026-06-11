@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Edit2, Filter, Loader2, MapPinned, PackagePlus, Plus, Route, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Edit2, FileText, Filter, Loader2, MapPinned, PackagePlus, Plus, Route, Search, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
@@ -8,10 +9,12 @@ import CargoFormModal from '../features/cargas/components/CargoFormModal';
 import { useCargoForm } from '../features/cargas/hooks/useCargoForm';
 import { useCargoMutations } from '../features/cargas/hooks/useCargoMutations';
 import { formatFreightSegment } from '../features/freights/utils/freightSegment';
-import { contractsApi, freightsApi, vehiclesApi, cargasApi, companiesApi } from '../lib/api';
+import { contractsApi, freightsApi, vehiclesApi, cargasApi, companiesApi, transportPartnersApi } from '../lib/api';
 import { formatDateOnlyPtBr } from '../lib/date';
 import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
+import { canAccessFiscal, canUseFiscalThirdParty } from '../lib/features';
+import type { TransportPartner } from '../features/transport-partners/types/transport-partner.types';
 import { isValidDateInput } from '../lib/validation';
 import { Cargo, Company, Contract, Freight, Vehicle } from '../types';
 import { clearFieldError, FieldLabel, FormAlert, FormDatePicker, hasRequiredFieldsFilled, useFormErrorFocus } from '../shared/forms';
@@ -27,6 +30,8 @@ const initialFormData = {
   destination: '',
   amount: '',
   hasCargo: 'true',
+  executionMode: 'own_fleet',
+  transportPartnerId: '',
 };
 
 type FreightFormField =
@@ -37,7 +42,9 @@ type FreightFormField =
   | 'origin'
   | 'destination'
   | 'amount'
-  | 'hasCargo';
+  | 'hasCargo'
+  | 'executionMode'
+  | 'transportPartnerId';
 
 function getFreightFormErrors(
   formData: typeof initialFormData,
@@ -68,6 +75,10 @@ function getFreightFormErrors(
     }
   }
 
+  if (formData.executionMode === 'third_party' && !formData.transportPartnerId) {
+    errors.transportPartnerId = 'Selecione o transportador (TAC) responsavel pelo frete.';
+  }
+
   return errors;
 }
 
@@ -77,11 +88,15 @@ export default function Freights() {
   const canUpdate = canAccess(userProfile, 'freights', 'update');
   const canDelete = canAccess(userProfile, 'freights', 'delete');
   const canCreateCargas = canAccess(userProfile, 'cargas', 'create');
+  const canEmitFiscal = canAccessFiscal(userProfile);
+  const navigate = useNavigate();
   const [freights, setFreights] = useState<Freight[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [cargas, setCargas] = useState<Cargo[]>([]);
+  const [transportPartners, setTransportPartners] = useState<TransportPartner[]>([]);
+  const canUseTac = canUseFiscalThirdParty(userProfile);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFreight, setEditingFreight] = useState<Freight | null>(null);
@@ -123,6 +138,13 @@ export default function Freights() {
       setContracts(contractsData);
       setCompanies(companiesData);
       setCargas(cargasData);
+      if (canUseTac) {
+        try {
+          setTransportPartners(await transportPartnersApi.list());
+        } catch {
+          setTransportPartners([]);
+        }
+      }
     } catch (error) {
       setLoadError(getErrorMessage(error, 'Nao foi possivel carregar os fretes.'));
     } finally {
@@ -246,6 +268,8 @@ export default function Freights() {
       destination: formData.destination.trim(),
       amount: requiresAmount ? Number(formData.amount) : 0,
       hasCargo: formData.hasCargo === 'true',
+      executionMode: (canUseTac ? formData.executionMode : 'own_fleet') as 'own_fleet' | 'third_party',
+      transportPartnerId: canUseTac && formData.executionMode === 'third_party' ? formData.transportPartnerId || undefined : undefined,
     };
 
     setIsSubmitting(true);
@@ -267,6 +291,8 @@ export default function Freights() {
           origin: 'origin',
           destination: 'destination',
           amount: 'amount',
+          executionMode: 'executionMode',
+          transportPartnerId: 'transportPartnerId',
         },
       });
 
@@ -402,6 +428,8 @@ export default function Freights() {
       destination: freight.destination,
       amount: freight.amount ? String(freight.amount) : '',
       hasCargo: freight.hasCargo === false ? 'false' : 'true',
+      executionMode: freight.executionMode || 'own_fleet',
+      transportPartnerId: freight.transportPartnerId || '',
     });
     setSubmitError('');
     setSubmitSuccess('');
@@ -527,8 +555,18 @@ export default function Freights() {
                         {freight.billingType === 'contract_recurring' ? 'Sem receita por viagem' : 'Receita no frete'}
                       </p>
                     </div>
-                    {(canUpdate || canDelete || canCreateCargas) && (
+                    {(canUpdate || canDelete || canCreateCargas || canEmitFiscal) && (
                       <div className="flex items-center gap-2">
+                        {canEmitFiscal ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/fiscal?fromFreight=${freight.id}`)}
+                            className="rounded-full p-2 text-outline transition-colors hover:bg-primary/10 hover:text-primary"
+                            aria-label={`Emitir CT-e do frete ${freightSegment}`}
+                          >
+                            <FileText className="h-5 w-5" />
+                          </button>
+                        ) : null}
                         {canCreateCargas && freight.hasCargo !== false ? (
                           <button
                             type="button"
@@ -660,6 +698,35 @@ export default function Freights() {
                 ) : (
                   <div className="md:col-span-2 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-sm text-on-surface">
                     Este frete sera registrado apenas para controle operacional. O faturamento continuara vindo do contrato recorrente.
+                  </div>
+                )}
+              </>
+            )}
+
+            {canUseTac && showOperationalFields && (
+              <>
+                <div>
+                  <FieldLabel>Execucao do transporte</FieldLabel>
+                  <CustomSelect
+                    value={formData.executionMode}
+                    onChange={(value) => updateField('executionMode', value)}
+                    options={[
+                      { value: 'own_fleet', label: 'Frota propria' },
+                      { value: 'third_party', label: 'Terceiro (TAC)' },
+                    ]}
+                  />
+                </div>
+
+                {formData.executionMode === 'third_party' && (
+                  <div>
+                    <FieldLabel required>Transportador (TAC)</FieldLabel>
+                    <CustomSelect
+                      value={formData.transportPartnerId}
+                      onChange={(value) => updateField('transportPartnerId', value)}
+                      placeholder="Selecione o transportador"
+                      options={transportPartners.map((partner) => ({ value: partner.id, label: `${partner.name} - ${partner.documentNumber}` }))}
+                      error={fieldErrors.transportPartnerId}
+                    />
                   </div>
                 )}
               </>

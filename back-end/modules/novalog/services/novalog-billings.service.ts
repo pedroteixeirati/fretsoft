@@ -71,6 +71,7 @@ function mapBillingItem(row: NovalogBillingItemRow) {
     id: row.id,
     displayId: row.display_id !== null && row.display_id !== undefined ? Number(row.display_id) : undefined,
     billingId: row.billing_id,
+    fiscalDocumentId: row.fiscal_document_id || undefined,
     cteNumber: row.cte_number,
     cteKey: row.cte_key || '',
     issueDate: row.issue_date || '',
@@ -124,6 +125,7 @@ function normalizeBillingItem(item: NovalogBillingItemInput, index: number, fall
   }
 
   return {
+    fiscalDocumentId: null,
     cteNumber,
     cteKey,
     issueDate,
@@ -224,6 +226,7 @@ async function createRevenueForBillingItem(billing: NovalogBillingRow, item: Nov
        company_name,
        novalog_billing_id,
        novalog_billing_item_id,
+       fiscal_document_id,
        competence_month,
        competence_year,
        competence_label,
@@ -235,10 +238,11 @@ async function createRevenueForBillingItem(billing: NovalogBillingRow, item: Nov
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', 'novalog_billing_item', $12, $12)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending', 'novalog_billing_item', $13, $13)
      on conflict (novalog_billing_item_id) where novalog_billing_item_id is not null do update set
        company_id = excluded.company_id,
        company_name = excluded.company_name,
+       fiscal_document_id = excluded.fiscal_document_id,
        competence_month = excluded.competence_month,
        competence_year = excluded.competence_year,
        competence_label = excluded.competence_label,
@@ -254,6 +258,7 @@ async function createRevenueForBillingItem(billing: NovalogBillingRow, item: Nov
       billing.company_name,
       billing.id,
       item.id,
+      item.fiscal_document_id || null,
       competence.month,
       competence.year,
       competence.label,
@@ -282,6 +287,7 @@ async function syncRevenueFromBillingItem(billing: NovalogBillingRow, item: Nova
     companyName: billing.company_name,
     billingId: billing.id,
     billingItemId: item.id,
+    fiscalDocumentId: item.fiscal_document_id || null,
     competenceMonth: competence.month,
     competenceYear: competence.year,
     competenceLabel: competence.label,
@@ -349,7 +355,7 @@ export async function updateNovalogBilling(auth: AuthContext | undefined, id: st
 
   try {
     await updateTenantNovalogBillingDraft(id, tenantId, payload, auth?.userId);
-    await replaceTenantNovalogBillingItems(id, tenantId, payload.items, auth?.userId);
+    await replaceTenantNovalogBillingItems(id, tenantId, payload, auth?.userId);
     return getBillingDetail(id, tenantId);
   } catch (error) {
     if ((error as { code?: string }).code === '23505') {
@@ -422,7 +428,10 @@ export async function updateNovalogBillingItem(auth: AuthContext | undefined, it
       return null;
     }
 
-    const result = await updateTenantNovalogBillingItem(itemId, tenantId, payload, auth?.userId, client);
+    const result = await updateTenantNovalogBillingItem(itemId, tenantId, payload, {
+      billingDate: billing.billing_date,
+      companyName: billing.company_name,
+    }, auth?.userId, client);
     const updatedItem = result.rows[0];
     if (!updatedItem) {
       throw validationError('CT-e nao pode ser editado no status atual.', 'novalog_billing_item_not_editable');
