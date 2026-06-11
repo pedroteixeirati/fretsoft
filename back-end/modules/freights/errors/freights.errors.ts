@@ -12,4 +12,7 @@ export const freightErrors = {
   vehicleNotLinked: () => new AppError('O veiculo selecionado nao esta vinculado a este contrato.', { code: 'freight_vehicle_not_linked', field: 'vehicleId' }),
   perTripAmountRequired: () => new AppError('Informe o valor do frete para contratos por viagem.', { code: 'freight_per_trip_amount_required', field: 'amount' }),
   standaloneAmountRequired: () => new AppError('O valor do frete deve ser maior que zero para fretes avulsos.', { code: 'freight_standalone_amount_required', field: 'amount' }),
+  invalidExecutionMode: () => new AppError('Modo de execucao do frete invalido.', { code: 'invalid_freight_execution_mode', field: 'executionMode' }),
+  invalidTransportPartner: () => new AppError('Selecione um transportador (TAC) valido para fretes de terceiro.', { code: 'invalid_freight_transport_partner', field: 'transportPartnerId' }),
+  transportPartnerNotFound: () => new AppError('O transportador informado nao pertence a este tenant.', { code: 'freight_transport_partner_not_found', field: 'transportPartnerId' }),
 };

@@ -11,4 +11,6 @@ export interface Freight {
   destination: string;
   amount: number;
   hasCargo?: boolean;
+  executionMode?: 'own_fleet' | 'third_party';
+  transportPartnerId?: string | null;
 }

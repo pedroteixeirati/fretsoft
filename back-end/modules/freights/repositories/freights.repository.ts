@@ -14,7 +14,22 @@ export type FreightRow = {
   destination: string;
   amount: string | number;
   has_carga: boolean;
+  execution_mode: 'own_fleet' | 'third_party';
+  transport_partner_id: string | null;
 };
+
+export async function findTenantTransportPartnerForFreight(partnerId: string, tenantId: string) {
+  const result = await pool.query<{ id: string }>(
+    `select id
+     from transport_partners
+     where id = $1
+       and tenant_id = $2
+     limit 1`,
+    [partnerId, tenantId]
+  );
+
+  return result.rows[0] || null;
+}
 
 export async function findTenantVehicleForFreight(vehicleId: string, tenantId: string) {
   const result = await pool.query<{ id: string; plate: string }>(
@@ -43,7 +58,9 @@ export async function listTenantFreights(tenantId: string) {
             origin,
             destination,
             amount,
-            has_carga
+            has_carga,
+            execution_mode,
+            transport_partner_id
      from freights
      where tenant_id = $1
      order by date desc`,
@@ -65,6 +82,8 @@ export async function insertTenantFreight(
     destination: string;
     amount: number;
     hasCargo: boolean;
+    executionMode: 'own_fleet' | 'third_party';
+    transportPartnerId: string | null;
   },
   tenantId: string,
   userId?: string
@@ -83,9 +102,11 @@ export async function insertTenantFreight(
        origin,
        destination,
        amount,
-       has_carga
+       has_carga,
+       execution_mode,
+       transport_partner_id
      )
-     values ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     values ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      returning id,
                display_id,
                tenant_id,
@@ -98,7 +119,9 @@ export async function insertTenantFreight(
                origin,
                destination,
                amount,
-               has_carga`,
+               has_carga,
+               execution_mode,
+               transport_partner_id`,
     [
       tenantId,
       userId || null,
@@ -112,6 +135,8 @@ export async function insertTenantFreight(
       payload.destination,
       payload.amount,
       payload.hasCargo,
+      payload.executionMode,
+      payload.transportPartnerId,
     ]
   );
 
@@ -131,6 +156,8 @@ export async function updateTenantFreight(
     destination: string;
     amount: number;
     hasCargo: boolean;
+    executionMode: 'own_fleet' | 'third_party';
+    transportPartnerId: string | null;
   },
   tenantId: string,
   userId?: string
@@ -147,10 +174,12 @@ export async function updateTenantFreight(
          destination = $8,
          amount = $9,
          has_carga = $10,
-         updated_by_user_id = $11,
+         execution_mode = $11,
+         transport_partner_id = $12,
+         updated_by_user_id = $13,
          updated_at = now()
-     where id = $12
-       and tenant_id = $13
+     where id = $14
+       and tenant_id = $15
      returning id,
                display_id,
                tenant_id,
@@ -163,7 +192,9 @@ export async function updateTenantFreight(
                origin,
                destination,
                amount,
-               has_carga`,
+               has_carga,
+               execution_mode,
+               transport_partner_id`,
     [
       payload.vehicleId,
       payload.plate,
@@ -175,6 +206,8 @@ export async function updateTenantFreight(
       payload.destination,
       payload.amount,
       payload.hasCargo,
+      payload.executionMode,
+      payload.transportPartnerId,
       userId || null,
       id,
       tenantId,
