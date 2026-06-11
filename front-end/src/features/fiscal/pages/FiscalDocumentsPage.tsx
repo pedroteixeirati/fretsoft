@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { FileCheck2, FilePlus2, Pencil, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
+import { FileCheck2, FilePlus2, Lock, Pencil, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { getErrorMessage } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
-import { Alert, Button, DataTable, Input, KpiCard, Modal, PageHeader, Select, type DataTableColumn } from '../../../shared/ui';
+import { Alert, Button, ConfirmDialog, DataTable, Input, KpiCard, Modal, PageHeader, Select, type DataTableColumn } from '../../../shared/ui';
 import { useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
 import type { FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType } from '../types/fiscal.types';
@@ -72,6 +72,7 @@ export default function FiscalDocumentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [documentToDelete, setDocumentToDelete] = useState<FiscalDocument | null>(null);
 
   const filteredDocuments = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -171,14 +172,16 @@ export default function FiscalDocumentsPage() {
     }
   };
 
-  const handleDelete = async (document: FiscalDocument) => {
-    if (!window.confirm(`Excluir ${documentLabel(document)}? Apenas rascunhos, rejeitados ou erros podem ser removidos.`)) return;
+  const confirmDelete = async () => {
+    if (!documentToDelete) return;
 
     try {
       setSubmitError('');
-      await deleteDocument.mutateAsync(document.id);
+      await deleteDocument.mutateAsync(documentToDelete.id);
       setSuccessMessage('Documento fiscal excluido com sucesso.');
+      setDocumentToDelete(null);
     } catch (deleteError) {
+      setDocumentToDelete(null);
       setSubmitError(getErrorMessage(deleteError, 'Nao foi possivel excluir o documento fiscal.'));
     }
   };
@@ -246,7 +249,7 @@ export default function FiscalDocumentsPage() {
             </button>
           ) : null}
           {canDelete ? (
-            <button type="button" aria-label={`Excluir ${documentLabel(document)}`} onClick={() => handleDelete(document)} className="rounded-full p-2 text-error hover:bg-error/10">
+            <button type="button" aria-label={`Excluir ${documentLabel(document)}`} onClick={() => setDocumentToDelete(document)} className="rounded-full p-2 text-error hover:bg-error/10">
               <Trash2 className="h-4 w-4" />
             </button>
           ) : null}
@@ -326,12 +329,12 @@ export default function FiscalDocumentsPage() {
             <Input label="Emissao" type="date" value={draft.issueDate} onChange={(event) => updateDraft('issueDate', event.target.value)} required />
             <Input label="Vencimento" type="date" value={draft.dueDate} onChange={(event) => updateDraft('dueDate', event.target.value)} />
             <Input label="Valor" type="number" step="0.01" min="0" value={draft.amount || ''} onChange={(event) => updateDraft('amount', Number(event.target.value))} required />
-            <Select
-              value={draft.status}
-              onChange={(value) => updateDraft('status', value as FiscalDocumentStatus)}
-              options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
-              placeholder="Status"
-            />
+            <div>
+              <span className="block text-sm font-medium text-on-surface-variant">Status</span>
+              <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-surface-container px-3 py-2 text-xs font-bold text-on-surface">
+                <Lock className="h-3 w-3" /> {statusLabels[editingDocument ? editingDocument.status : 'draft']}
+              </span>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -356,6 +359,17 @@ export default function FiscalDocumentsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={Boolean(documentToDelete)}
+        tone="danger"
+        title="Excluir documento fiscal"
+        message={documentToDelete ? `Excluir ${documentLabel(documentToDelete)}? Apenas rascunhos, rejeitados ou erros podem ser removidos.` : ''}
+        confirmLabel="Excluir"
+        isLoading={deleteDocument.isPending}
+        onConfirm={confirmDelete}
+        onCancel={() => setDocumentToDelete(null)}
+      />
     </div>
   );
 }

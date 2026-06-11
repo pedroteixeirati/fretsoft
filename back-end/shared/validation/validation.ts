@@ -29,6 +29,12 @@ export function normalizeCpf(value?: string | null) {
   return (value || '').replace(/\D/g, '');
 }
 
+// Preserva letras para suportar o CNPJ alfanumerico (padrao Brasil 2026),
+// removendo apenas formatacao. CPF continua 11 digitos; CNPJ 14 caracteres.
+export function normalizeDocumentNumber(value?: string | null) {
+  return (value || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+}
+
 export function normalizePlate(value?: string | null) {
   return (value || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 }

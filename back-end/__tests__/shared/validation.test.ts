@@ -10,10 +10,19 @@ import {
   isValidPlate,
   normalizeCnpj,
   normalizeCpf,
+  normalizeDocumentNumber,
   normalizePhone,
   normalizePlate,
   slugify,
 } from '../../shared/validation/validation.ts';
+
+test('normalizeDocumentNumber preserva CNPJ alfanumerico e mantem CPF numerico', () => {
+  // CPF numerico: 11 digitos preservados.
+  assert.equal(normalizeDocumentNumber('123.456.789-09'), '12345678909');
+  // CNPJ alfanumerico (padrao 2026): letras preservadas, formatacao removida, maiusculo.
+  assert.equal(normalizeDocumentNumber('12.abc.345/01de-35'), '12ABC34501DE35');
+  assert.equal(normalizeDocumentNumber('12abc34501de35').length, 14);
+});
 
 test('valida e normaliza CNPJ corretamente', () => {
   assert.equal(normalizeCnpj('12.544.992/0001-05'), '12544992000105');

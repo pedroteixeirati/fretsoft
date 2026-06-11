@@ -39,6 +39,19 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('status fiscal e read-only: nasce draft e edicao preserva o estado atual', () => {
+  assert.match(serviceSource, /createTenantFiscalDocument\(\{ \.\.\.payload, status: 'draft' \}/);
+  assert.match(serviceSource, /editableStatuses\.includes\(current\.status\)/);
+  assert.match(serviceSource, /throw fiscalErrors\.documentNotEditable\(\)/);
+  assert.match(serviceSource, /updateTenantFiscalDocument\(id, \{ \.\.\.payload, status: current\.status \}/);
+});
+
+test('documento das partes preserva CNPJ alfanumerico', () => {
+  assert.match(serviceSource, /documentNumber: normalizeDocumentNumber\(party\.documentNumber\)/);
+  assert.match(providerServiceSource, /\[\^0-9A-Za-z\]/);
+  assert.match(providerServiceSource, /const isCpf = document\.length === 11/);
+});
+
 test('service valida dados fiscais criticos antes de persistir', () => {
   assert.match(serviceSource, /const documentTypes: FiscalDocumentType\[\] = \['cte', 'cte_os', 'mdfe'\]/);
   assert.match(serviceSource, /const statuses: FiscalDocumentStatus\[\]/);

@@ -98,9 +98,11 @@ function partyByRole(parties: FiscalPartyRow[], role: FiscalPartyRow['role']) {
 
 function focusPartyFields(prefix: string, party?: FiscalPartyRow) {
   if (!party) return {};
-  const digits = (party.document_number || '').replace(/\D/g, '');
+  // Preserva letras: o CNPJ alfanumerico (2026) nao pode ter caracteres removidos.
+  const document = (party.document_number || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  const isCpf = document.length === 11 && /^\d{11}$/.test(document);
   return onlyDefinedEntries({
-    [`${digits.length === 11 ? 'cpf' : 'cnpj'}_${prefix}`]: digits || undefined,
+    [`${isCpf ? 'cpf' : 'cnpj'}_${prefix}`]: document || undefined,
     [`inscricao_estadual_${prefix}`]: party.state_registration || undefined,
     [`nome_${prefix}`]: party.name,
     [`municipio_${prefix}`]: party.city || undefined,

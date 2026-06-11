@@ -2,6 +2,7 @@ import {
   isPositiveNumber,
   isValidDate,
   isValidState,
+  normalizeDocumentNumber,
   normalizeOptionalText,
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
@@ -120,7 +121,7 @@ function normalizeParty(party: FiscalPartyInput): FiscalPartyPayload {
   return {
     role,
     name,
-    documentNumber: normalizeDigits(party.documentNumber),
+    documentNumber: normalizeDocumentNumber(party.documentNumber),
     stateRegistration: normalizeOptionalText(party.stateRegistration) || '',
     city: normalizeOptionalText(party.city) || '',
     state,
@@ -189,21 +190,31 @@ export async function getFiscalDocument(id: string, tenantId?: string) {
   return mapDocumentRow(row, parties);
 }
 
+const editableStatuses: FiscalDocumentStatus[] = ['draft', 'rejected', 'error'];
+
 export async function createFiscalDocument(tenantId: string | undefined, userId: string | undefined, body: FiscalDocumentInput) {
   const payload = await validateFiscalDocumentPayload(body);
   if (await findFiscalDocumentDuplicate(payload, tenantId)) throw fiscalErrors.duplicatedDocument();
   if (payload.accessKey && await findFiscalDocumentByAccessKey(payload.accessKey, tenantId)) throw fiscalErrors.duplicatedAccessKey();
 
-  const row = await createTenantFiscalDocument(payload, tenantId, userId);
+  // Status nunca vem do cliente: documento sempre nasce em rascunho e so muda via emit/sync.
+  const row = await createTenantFiscalDocument({ ...payload, status: 'draft' }, tenantId, userId);
   return row ? getFiscalDocument(row.id, tenantId) : null;
 }
 
 export async function updateFiscalDocument(id: string, tenantId: string | undefined, userId: string | undefined, body: FiscalDocumentInput) {
+  const current = await findTenantFiscalDocument(id, tenantId);
+  if (!current) return null;
+  if (!editableStatuses.includes(current.status)) {
+    throw fiscalErrors.documentNotEditable();
+  }
+
   const payload = await validateFiscalDocumentPayload(body);
   if (await findFiscalDocumentDuplicate(payload, tenantId, id)) throw fiscalErrors.duplicatedDocument();
   if (payload.accessKey && await findFiscalDocumentByAccessKey(payload.accessKey, tenantId, id)) throw fiscalErrors.duplicatedAccessKey();
 
-  const row = await updateTenantFiscalDocument(id, payload, tenantId, userId);
+  // Preserva o status atual; edicao manual nunca altera o estado fiscal.
+  const row = await updateTenantFiscalDocument(id, { ...payload, status: current.status }, tenantId, userId);
   return row ? getFiscalDocument(row.id, tenantId) : null;
 }
 

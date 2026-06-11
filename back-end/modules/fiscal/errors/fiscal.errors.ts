@@ -17,6 +17,7 @@ export const fiscalErrors = {
   duplicatedDocument: () => conflictError('Ja existe um documento fiscal com este tipo, serie e numero.', 'duplicated_fiscal_document', 'number'),
   duplicatedAccessKey: () => conflictError('Ja existe um documento fiscal com esta chave de acesso.', 'duplicated_fiscal_access_key', 'accessKey'),
   documentNotEmittable: () => conflictError('Apenas documentos em rascunho, rejeitados ou com erro podem ser enviados para emissao.', 'fiscal_document_not_emittable', 'status'),
+  documentNotEditable: () => conflictError('Documento fiscal autorizado ou em processamento nao pode ser editado.', 'fiscal_document_not_editable', 'status'),
   providerNotConfigured: () => new AppError('Nenhum provider fiscal foi configurado para emissao automatica.', { statusCode: 503, code: 'fiscal_provider_not_configured' }),
   providerTokenMissing: () => new AppError('Token da Focus NFe nao configurado.', { statusCode: 503, code: 'focus_nfe_token_missing' }),
   providerRequestFailed: (message: string, details?: Record<string, unknown>) => new AppError(message, { statusCode: 502, code: 'fiscal_provider_request_failed', details: details || null }),
