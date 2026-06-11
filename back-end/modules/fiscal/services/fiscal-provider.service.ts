@@ -1,7 +1,7 @@
 import type { FiscalDocumentRow, FiscalPartyRow, FiscalPaymentRow } from '../dtos/fiscal-document.types';
 import { fiscalErrors } from '../errors/fiscal.errors';
 
-export type FiscalProviderOperation = 'emit_document' | 'consult_document' | 'close_document';
+export type FiscalProviderOperation = 'emit_document' | 'consult_document' | 'close_document' | 'send_email';
 
 export interface FiscalProviderRequest {
   operation: FiscalProviderOperation;
@@ -42,6 +42,7 @@ export interface FiscalProviderAdapter {
   emitDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
   consultDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
   closeDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
+  sendEmail(request: FiscalProviderRequest, emails: string[]): Promise<FiscalProviderResponse>;
 }
 
 const focusProviderAliases = new Set(['focus', 'focus_nfe', 'focusnfe']);
@@ -401,6 +402,38 @@ export function createFocusNfeProviderAdapter(): FiscalProviderAdapter {
         clearTimeout(timeout);
       }
     },
+    async sendEmail(request, emails) {
+      const token = focusTokenFromEnv();
+      const endpoint = focusDocumentEndpoint(request.document.document_type);
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const response = await fetch(`${focusBaseUrlFromEnv()}/${endpoint}/${encodeURIComponent(reference)}/email`, {
+          method: 'POST',
+          headers: {
+            Authorization: focusAuthHeader(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ emails }),
+          signal: controller.signal,
+        });
+        const responsePayload = await readJsonResponse(response);
+
+        if (!response.ok) {
+          throw fiscalErrors.providerRequestFailed('Falha ao reenviar o documento por e-mail na Focus NFe.', {
+            provider: 'focus_nfe',
+            httpStatus: response.status,
+            response: responsePayload,
+          });
+        }
+
+        return { status: 'authorized', provider: 'focus_nfe', responsePayload, httpStatus: response.status };
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
   };
 }
 
@@ -461,6 +494,16 @@ export function createMockFiscalProviderAdapter(): FiscalProviderAdapter {
           status: 'encerrado',
           mensagem: 'MDF-e encerrado em mock local.',
         },
+        httpStatus: 200,
+      };
+    },
+    async sendEmail(request, emails) {
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      return {
+        status: 'authorized',
+        provider: 'mock_fiscal',
+        providerDocumentId: reference,
+        responsePayload: { ref: reference, enviado: true, emails, mensagem: 'Documento reenviado por e-mail em mock local.' },
         httpStatus: 200,
       };
     },

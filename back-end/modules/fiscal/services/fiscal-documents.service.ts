@@ -614,6 +614,51 @@ export async function syncFiscalDocument(id: string, tenantId: string | undefine
   }
 }
 
+export async function resendFiscalDocument(id: string, tenantId: string | undefined, emails: string[]) {
+  const document = await findTenantFiscalDocument(id, tenantId);
+  if (!document) return null;
+  if (document.status !== 'authorized') throw fiscalErrors.documentNotResendable();
+
+  const cleanEmails = (Array.isArray(emails) ? emails : [])
+    .map((email) => String(email).trim())
+    .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+  if (cleanEmails.length === 0) throw fiscalErrors.invalidResendEmail();
+
+  const request = buildFiscalProviderRequest(document, [], []);
+  const requestPayload = { ...serializeFiscalProviderRequest({ ...request, operation: 'send_email' }), emails: cleanEmails };
+  const startedAt = Date.now();
+  let providerName = document.provider || 'focus_nfe';
+
+  try {
+    const provider = getFiscalProviderAdapter();
+    providerName = provider.name;
+    const response = await provider.sendEmail({ ...request, operation: 'send_email' }, cleanEmails);
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'send_email',
+      requestPayload,
+      responsePayload: response.responsePayload || {},
+      httpStatus: response.httpStatus || null,
+      durationMs: Date.now() - startedAt,
+    });
+    return getFiscalDocument(id, tenantId);
+  } catch (error) {
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'send_email',
+      requestPayload,
+      responsePayload: {},
+      errorMessage: error instanceof Error ? error.message : 'Falha desconhecida ao reenviar o documento.',
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
+}
+
 export async function closeMdfeDocument(id: string, tenantId: string | undefined, userId: string | undefined) {
   const document = await findTenantFiscalDocument(id, tenantId);
   if (!document) return null;

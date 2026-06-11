@@ -37,13 +37,19 @@ export function useFiscalDocumentMutations() {
     onSuccess: invalidate,
   });
 
+  const resendDocument = useMutation({
+    mutationFn: ({ id, emails }: { id: string; emails: string[] }) => fiscalApi.resendDocument(id, emails),
+    onSuccess: invalidate,
+  });
+
   return {
     createDocument,
     updateDocument,
     emitDocument,
     syncDocument,
     closeDocument,
+    resendDocument,
     deleteDocument,
-    isSubmitting: createDocument.isPending || updateDocument.isPending || emitDocument.isPending || syncDocument.isPending || closeDocument.isPending || deleteDocument.isPending,
+    isSubmitting: createDocument.isPending || updateDocument.isPending || emitDocument.isPending || syncDocument.isPending || closeDocument.isPending || resendDocument.isPending || deleteDocument.isPending,
   };
 }

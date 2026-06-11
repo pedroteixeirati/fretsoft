@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileCheck2, FilePlus2, Flag, Lock, Pencil, RefreshCw, Search, Send, Trash2, Upload } from 'lucide-react';
+import { FileCheck2, FilePlus2, Flag, Lock, Mail, Pencil, RefreshCw, Search, Send, Trash2, Upload } from 'lucide-react';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { getErrorMessage } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
@@ -82,7 +82,7 @@ export default function FiscalDocumentsPage() {
   const canDelete = canAccess(userProfile, 'fiscal', 'delete');
   const canUseTac = canUseFiscalThirdParty(userProfile);
   const { documents, isLoading, error } = useFiscalDocumentsQuery(Boolean(user));
-  const { createDocument, updateDocument, emitDocument, syncDocument, closeDocument, deleteDocument, isSubmitting } = useFiscalDocumentMutations();
+  const { createDocument, updateDocument, emitDocument, syncDocument, closeDocument, resendDocument, deleteDocument, isSubmitting } = useFiscalDocumentMutations();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FiscalDocumentStatus>('all');
@@ -94,6 +94,8 @@ export default function FiscalDocumentsPage() {
   const [warningMessages, setWarningMessages] = useState<string[]>([]);
   const [documentToDelete, setDocumentToDelete] = useState<FiscalDocument | null>(null);
   const [documentToClose, setDocumentToClose] = useState<FiscalDocument | null>(null);
+  const [documentToResend, setDocumentToResend] = useState<FiscalDocument | null>(null);
+  const [resendEmails, setResendEmails] = useState('');
   const [nfeImportMsg, setNfeImportMsg] = useState('');
   const [nfeImportError, setNfeImportError] = useState('');
   const nfeInputRef = useRef<HTMLInputElement | null>(null);
@@ -373,6 +375,28 @@ export default function FiscalDocumentsPage() {
     }
   };
 
+  const openResend = (document: FiscalDocument) => {
+    setDocumentToResend(document);
+    setResendEmails('');
+    setSubmitError('');
+  };
+
+  const confirmResend = async () => {
+    if (!documentToResend) return;
+    const emails = resendEmails.split(/[,;\s]+/).map((email) => email.trim()).filter(Boolean);
+    if (emails.length === 0) {
+      setSubmitError('Informe ao menos um e-mail para reenvio.');
+      return;
+    }
+    try {
+      await resendDocument.mutateAsync({ id: documentToResend.id, emails });
+      setSuccessMessage('Documento reenviado por e-mail.');
+      setDocumentToResend(null);
+    } catch (resendError) {
+      setSubmitError(getErrorMessage(resendError, 'Nao foi possivel reenviar o documento.'));
+    }
+  };
+
   const confirmClose = async () => {
     if (!documentToClose) return;
     try {
@@ -455,6 +479,16 @@ export default function FiscalDocumentsPage() {
               className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container disabled:opacity-50"
             >
               <RefreshCw className="h-4 w-4" />
+            </button>
+          ) : null}
+          {canUpdate && document.status === 'authorized' ? (
+            <button
+              type="button"
+              aria-label={`Reenviar ${documentLabel(document)} por e-mail`}
+              onClick={() => openResend(document)}
+              className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container"
+            >
+              <Mail className="h-4 w-4" />
             </button>
           ) : null}
           {canUpdate && document.documentType === 'mdfe' && document.status === 'authorized' && !document.mdfeData?.encerrado ? (
@@ -757,6 +791,34 @@ export default function FiscalDocumentsPage() {
             <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Salvar documento'}</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(documentToResend)}
+        onClose={() => setDocumentToResend(null)}
+        title={documentToResend ? `Reenviar ${documentLabel(documentToResend)} por e-mail` : 'Reenviar documento'}
+        subtitle="Envia o XML e o DACTE ao cliente (via emissor)."
+        panelClassName="max-w-lg"
+      >
+        <div className="space-y-4">
+          <Input
+            label="E-mail(s) do destinatario"
+            type="text"
+            value={resendEmails}
+            onChange={(event) => setResendEmails(event.target.value)}
+            placeholder="separe por virgula"
+          />
+          {documentToResend?.xml || documentToResend?.dacteUrl ? (
+            <div className="flex flex-wrap gap-4 text-sm">
+              {documentToResend?.xml ? <a href={documentToResend.xml} target="_blank" rel="noreferrer" className="text-info hover:underline">Baixar XML</a> : null}
+              {documentToResend?.dacteUrl ? <a href={documentToResend.dacteUrl} target="_blank" rel="noreferrer" className="text-info hover:underline">Baixar DACTE</a> : null}
+            </div>
+          ) : null}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setDocumentToResend(null)}>Fechar</Button>
+            <Button onClick={confirmResend} disabled={resendDocument.isPending}>{resendDocument.isPending ? 'Enviando...' : 'Enviar'}</Button>
+          </div>
+        </div>
       </Modal>
 
       <ConfirmDialog

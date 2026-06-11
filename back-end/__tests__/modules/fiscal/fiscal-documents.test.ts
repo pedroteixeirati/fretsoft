@@ -39,6 +39,15 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('reenvio do documento autorizado por e-mail (saida)', () => {
+  assert.match(providerServiceSource, /sendEmail\(request: FiscalProviderRequest, emails: string\[\]\)/);
+  assert.match(providerServiceSource, /\/\$\{endpoint\}\/\$\{encodeURIComponent\(reference\)\}\/email/);
+  assert.match(serviceSource, /export async function resendFiscalDocument/);
+  assert.match(serviceSource, /document\.status !== 'authorized'\) throw fiscalErrors\.documentNotResendable\(\)/);
+  assert.match(serviceSource, /provider\.sendEmail\(\{ \.\.\.request, operation: 'send_email' \}, cleanEmails\)/);
+  assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/email'/);
+});
+
 test('MDF-e: dados estruturados, agregacao de CT-es e encerramento', () => {
   const mdfeMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713441600000_mdfe_data.sql'), 'utf8');
   assert.match(mdfeMigration, /add column if not exists mdfe_data jsonb/i);
