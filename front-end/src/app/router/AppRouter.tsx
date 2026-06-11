@@ -22,6 +22,7 @@ import Settings from '../../pages/Settings';
 import Support from '../../pages/Support';
 import LoginPage from '../../features/auth/pages/LoginPage';
 import AccessPendingPage from '../../features/auth/pages/AccessPendingPage';
+import PublicTacRegistrationPage from '../../features/transport-partners/pages/PublicTacRegistrationPage';
 import PrivateLayout from '../layouts/PrivateLayout';
 import PublicLayout from '../layouts/PublicLayout';
 import PrivateRoute from './PrivateRoute';
@@ -47,6 +48,8 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/cadastro-tac/:tenantSlug" element={<PublicTacRegistrationPage />} />
+
         <Route element={<PublicRoute />}>
           <Route element={<PublicLayout />}>
             <Route path="/login" element={<LoginPage />} />

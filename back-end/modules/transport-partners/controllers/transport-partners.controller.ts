@@ -10,6 +10,7 @@ import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { serializeTransportPartner, serializeTransportPartners } from '../serializers/transport-partners.serializer';
 import {
   createTransportPartner,
+  createPublicTacRegistration,
   deleteTransportPartner,
   listTransportPartners,
   transportPartnersPermissions,
@@ -17,6 +18,20 @@ import {
 } from '../services/transport-partners.service';
 
 const router = express.Router();
+
+router.post('/public/tenants/:slug/tac-registration', async (req, res, next) => {
+  try {
+    const registration = await createPublicTacRegistration(req.params.slug, req.body);
+    if (!registration) {
+      sendErrorResponse(res, notFoundError('Formulario de cadastro nao encontrado.', 'public_tac_registration_not_found'));
+      return;
+    }
+
+    res.status(201).json(registration);
+  } catch (error) {
+    next(error);
+  }
+});
 
 function requireThirdPartyFeature(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const features = req.auth?.features;

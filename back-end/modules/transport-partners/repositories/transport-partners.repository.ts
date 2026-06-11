@@ -9,6 +9,8 @@ function selectColumns() {
           document_number,
           partner_type,
           rntrc,
+          phone,
+          receipt_method,
           bank_name,
           bank_branch,
           bank_account,
@@ -16,9 +18,28 @@ function selectColumns() {
           pix_key,
           pix_key_type,
           status,
+          approval_status,
+          approved_by_user_id,
+          approved_at,
+          accepted_responsibility_at,
+          accepted_lgpd_at,
+          public_submitted_at,
           notes,
           created_at,
           updated_at`;
+}
+
+export async function findActiveTenantBySlug(slug: string) {
+  const result = await pool.query<{ id: string; name: string; trade_name: string | null; slug: string }>(
+    `select id, name, trade_name, slug
+     from tenants
+     where slug = $1
+       and status = 'active'
+     limit 1`,
+    [slug]
+  );
+
+  return result.rows[0] || null;
 }
 
 export async function listTenantTransportPartners(tenantId: string) {
@@ -95,6 +116,67 @@ export async function insertTenantTransportPartner(payload: TransportPartnerPayl
       payload.pixKey || null,
       payload.pixKeyType || null,
       payload.status,
+      payload.notes || null,
+    ]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function insertPublicTacRegistration(
+  payload: {
+    name: string;
+    documentNumber: string;
+    rntrc: string;
+    phone: string;
+    receiptMethod: 'pix' | 'bank_transfer' | 'both';
+    pixKey: string;
+    pixKeyType: string;
+    bankName: string;
+    bankBranch: string;
+    bankAccount: string;
+    bankAccountType: string;
+    notes: string;
+  },
+  tenantId: string
+) {
+  const result = await pool.query<TransportPartnerRow>(
+    `insert into transport_partners (
+       tenant_id,
+       name,
+       document_number,
+       partner_type,
+       rntrc,
+       phone,
+       receipt_method,
+       bank_name,
+       bank_branch,
+       bank_account,
+       bank_account_type,
+       pix_key,
+       pix_key_type,
+       status,
+       approval_status,
+       accepted_responsibility_at,
+       accepted_lgpd_at,
+       public_submitted_at,
+       notes
+     )
+     values ($1, $2, $3, 'tac', $4, $5, $6, $7, $8, $9, $10, $11, $12, 'inactive', 'pending', now(), now(), now(), $13)
+     returning ${selectColumns()}`,
+    [
+      tenantId,
+      payload.name,
+      payload.documentNumber,
+      payload.rntrc,
+      payload.phone,
+      payload.receiptMethod,
+      payload.bankName || null,
+      payload.bankBranch || null,
+      payload.bankAccount || null,
+      payload.bankAccountType || null,
+      payload.pixKey || null,
+      payload.pixKeyType || null,
       payload.notes || null,
     ]
   );

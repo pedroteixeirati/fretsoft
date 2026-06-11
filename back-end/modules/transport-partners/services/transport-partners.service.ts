@@ -1,10 +1,13 @@
 import type { ResourcePermissions } from '../../../shared/authorization/permissions';
-import { isValidCnpj, isValidCpf, normalizeDocumentNumber, normalizeOptionalText, normalizeRequiredText } from '../../../shared/validation/validation';
+import { isValidCnpj, isValidCpf, isValidPhone, normalizeDocumentNumber, normalizeOptionalText, normalizePhone, normalizeRequiredText } from '../../../shared/validation/validation';
 import type { AuthContext } from '../../auth/dtos/auth-context';
 import type {
   TransportPartnerInput,
   TransportPartnerPayload,
   TransportPartnerRow,
+  PublicTacRegistrationInput,
+  PublicTacRegistrationPayload,
+  TransportPartnerReceiptMethod,
   TransportPartnerStatus,
   TransportPartnerType,
 } from '../dtos/transport-partner.types';
@@ -12,7 +15,9 @@ import { transportPartnerErrors } from '../errors/transport-partners.errors';
 import {
   deleteTenantTransportPartner,
   findTenantTransportPartner,
+  findActiveTenantBySlug,
   findTransportPartnerByDocument,
+  insertPublicTacRegistration,
   insertTenantTransportPartner,
   listTenantTransportPartners,
   updateTenantTransportPartner,
@@ -27,6 +32,7 @@ export const transportPartnersPermissions: ResourcePermissions = {
 
 const partnerTypes: TransportPartnerType[] = ['tac', 'agregado'];
 const partnerStatuses: TransportPartnerStatus[] = ['active', 'inactive'];
+const receiptMethods: TransportPartnerReceiptMethod[] = ['pix', 'bank_transfer', 'both'];
 
 function isValidPartnerDocument(document: string) {
   // CPF: 11 digitos numericos. CNPJ: 14 caracteres (numerico valido ou alfanumerico).
@@ -83,6 +89,53 @@ export function validateTransportPartnerPayload(body: TransportPartnerInput): Tr
   };
 }
 
+export function validatePublicTacRegistrationPayload(body: PublicTacRegistrationInput): PublicTacRegistrationPayload {
+  const name = normalizeRequiredText(body.name);
+  const documentNumber = normalizeDocumentNumber(body.documentNumber);
+  const rntrc = (normalizeOptionalText(body.rntrc) || '').replace(/\D/g, '');
+  const phone = normalizePhone(body.phone);
+  const receiptMethod = normalizeOptionalText(body.receiptMethod as string) as TransportPartnerReceiptMethod;
+  const pixKey = normalizeOptionalText(body.pixKey) || '';
+  const pixKeyType = normalizeOptionalText(body.pixKeyType) || '';
+  const bankName = normalizeOptionalText(body.bankName) || '';
+  const bankBranch = normalizeOptionalText(body.bankBranch) || '';
+  const bankAccount = normalizeOptionalText(body.bankAccount) || '';
+  const bankAccountType = normalizeOptionalText(body.bankAccountType) || '';
+
+  if (name.length < 2) throw transportPartnerErrors.invalidName();
+  if (!isValidPartnerDocument(documentNumber)) throw transportPartnerErrors.invalidDocument();
+  if (rntrc.length < 8 || rntrc.length > 12) throw transportPartnerErrors.invalidRntrc();
+  if (!isValidPhone(phone)) throw transportPartnerErrors.invalidPhone();
+  if (!receiptMethods.includes(receiptMethod)) throw transportPartnerErrors.invalidReceiptMethod();
+
+  if ((receiptMethod === 'pix' || receiptMethod === 'both') && (!pixKey || !pixKeyType)) {
+    throw transportPartnerErrors.missingPixData();
+  }
+
+  if ((receiptMethod === 'bank_transfer' || receiptMethod === 'both') && (!bankName || !bankBranch || !bankAccount || !bankAccountType)) {
+    throw transportPartnerErrors.missingBankData();
+  }
+
+  if (body.acceptedResponsibility !== true || body.acceptedLgpd !== true) {
+    throw transportPartnerErrors.termsNotAccepted();
+  }
+
+  return {
+    name,
+    documentNumber,
+    rntrc,
+    phone,
+    receiptMethod,
+    pixKey,
+    pixKeyType,
+    bankName,
+    bankBranch,
+    bankAccount,
+    bankAccountType,
+    notes: normalizeOptionalText(body.notes) || '',
+  };
+}
+
 export async function listTransportPartners(auth?: AuthContext) {
   if (!auth?.tenantId) return [];
   const rows = await listTenantTransportPartners(auth.tenantId);
@@ -97,6 +150,26 @@ export async function createTransportPartner(auth: AuthContext | undefined, body
   }
   const row = await insertTenantTransportPartner(payload, tenantId, auth?.userId);
   return row ? mapPartnerRow(row) : null;
+}
+
+export async function createPublicTacRegistration(tenantSlug: string, body: PublicTacRegistrationInput) {
+  const normalizedSlug = normalizeRequiredText(tenantSlug).toLowerCase();
+  const tenant = await findActiveTenantBySlug(normalizedSlug);
+  if (!tenant) return null;
+
+  const payload = validatePublicTacRegistrationPayload(body);
+  if (await findTransportPartnerByDocument(payload.documentNumber, tenant.id)) {
+    throw transportPartnerErrors.duplicatedDocument();
+  }
+
+  const row = await insertPublicTacRegistration(payload, tenant.id);
+  return row ? {
+    id: row.id,
+    tenantName: tenant.trade_name || tenant.name,
+    name: row.name,
+    documentNumber: row.document_number,
+    status: row.approval_status,
+  } : null;
 }
 
 export async function updateTransportPartner(auth: AuthContext | undefined, id: string, body: TransportPartnerInput) {
