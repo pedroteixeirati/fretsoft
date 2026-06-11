@@ -18,6 +18,33 @@ export type FreightRow = {
   transport_partner_id: string | null;
 };
 
+export async function findTenantFreightById(id: string, tenantId: string) {
+  const result = await pool.query<FreightRow>(
+    `select id,
+            display_id,
+            tenant_id,
+            vehicle_id,
+            plate,
+            contract_id,
+            contract_name,
+            billing_type,
+            date,
+            origin,
+            destination,
+            amount,
+            has_carga,
+            execution_mode,
+            transport_partner_id
+     from freights
+     where id = $1
+       and tenant_id = $2
+     limit 1`,
+    [id, tenantId]
+  );
+
+  return result.rows[0] || null;
+}
+
 export async function findTenantTransportPartnerForFreight(partnerId: string, tenantId: string) {
   const result = await pool.query<{ id: string }>(
     `select id

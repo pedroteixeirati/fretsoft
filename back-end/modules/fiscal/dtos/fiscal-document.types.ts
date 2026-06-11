@@ -34,6 +34,7 @@ export interface FiscalDocumentInput {
   taxData?: Record<string, unknown> | null;
   emitterSnapshot?: Record<string, unknown> | null;
   notes?: string | null;
+  sourceFreightId?: string | null;
   parties?: FiscalPartyInput[] | null;
 }
 
@@ -69,6 +70,7 @@ export interface FiscalDocumentPayload {
   taxData: Record<string, unknown>;
   emitterSnapshot: Record<string, unknown>;
   notes: string;
+  sourceFreightId: string | null;
   parties: FiscalPartyPayload[];
 }
 
@@ -97,6 +99,7 @@ export interface FiscalDocumentRow {
   tax_data: Record<string, unknown> | null;
   emitter_snapshot: Record<string, unknown> | null;
   notes: string | null;
+  source_freight_id: string | null;
   created_at: string;
   updated_at: string;
 }

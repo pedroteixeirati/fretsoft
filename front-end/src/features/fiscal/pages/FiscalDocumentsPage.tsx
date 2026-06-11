@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FileCheck2, FilePlus2, Lock, Pencil, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { getErrorMessage } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
 import { Alert, Button, ConfirmDialog, DataTable, Input, KpiCard, Modal, PageHeader, Select, type DataTableColumn } from '../../../shared/ui';
+import { fiscalApi } from '../services/fiscal.api';
 import { useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
 import type { FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType } from '../types/fiscal.types';
@@ -44,6 +46,7 @@ const emptyDraft: FiscalDocumentDraft = {
   taxData: {},
   emitterSnapshot: {},
   notes: '',
+  sourceFreightId: '',
   parties: [],
 };
 
@@ -73,6 +76,7 @@ export default function FiscalDocumentsPage() {
   const [submitError, setSubmitError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [documentToDelete, setDocumentToDelete] = useState<FiscalDocument | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const filteredDocuments = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -132,6 +136,7 @@ export default function FiscalDocumentsPage() {
       taxData: document.taxData || {},
       emitterSnapshot: document.emitterSnapshot || {},
       notes: document.notes,
+      sourceFreightId: document.sourceFreightId || '',
       parties: document.parties || [],
     });
     setSubmitError('');
@@ -141,6 +146,44 @@ export default function FiscalDocumentsPage() {
   const updateDraft = <K extends keyof FiscalDocumentDraft>(key: K, value: FiscalDocumentDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
   };
+
+  useEffect(() => {
+    const fromFreight = searchParams.get('fromFreight');
+    if (!fromFreight || isLoading) return;
+
+    let cancelled = false;
+    const clearParam = () => {
+      searchParams.delete('fromFreight');
+      setSearchParams(searchParams, { replace: true });
+    };
+
+    (async () => {
+      try {
+        const result = await fiscalApi.draftFromFreight(fromFreight);
+        if (cancelled) return;
+        if (result.existingDocumentId) {
+          const existing = documents.find((current) => current.id === result.existingDocumentId);
+          if (existing) {
+            openEdit(existing);
+            setSuccessMessage('Este frete ja possui um documento fiscal. Abrimos o registro existente.');
+          }
+        } else {
+          setEditingDocument(null);
+          setDraft({ ...emptyDraft, ...result.draft } as FiscalDocumentDraft);
+          setSubmitError('');
+          setIsModalOpen(true);
+        }
+      } catch (prefillError) {
+        if (!cancelled) setSubmitError(getErrorMessage(prefillError, 'Nao foi possivel carregar os dados do frete.'));
+      } finally {
+        if (!cancelled) clearParam();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, isLoading, documents]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

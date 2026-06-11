@@ -10,7 +10,7 @@ import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { fiscalPermissions } from '../fiscal.resource';
 import type { FiscalDocumentInput } from '../dtos/fiscal-document.types';
 import { serializeFiscalDocument, serializeFiscalDocuments } from '../serializers/fiscal-documents.serializer';
-import { createFiscalDocument, emitFiscalDocument, getFiscalDocument, listTenantFiscalDocuments, removeFiscalDocument, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
+import { buildFiscalDraftFromFreight, createFiscalDocument, emitFiscalDocument, getFiscalDocument, listTenantFiscalDocuments, removeFiscalDocument, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
 
 const router = express.Router();
 
@@ -28,6 +28,24 @@ router.get('/fiscal/documents', loadAuthContext, requireFiscalFeature, async (re
     }
 
     res.json(serializeFiscalDocuments(await listTenantFiscalDocuments(req.auth?.tenantId)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/fiscal/documents/from-freight/:freightId', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('create', fiscalPermissions, req.auth?.role), 'Sem permissao para emitir documentos fiscais.')) {
+      return;
+    }
+
+    const result = await buildFiscalDraftFromFreight(req.params.freightId, req.auth?.tenantId);
+    if (!result) {
+      sendErrorResponse(res, notFoundError('Frete nao encontrado.', 'freight_not_found'));
+      return;
+    }
+
+    res.json(result);
   } catch (error) {
     next(error);
   }

@@ -39,6 +39,16 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('documento fiscal nasce de um frete com idempotencia por frete', () => {
+  const sourceMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713430800000_fiscal_source_freight.sql'), 'utf8');
+  assert.match(sourceMigration, /add column if not exists source_freight_id uuid references freights\(id\)/i);
+  assert.match(sourceMigration, /idx_fiscal_documents_unique_source_freight[\s\S]*where source_freight_id is not null and status <> 'canceled'/i);
+  assert.match(serviceSource, /export async function buildFiscalDraftFromFreight/);
+  assert.match(serviceSource, /findFiscalDocumentBySourceFreight\(payload\.sourceFreightId, tenantId\)/);
+  assert.match(serviceSource, /throw fiscalErrors\.duplicatedSourceFreight\(\)/);
+  assert.match(controllerSource, /router\.get\('\/fiscal\/documents\/from-freight\/:freightId'/);
+});
+
 test('status fiscal e read-only: nasce draft e edicao preserva o estado atual', () => {
   assert.match(serviceSource, /createTenantFiscalDocument\(\{ \.\.\.payload, status: 'draft' \}/);
   assert.match(serviceSource, /editableStatuses\.includes\(current\.status\)/);

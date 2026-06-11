@@ -2,10 +2,12 @@ import {
   isPositiveNumber,
   isValidDate,
   isValidState,
+  isValidUuid,
   normalizeDocumentNumber,
   normalizeOptionalText,
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
+import { findTenantFreightById } from '../../freights/repositories/freights.repository';
 import type {
   FiscalDocumentInput,
   FiscalDocumentPayload,
@@ -23,6 +25,7 @@ import {
   createFiscalCommunicationLog,
   deleteTenantFiscalDocument,
   findFiscalDocumentByAccessKey,
+  findFiscalDocumentBySourceFreight,
   findFiscalDocumentDuplicate,
   findTenantFiscalDocument,
   listFiscalDocumentParties,
@@ -103,6 +106,7 @@ function mapDocumentRow(row: FiscalDocumentRow, parties: FiscalPartyRow[] = []) 
     taxData: row.tax_data || {},
     emitterSnapshot: row.emitter_snapshot || {},
     notes: row.notes || '',
+    sourceFreightId: row.source_freight_id || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     parties: parties.map(mapPartyRow),
@@ -144,6 +148,8 @@ export async function validateFiscalDocumentPayload(body: FiscalDocumentInput): 
   if (!/^\d{2}$/.test(model)) throw fiscalErrors.invalidModel();
   if (!/^[0-9A-Za-z-]{1,10}$/.test(series)) throw fiscalErrors.invalidSeries();
   if (!/^[0-9A-Za-z-]{1,20}$/.test(number)) throw fiscalErrors.invalidNumber();
+  const sourceFreightId = normalizeOptionalText(body.sourceFreightId) || '';
+  if (sourceFreightId && !isValidUuid(sourceFreightId)) throw fiscalErrors.invalidSourceFreight();
   if (accessKey && !/^\d{44}$/.test(accessKey)) throw fiscalErrors.invalidAccessKey();
   if (!statuses.includes(status)) throw fiscalErrors.invalidStatus();
   if (!isValidDate(issueDate)) throw fiscalErrors.invalidIssueDate();
@@ -173,6 +179,7 @@ export async function validateFiscalDocumentPayload(body: FiscalDocumentInput): 
     taxData: normalizeJsonObject(body.taxData),
     emitterSnapshot: normalizeJsonObject(body.emitterSnapshot),
     notes: normalizeOptionalText(body.notes) || '',
+    sourceFreightId: sourceFreightId || null,
     parties,
   };
 }
@@ -196,10 +203,38 @@ export async function createFiscalDocument(tenantId: string | undefined, userId:
   const payload = await validateFiscalDocumentPayload(body);
   if (await findFiscalDocumentDuplicate(payload, tenantId)) throw fiscalErrors.duplicatedDocument();
   if (payload.accessKey && await findFiscalDocumentByAccessKey(payload.accessKey, tenantId)) throw fiscalErrors.duplicatedAccessKey();
+  // Idempotencia: um frete nao pode gerar dois documentos fiscais ativos.
+  if (payload.sourceFreightId && await findFiscalDocumentBySourceFreight(payload.sourceFreightId, tenantId)) {
+    throw fiscalErrors.duplicatedSourceFreight();
+  }
 
   // Status nunca vem do cliente: documento sempre nasce em rascunho e so muda via emit/sync.
   const row = await createTenantFiscalDocument({ ...payload, status: 'draft' }, tenantId, userId);
   return row ? getFiscalDocument(row.id, tenantId) : null;
+}
+
+export async function buildFiscalDraftFromFreight(freightId: string, tenantId: string | undefined) {
+  const freight = await findTenantFreightById(freightId, tenantId || '');
+  if (!freight) return null;
+
+  const existing = await findFiscalDocumentBySourceFreight(freight.id, tenantId);
+
+  return {
+    existingDocumentId: existing?.id || null,
+    draft: {
+      documentType: 'cte' as FiscalDocumentType,
+      model: '57',
+      issueDate: freight.date || '',
+      dueDate: '',
+      amount: Number(freight.amount || 0),
+      originName: freight.origin || '',
+      destinationName: freight.destination || '',
+      takerName: freight.contract_name || '',
+      executionMode: freight.execution_mode || 'own_fleet',
+      transportPartnerId: freight.transport_partner_id || '',
+      sourceFreightId: freight.id,
+    },
+  };
 }
 
 export async function updateFiscalDocument(id: string, tenantId: string | undefined, userId: string | undefined, body: FiscalDocumentInput) {

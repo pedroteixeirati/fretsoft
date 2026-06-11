@@ -36,9 +36,15 @@ export interface FiscalDocument {
   taxData: Record<string, unknown>;
   emitterSnapshot: Record<string, unknown>;
   notes: string;
+  sourceFreightId: string;
   createdAt: string;
   updatedAt: string;
   parties: FiscalParty[];
 }
 
 export type FiscalDocumentDraft = Omit<FiscalDocument, 'id' | 'displayId' | 'createdAt' | 'updatedAt'>;
+
+export interface FiscalDraftFromFreight {
+  existingDocumentId: string | null;
+  draft: Partial<FiscalDocumentDraft> & { sourceFreightId: string };
+}

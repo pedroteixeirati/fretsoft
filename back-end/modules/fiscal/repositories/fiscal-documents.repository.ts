@@ -31,6 +31,7 @@ function selectDocumentColumns() {
           tax_data,
           emitter_snapshot,
           notes,
+          source_freight_id,
           created_at,
           updated_at`;
 }
@@ -116,6 +117,20 @@ export async function findFiscalDocumentByAccessKey(accessKey: string, tenantId?
   return result.rows[0] || null;
 }
 
+export async function findFiscalDocumentBySourceFreight(freightId: string, tenantId?: string) {
+  const result = await pool.query<{ id: string }>(
+    `select id
+     from fiscal_documents
+     where tenant_id = $1
+       and source_freight_id = $2
+       and status <> 'canceled'
+     limit 1`,
+    [tenantId, freightId]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function replaceDocumentParties(documentId: string, payload: FiscalDocumentPayload, tenantId?: string) {
   await pool.query(
     `delete from fiscal_document_parties
@@ -177,10 +192,11 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
        tax_data,
        emitter_snapshot,
        notes,
+       source_freight_id,
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $24)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $25)
      returning ${selectDocumentColumns()}`,
     [
       tenantId,
@@ -206,6 +222,7 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
       payload.taxData,
       payload.emitterSnapshot,
       payload.notes || null,
+      payload.sourceFreightId || null,
       userId,
     ]
   );
@@ -243,10 +260,11 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
          tax_data = $20,
          emitter_snapshot = $21,
          notes = $22,
-         updated_by_user_id = $23,
+         source_freight_id = $23,
+         updated_by_user_id = $24,
          updated_at = now()
-     where id = $24
-       and tenant_id = $25
+     where id = $25
+       and tenant_id = $26
      returning ${selectDocumentColumns()}`,
     [
       payload.documentType,
@@ -271,6 +289,7 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
       payload.taxData,
       payload.emitterSnapshot,
       payload.notes || null,
+      payload.sourceFreightId || null,
       userId,
       id,
       tenantId,

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Edit2, Filter, Loader2, MapPinned, PackagePlus, Plus, Route, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Edit2, FileText, Filter, Loader2, MapPinned, PackagePlus, Plus, Route, Search, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import CustomSelect from '../components/CustomSelect';
 import KpiCard from '../components/KpiCard';
 import Modal from '../components/Modal';
@@ -12,7 +13,7 @@ import { contractsApi, freightsApi, vehiclesApi, cargasApi, companiesApi, transp
 import { formatDateOnlyPtBr } from '../lib/date';
 import { FormFieldErrors, getErrorMessage, resolveFieldError } from '../lib/errors';
 import { canAccess } from '../lib/permissions';
-import { canUseFiscalThirdParty } from '../lib/features';
+import { canAccessFiscal, canUseFiscalThirdParty } from '../lib/features';
 import type { TransportPartner } from '../features/transport-partners/types/transport-partner.types';
 import { isValidDateInput } from '../lib/validation';
 import { Cargo, Company, Contract, Freight, Vehicle } from '../types';
@@ -87,6 +88,8 @@ export default function Freights() {
   const canUpdate = canAccess(userProfile, 'freights', 'update');
   const canDelete = canAccess(userProfile, 'freights', 'delete');
   const canCreateCargas = canAccess(userProfile, 'cargas', 'create');
+  const canEmitFiscal = canAccessFiscal(userProfile);
+  const navigate = useNavigate();
   const [freights, setFreights] = useState<Freight[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -552,8 +555,18 @@ export default function Freights() {
                         {freight.billingType === 'contract_recurring' ? 'Sem receita por viagem' : 'Receita no frete'}
                       </p>
                     </div>
-                    {(canUpdate || canDelete || canCreateCargas) && (
+                    {(canUpdate || canDelete || canCreateCargas || canEmitFiscal) && (
                       <div className="flex items-center gap-2">
+                        {canEmitFiscal ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/fiscal?fromFreight=${freight.id}`)}
+                            className="rounded-full p-2 text-outline transition-colors hover:bg-primary/10 hover:text-primary"
+                            aria-label={`Emitir CT-e do frete ${freightSegment}`}
+                          >
+                            <FileText className="h-5 w-5" />
+                          </button>
+                        ) : null}
                         {canCreateCargas && freight.hasCargo !== false ? (
                           <button
                             type="button"
