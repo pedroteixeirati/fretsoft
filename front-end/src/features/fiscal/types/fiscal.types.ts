@@ -58,6 +58,7 @@ export interface FiscalDocument {
   updatedAt: string;
   parties: FiscalParty[];
   payments: FiscalPayment[];
+  warnings?: string[];
 }
 
 export type FiscalDocumentDraft = Omit<FiscalDocument, 'id' | 'displayId' | 'createdAt' | 'updatedAt'>;

@@ -7,6 +7,7 @@ import {
   normalizeOptionalText,
   normalizeRequiredText,
 } from '../../../shared/validation/validation';
+import { config } from '../../../shared/config/env';
 import { findTenantFreightById } from '../../freights/repositories/freights.repository';
 import { findTenantTransportPartner } from '../../transport-partners/repositories/transport-partners.repository';
 import type {
@@ -269,6 +270,20 @@ export async function getFiscalDocument(id: string, tenantId?: string) {
 
 const editableStatuses: FiscalDocumentStatus[] = ['draft', 'rejected', 'error'];
 
+// Alerta nao-bloqueante: pagamento de frete ao TAC abaixo do piso ANTT estimado.
+function computePisoWarnings(payload: FiscalDocumentPayload): string[] {
+  const warnings: string[] = [];
+  const piso = config.fiscalPisoMinFreight;
+  if (payload.executionMode === 'third_party' && piso > 0) {
+    for (const payment of payload.payments) {
+      if (payment.componentType === '04' && payment.amount < piso) {
+        warnings.push(`Valor pago de frete (R$ ${payment.amount.toFixed(2)}) abaixo do piso minimo estimado (R$ ${piso.toFixed(2)}). Confira a tabela ANTT vigente.`);
+      }
+    }
+  }
+  return warnings;
+}
+
 export async function createFiscalDocument(tenantId: string | undefined, userId: string | undefined, body: FiscalDocumentInput) {
   const payload = await validateFiscalDocumentPayload(body);
   if (await findFiscalDocumentDuplicate(payload, tenantId)) throw fiscalErrors.duplicatedDocument();
@@ -280,7 +295,9 @@ export async function createFiscalDocument(tenantId: string | undefined, userId:
 
   // Status nunca vem do cliente: documento sempre nasce em rascunho e so muda via emit/sync.
   const row = await createTenantFiscalDocument({ ...payload, status: 'draft' }, tenantId, userId);
-  return row ? getFiscalDocument(row.id, tenantId) : null;
+  if (!row) return null;
+  const doc = await getFiscalDocument(row.id, tenantId);
+  return doc ? { ...doc, warnings: computePisoWarnings(payload) } : null;
 }
 
 export async function buildFiscalDraftFromFreight(freightId: string, tenantId: string | undefined) {
@@ -336,7 +353,9 @@ export async function updateFiscalDocument(id: string, tenantId: string | undefi
 
   // Preserva o status atual; edicao manual nunca altera o estado fiscal.
   const row = await updateTenantFiscalDocument(id, { ...payload, status: current.status }, tenantId, userId);
-  return row ? getFiscalDocument(row.id, tenantId) : null;
+  if (!row) return null;
+  const doc = await getFiscalDocument(row.id, tenantId);
+  return doc ? { ...doc, warnings: computePisoWarnings(payload) } : null;
 }
 
 export async function removeFiscalDocument(id: string, tenantId?: string) {

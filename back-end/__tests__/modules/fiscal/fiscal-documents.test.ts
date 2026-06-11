@@ -39,6 +39,15 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('piso ANTT gera alerta nao-bloqueante via warnings', () => {
+  assert.match(serviceSource, /function computePisoWarnings/);
+  assert.match(serviceSource, /config\.fiscalPisoMinFreight/);
+  assert.match(serviceSource, /payment\.componentType === '04' && payment\.amount < piso/);
+  assert.match(serviceSource, /warnings: computePisoWarnings\(payload\)/);
+  // Nao bloqueia: warnings sao retornados no documento, nao lancam erro.
+  assert.doesNotMatch(serviceSource, /throw[^\n]*piso/i);
+});
+
 test('frete de terceiro exige CIOT/RNTRC/infPag e mapeia para o provider', () => {
   const ciotMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713434400000_fiscal_ciot_payments.sql'), 'utf8');
   assert.match(ciotMigration, /add column if not exists ciot text/i);

@@ -81,6 +81,7 @@ export default function FiscalDocumentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [warningMessages, setWarningMessages] = useState<string[]>([]);
   const [documentToDelete, setDocumentToDelete] = useState<FiscalDocument | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -223,12 +224,11 @@ export default function FiscalDocumentsPage() {
         model: draft.documentType === 'mdfe' && !draft.model ? '58' : draft.model || '57',
       };
 
-      if (editingDocument) {
-        await updateDocument.mutateAsync({ id: editingDocument.id, payload });
-      } else {
-        await createDocument.mutateAsync(payload);
-      }
+      const saved = editingDocument
+        ? await updateDocument.mutateAsync({ id: editingDocument.id, payload })
+        : await createDocument.mutateAsync(payload);
 
+      setWarningMessages(saved?.warnings ?? []);
       setSuccessMessage(editingDocument ? 'Documento fiscal atualizado com sucesso.' : 'Documento fiscal registrado com sucesso.');
       setIsModalOpen(false);
     } catch (submitError) {
@@ -333,6 +333,13 @@ export default function FiscalDocumentsPage() {
       {error ? <Alert tone="danger">{getErrorMessage(error, 'Nao foi possivel carregar os documentos fiscais.')}</Alert> : null}
       {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
       {successMessage ? <Alert tone="success">{successMessage}</Alert> : null}
+      {warningMessages.length ? (
+        <Alert tone="warning">
+          <ul className="list-disc pl-4">
+            {warningMessages.map((message, index) => <li key={index}>{message}</li>)}
+          </ul>
+        </Alert>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <KpiCard label="Valor filtrado" value={currency.format(totals.amount)} icon={FileCheck2} tone="success" />
