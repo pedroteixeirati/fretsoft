@@ -16,6 +16,7 @@ import type {
   FiscalDocumentRow,
   FiscalDocumentStatus,
   FiscalDocumentType,
+  FiscalCteData,
   FiscalExecutionMode,
   FiscalPartyInput,
   FiscalPartyPayload,
@@ -34,6 +35,7 @@ import {
   findFiscalDocumentByAccessKey,
   findFiscalDocumentBySourceFreight,
   findFiscalDocumentDuplicate,
+  findTenantEmitter,
   findTenantFiscalDocument,
   listFiscalDocumentParties,
   listFiscalDocumentPayments,
@@ -52,6 +54,32 @@ const statuses: FiscalDocumentStatus[] = ['draft', 'processing', 'authorized', '
 const partyRoles: FiscalPartyRole[] = ['taker', 'sender', 'recipient', 'dispatcher', 'receiver'];
 const executionModes: FiscalExecutionMode[] = ['own_fleet', 'third_party'];
 const paymentComponents: FiscalPaymentComponent[] = ['01', '02', '03', '04'];
+
+function onlyFilled(record: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && value !== null && value !== ''));
+}
+
+// Monta o bloco do emitente (nomes de campo da Focus) a partir do cadastro do tenant.
+async function buildEmitterSnapshot(tenantId?: string) {
+  const emitter = await findTenantEmitter(tenantId);
+  if (!emitter) return {};
+  return onlyFilled({
+    cnpj_emitente: (emitter.cnpj || '').replace(/\D/g, '') || undefined,
+    inscricao_estadual_emitente: emitter.state_registration || undefined,
+    nome_emitente: emitter.name || undefined,
+    nome_fantasia_emitente: emitter.trade_name || undefined,
+    regime_tributario_emitente: emitter.crt || undefined,
+    logradouro_emitente: emitter.address_line || undefined,
+    numero_emitente: emitter.address_number || undefined,
+    complemento_emitente: emitter.address_complement || undefined,
+    bairro_emitente: emitter.district || undefined,
+    municipio_emitente: emitter.city || undefined,
+    codigo_municipio_emitente: emitter.ibge_code || undefined,
+    uf_emitente: emitter.state || undefined,
+    cep_emitente: (emitter.zip_code || '').replace(/\D/g, '') || undefined,
+    telefone_emitente: emitter.phone || undefined,
+  });
+}
 
 function mapPaymentRow(row: FiscalPaymentRow) {
   return {
@@ -125,6 +153,12 @@ function mapPartyRow(row: FiscalPartyRow) {
     stateRegistration: row.state_registration || '',
     city: row.city || '',
     state: row.state || '',
+    phone: row.phone || '',
+    street: row.street || '',
+    number: row.number || '',
+    district: row.district || '',
+    zipCode: row.zip_code || '',
+    cityIbgeCode: row.city_ibge_code || '',
   };
 }
 
@@ -158,6 +192,7 @@ function mapDocumentRow(row: FiscalDocumentRow, parties: FiscalPartyRow[] = [], 
     executionMode: row.execution_mode || 'own_fleet',
     ciot: row.ciot || '',
     rntrc: row.rntrc || '',
+    cteData: row.cte_data || {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     parties: parties.map(mapPartyRow),
@@ -181,6 +216,35 @@ function normalizeParty(party: FiscalPartyInput): FiscalPartyPayload {
     stateRegistration: normalizeOptionalText(party.stateRegistration) || '',
     city: normalizeOptionalText(party.city) || '',
     state,
+    phone: normalizeOptionalText(party.phone) || '',
+    street: normalizeOptionalText(party.street) || '',
+    number: normalizeOptionalText(party.number) || '',
+    district: normalizeOptionalText(party.district) || '',
+    zipCode: (normalizeOptionalText(party.zipCode) || '').replace(/\D/g, ''),
+    cityIbgeCode: (normalizeOptionalText(party.cityIbgeCode) || '').replace(/\D/g, ''),
+  };
+}
+
+function normalizeCteData(value: unknown): FiscalCteData {
+  const data = (value && typeof value === 'object' && !Array.isArray(value) ? value : {}) as Record<string, unknown>;
+  const toNumber = (input: unknown) => (input === undefined || input === null || input === '' ? undefined : Number(input));
+  const nfeKeys = Array.isArray(data.nfeKeys)
+    ? (data.nfeKeys as unknown[]).map((key) => String(key).replace(/\D/g, '')).filter((key) => key.length === 44)
+    : undefined;
+
+  return {
+    cfop: normalizeOptionalText(data.cfop as string) || undefined,
+    naturezaOperacao: normalizeOptionalText(data.naturezaOperacao as string) || undefined,
+    tipoServico: normalizeOptionalText(data.tipoServico as string) || undefined,
+    icmsCst: normalizeOptionalText(data.icmsCst as string) || undefined,
+    icmsBaseCalculo: toNumber(data.icmsBaseCalculo),
+    icmsAliquota: toNumber(data.icmsAliquota),
+    icmsValor: toNumber(data.icmsValor),
+    produtoPredominante: normalizeOptionalText(data.produtoPredominante as string) || undefined,
+    valorCarga: toNumber(data.valorCarga),
+    municipioInicioIbge: (normalizeOptionalText(data.municipioInicioIbge as string) || '').replace(/\D/g, '') || undefined,
+    municipioFimIbge: (normalizeOptionalText(data.municipioFimIbge as string) || '').replace(/\D/g, '') || undefined,
+    nfeKeys,
   };
 }
 
@@ -249,6 +313,7 @@ export async function validateFiscalDocumentPayload(body: FiscalDocumentInput): 
     executionMode,
     ciot,
     rntrc,
+    cteData: normalizeCteData(body.cteData),
     payments,
     parties,
   };
@@ -324,6 +389,10 @@ export async function buildFiscalDraftFromFreight(freightId: string, tenantId: s
       ciot: '',
       rntrc: partner?.rntrc || '',
       sourceFreightId: freight.id,
+      cteData: {
+        naturezaOperacao: 'PRESTACAO DE SERVICO DE TRANSPORTE',
+        valorCarga: amount,
+      } as FiscalCteData,
       payments: partner
         ? [{
             payeeName: partner.name,
@@ -372,6 +441,8 @@ export async function emitFiscalDocument(id: string, tenantId: string | undefine
 
   const parties = await listFiscalDocumentParties(id, tenantId);
   const payments = await listFiscalDocumentPayments(id, tenantId);
+  // Emitente sempre preenchido do cadastro do tenant; o snapshot do documento sobrescreve se houver.
+  document.emitter_snapshot = { ...(await buildEmitterSnapshot(tenantId)), ...(document.emitter_snapshot || {}) };
   const request = buildFiscalProviderRequest(document, parties, payments);
   const requestPayload = serializeFiscalProviderRequest(request);
   const startedAt = Date.now();
@@ -431,6 +502,8 @@ export async function syncFiscalDocument(id: string, tenantId: string | undefine
 
   const parties = await listFiscalDocumentParties(id, tenantId);
   const payments = await listFiscalDocumentPayments(id, tenantId);
+  // Emitente sempre preenchido do cadastro do tenant; o snapshot do documento sobrescreve se houver.
+  document.emitter_snapshot = { ...(await buildEmitterSnapshot(tenantId)), ...(document.emitter_snapshot || {}) };
   const request = buildFiscalProviderRequest(document, parties, payments);
   const requestPayload = serializeFiscalProviderRequest({ ...request, operation: 'consult_document' });
   const startedAt = Date.now();

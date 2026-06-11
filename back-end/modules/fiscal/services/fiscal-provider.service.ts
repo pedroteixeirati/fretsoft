@@ -120,14 +120,27 @@ function focusPartyFields(prefix: string, party?: FiscalPartyRow) {
     [`${isCpf ? 'cpf' : 'cnpj'}_${prefix}`]: document || undefined,
     [`inscricao_estadual_${prefix}`]: party.state_registration || undefined,
     [`nome_${prefix}`]: party.name,
+    [`telefone_${prefix}`]: party.phone || undefined,
+    [`logradouro_${prefix}`]: party.street || undefined,
+    [`numero_${prefix}`]: party.number || undefined,
+    [`bairro_${prefix}`]: party.district || undefined,
+    [`cep_${prefix}`]: (party.zip_code || '').replace(/\D/g, '') || undefined,
+    [`codigo_municipio_${prefix}`]: party.city_ibge_code || undefined,
     [`municipio_${prefix}`]: party.city || undefined,
     [`uf_${prefix}`]: party.state || undefined,
   });
 }
 
+function cteNfes(cteData: Record<string, unknown>, taxData: Record<string, unknown>) {
+  const keys = Array.isArray(cteData.nfeKeys) ? (cteData.nfeKeys as unknown[]) : null;
+  if (keys && keys.length) return keys.map((key) => ({ chave_nfe: String(key) }));
+  return taxData.nfes;
+}
+
 function mapFocusCtePayload(request: FiscalProviderRequest) {
   const document = request.document;
   const taxData = document.tax_data || {};
+  const cteData = (document.cte_data || {}) as Record<string, unknown>;
   const emitter = document.emitter_snapshot || {};
   const sender = partyByRole(request.parties, 'sender');
   const recipient = partyByRole(request.parties, 'recipient');
@@ -137,18 +150,19 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
   return onlyDefinedEntries({
     ...emitter,
     ...taxData,
-    natureza_operacao: document.tax_data?.natureza_operacao || 'PRESTACAO DE SERVICO DE TRANSPORTE',
+    natureza_operacao: cteData.naturezaOperacao || document.tax_data?.natureza_operacao || 'PRESTACAO DE SERVICO DE TRANSPORTE',
     data_emissao: document.issue_date,
     tipo_documento: taxData.tipo_documento ?? '0',
-    codigo_municipio_envio: document.tax_data?.codigo_municipio_envio,
+    cfop: cteData.cfop || taxData.cfop || undefined,
+    codigo_municipio_envio: cteData.municipioInicioIbge || document.tax_data?.codigo_municipio_envio,
     municipio_envio: document.tax_data?.municipio_envio || document.origin_name || undefined,
     uf_envio: document.tax_data?.uf_envio,
     modal: taxData.modal || '01',
-    tipo_servico: taxData.tipo_servico || '0',
-    codigo_municipio_inicio: document.tax_data?.codigo_municipio_inicio,
+    tipo_servico: cteData.tipoServico || taxData.tipo_servico || '0',
+    codigo_municipio_inicio: cteData.municipioInicioIbge || document.tax_data?.codigo_municipio_inicio,
     municipio_inicio: document.tax_data?.municipio_inicio || document.origin_name || undefined,
     uf_inicio: document.tax_data?.uf_inicio,
-    codigo_municipio_fim: document.tax_data?.codigo_municipio_fim,
+    codigo_municipio_fim: cteData.municipioFimIbge || document.tax_data?.codigo_municipio_fim,
     municipio_fim: document.tax_data?.municipio_fim || document.destination_name || undefined,
     uf_fim: document.tax_data?.uf_fim,
     tomador: document.tax_data?.tomador,
@@ -156,10 +170,14 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
     indicador_inscricao_estadual_tomador: taxData.indicador_inscricao_estadual_tomador || '1',
     valor_total: Number(document.amount || 0),
     valor_receber: Number(document.amount || 0),
-    valor_total_carga: taxData.valor_total_carga || Number(document.amount || 0),
-    produto_predominante: taxData.produto_predominante,
+    valor_total_carga: cteData.valorCarga || taxData.valor_total_carga || Number(document.amount || 0),
+    icms_situacao_tributaria: cteData.icmsCst || taxData.icms_situacao_tributaria || undefined,
+    icms_base_calculo: cteData.icmsBaseCalculo ?? taxData.icms_base_calculo,
+    icms_aliquota: cteData.icmsAliquota ?? taxData.icms_aliquota,
+    icms_valor: cteData.icmsValor ?? taxData.icms_valor,
+    produto_predominante: cteData.produtoPredominante || taxData.produto_predominante,
     quantidades: taxData.quantidades,
-    nfes: taxData.nfes,
+    nfes: cteNfes(cteData, taxData),
     modal_rodoviario: taxData.modal_rodoviario,
     observacao: document.notes || taxData.observacao,
     ciot: document.ciot || taxData.ciot || undefined,

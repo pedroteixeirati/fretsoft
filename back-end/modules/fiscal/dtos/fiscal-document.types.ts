@@ -47,6 +47,27 @@ export interface FiscalPartyInput {
   stateRegistration?: string | null;
   city?: string | null;
   state?: string | null;
+  phone?: string | null;
+  street?: string | null;
+  number?: string | null;
+  district?: string | null;
+  zipCode?: string | null;
+  cityIbgeCode?: string | null;
+}
+
+export interface FiscalCteData {
+  cfop?: string;
+  naturezaOperacao?: string;
+  tipoServico?: string;
+  icmsCst?: string;
+  icmsBaseCalculo?: number;
+  icmsAliquota?: number;
+  icmsValor?: number;
+  produtoPredominante?: string;
+  valorCarga?: number;
+  municipioInicioIbge?: string;
+  municipioFimIbge?: string;
+  nfeKeys?: string[];
 }
 
 export interface FiscalDocumentInput {
@@ -77,6 +98,7 @@ export interface FiscalDocumentInput {
   ciot?: string | null;
   rntrc?: string | null;
   transportPartnerId?: string | null;
+  cteData?: FiscalCteData | null;
   payments?: FiscalPaymentInput[] | null;
   parties?: FiscalPartyInput[] | null;
 }
@@ -88,6 +110,12 @@ export interface FiscalPartyPayload {
   stateRegistration: string;
   city: string;
   state: string;
+  phone: string;
+  street: string;
+  number: string;
+  district: string;
+  zipCode: string;
+  cityIbgeCode: string;
 }
 
 export interface FiscalDocumentPayload {
@@ -117,6 +145,7 @@ export interface FiscalDocumentPayload {
   executionMode: FiscalExecutionMode;
   ciot: string;
   rntrc: string;
+  cteData: FiscalCteData;
   payments: FiscalPaymentPayload[];
   parties: FiscalPartyPayload[];
 }
@@ -150,6 +179,7 @@ export interface FiscalDocumentRow {
   execution_mode: FiscalExecutionMode;
   ciot: string | null;
   rntrc: string | null;
+  cte_data: FiscalCteData | null;
   created_at: string;
   updated_at: string;
 }
@@ -164,4 +194,10 @@ export interface FiscalPartyRow {
   state_registration: string | null;
   city: string | null;
   state: string | null;
+  phone: string | null;
+  street: string | null;
+  number: string | null;
+  district: string | null;
+  zip_code: string | null;
+  city_ibge_code: string | null;
 }

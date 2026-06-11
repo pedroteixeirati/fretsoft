@@ -39,6 +39,26 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('CT-e completo: emitente automatico, partes com endereco/IBGE, tributacao e NF-e', () => {
+  const cteMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713438000000_cte_fiscal_data.sql'), 'utf8');
+  assert.match(cteMigration, /alter table if exists tenants add column if not exists crt text/i);
+  assert.match(cteMigration, /fiscal_document_parties add column if not exists city_ibge_code text/i);
+  assert.match(cteMigration, /fiscal_documents add column if not exists cte_data jsonb/i);
+
+  // Emitente preenchido do tenant nos campos da Focus.
+  assert.match(serviceSource, /async function buildEmitterSnapshot/);
+  assert.match(serviceSource, /cnpj_emitente:/);
+  assert.match(serviceSource, /findTenantEmitter/);
+  assert.match(serviceSource, /document\.emitter_snapshot = \{ \.\.\.\(await buildEmitterSnapshot\(tenantId\)\)/);
+
+  // Partes e cteData mapeados para a Focus.
+  assert.match(providerServiceSource, /codigo_municipio_\$\{prefix\}/);
+  assert.match(providerServiceSource, /logradouro_\$\{prefix\}/);
+  assert.match(providerServiceSource, /icms_situacao_tributaria: cteData\.icmsCst/);
+  assert.match(providerServiceSource, /cfop: cteData\.cfop/);
+  assert.match(providerServiceSource, /nfes: cteNfes\(cteData, taxData\)/);
+});
+
 test('piso ANTT gera alerta nao-bloqueante via warnings', () => {
   assert.match(serviceSource, /function computePisoWarnings/);
   assert.match(serviceSource, /config\.fiscalPisoMinFreight/);

@@ -35,6 +35,7 @@ function selectDocumentColumns() {
           execution_mode,
           ciot,
           rntrc,
+          cte_data,
           created_at,
           updated_at`;
 }
@@ -48,7 +49,13 @@ function selectPartyColumns() {
           document_number,
           state_registration,
           city,
-          state`;
+          state,
+          phone,
+          street,
+          number,
+          district,
+          zip_code,
+          city_ibge_code`;
 }
 
 export async function listTenantFiscalDocuments(tenantId?: string) {
@@ -115,6 +122,36 @@ export async function findFiscalDocumentByAccessKey(accessKey: string, tenantId?
        and ($3::uuid is null or id <> $3)
      limit 1`,
     [tenantId, accessKey, ignoreId || null]
+  );
+
+  return result.rows[0] || null;
+}
+
+export type TenantEmitterRow = {
+  cnpj: string | null;
+  state_registration: string | null;
+  name: string;
+  trade_name: string | null;
+  crt: string | null;
+  phone: string | null;
+  zip_code: string | null;
+  ibge_code: string | null;
+  address_line: string | null;
+  address_number: string | null;
+  address_complement: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+};
+
+export async function findTenantEmitter(tenantId?: string) {
+  const result = await pool.query<TenantEmitterRow>(
+    `select cnpj, state_registration, name, trade_name, crt, phone, zip_code, ibge_code,
+            address_line, address_number, address_complement, district, city, state
+     from tenants
+     where id = $1
+     limit 1`,
+    [tenantId]
   );
 
   return result.rows[0] || null;
@@ -214,9 +251,15 @@ async function replaceDocumentParties(documentId: string, payload: FiscalDocumen
          document_number,
          state_registration,
          city,
-         state
+         state,
+         phone,
+         street,
+         number,
+         district,
+         zip_code,
+         city_ibge_code
        )
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         tenantId,
         documentId,
@@ -226,6 +269,12 @@ async function replaceDocumentParties(documentId: string, payload: FiscalDocumen
         party.stateRegistration || null,
         party.city || null,
         party.state || null,
+        party.phone || null,
+        party.street || null,
+        party.number || null,
+        party.district || null,
+        party.zipCode || null,
+        party.cityIbgeCode || null,
       ]
     );
   }
@@ -261,10 +310,11 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
        execution_mode,
        ciot,
        rntrc,
+       cte_data,
        created_by_user_id,
        updated_by_user_id
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $28)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $29)
      returning ${selectDocumentColumns()}`,
     [
       tenantId,
@@ -294,6 +344,7 @@ export async function createTenantFiscalDocument(payload: FiscalDocumentPayload,
       payload.executionMode,
       payload.ciot || null,
       payload.rntrc || null,
+      payload.cteData || {},
       userId,
     ]
   );
@@ -336,10 +387,11 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
          execution_mode = $24,
          ciot = $25,
          rntrc = $26,
-         updated_by_user_id = $27,
+         cte_data = $27,
+         updated_by_user_id = $28,
          updated_at = now()
-     where id = $28
-       and tenant_id = $29
+     where id = $29
+       and tenant_id = $30
      returning ${selectDocumentColumns()}`,
     [
       payload.documentType,
@@ -368,6 +420,7 @@ export async function updateTenantFiscalDocument(id: string, payload: FiscalDocu
       payload.executionMode,
       payload.ciot || null,
       payload.rntrc || null,
+      payload.cteData || {},
       userId,
       id,
       tenantId,
