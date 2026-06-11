@@ -4,6 +4,7 @@ export type NavItem =
   | 'tenantProfile'
   | 'revenues'
   | 'payables'
+  | 'fiscal'
   | 'expenses'
   | 'vehicles'
   | 'suppliers'

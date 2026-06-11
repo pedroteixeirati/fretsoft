@@ -8,6 +8,7 @@ export const navItemToPath: Record<NavItem, string> = {
   tenantProfile: '/transportadora',
   revenues: '/contas-a-receber',
   payables: '/contas-a-pagar',
+  fiscal: '/fiscal',
   expenses: '/custos-operacionais',
   vehicles: '/veiculos',
   suppliers: '/fornecedores',
@@ -43,6 +44,7 @@ export function getFirstAllowedTab(profile: UserProfile): NavItem {
   if (canAccess(profile, 'providers', 'read')) return 'suppliers';
   if (canAccess(profile, 'companies', 'read')) return 'companies';
   if (canAccess(profile, 'freights', 'read')) return 'freights';
+  if (canAccess(profile, 'fiscal', 'read')) return 'fiscal';
   if (canAccessNovalogOperations(profile)) return 'novalogOperations';
   if (canAccessNovalogOperations(profile)) return 'novalogBillings';
   if (canAccessNovalogOperations(profile)) return 'novalogReports';
@@ -62,6 +64,7 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
       return canAccess(profile, 'tenantProfile', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'revenues':
     case 'payables':
+    case 'fiscal':
     case 'reports':
       return activeTab;
     case 'expenses':
@@ -100,6 +103,7 @@ export const navItemSectionMap: Partial<Record<NavItem, Section>> = {
   tenantProfile: 'tenantProfile',
   revenues: 'revenues',
   payables: 'payables',
+  fiscal: 'fiscal',
   expenses: 'expenses',
   vehicles: 'vehicles',
   suppliers: 'providers',

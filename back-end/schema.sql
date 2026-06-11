@@ -994,3 +994,120 @@ create index if not exists idx_payables_source on payables(tenant_id, source_typ
 create index if not exists idx_payables_tenant_reference_month on payables(tenant_id, reference_month);
 create index if not exists idx_payables_tenant_invoice_number on payables(tenant_id, invoice_number);
 create index if not exists idx_payables_tenant_document_number on payables(tenant_id, document_number);
+
+create table if not exists fiscal_documents (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  document_type text not null default 'cte' check (document_type in ('cte', 'cte_os', 'mdfe')),
+  model text not null default '57',
+  series text not null,
+  number text not null,
+  access_key text,
+  status text not null default 'draft' check (status in ('draft', 'processing', 'authorized', 'rejected', 'canceled', 'denied', 'inutilized', 'error')),
+  issue_date text not null,
+  due_date text,
+  amount numeric not null default 0,
+  origin_name text,
+  destination_name text,
+  taker_name text,
+  protocol text,
+  authorized_at timestamptz,
+  xml text,
+  dacte_url text,
+  provider text,
+  provider_document_id text,
+  idempotency_key text,
+  tax_data jsonb not null default '{}'::jsonb,
+  emitter_snapshot jsonb not null default '{}'::jsonb,
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists fiscal_document_parties (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  fiscal_document_id uuid not null references fiscal_documents(id) on delete cascade,
+  role text not null check (role in ('taker', 'sender', 'recipient', 'dispatcher', 'receiver')),
+  name text not null,
+  document_number text,
+  state_registration text,
+  city text,
+  state text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists fiscal_document_freights (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  fiscal_document_id uuid not null references fiscal_documents(id) on delete cascade,
+  freight_id uuid not null references freights(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (tenant_id, fiscal_document_id, freight_id)
+);
+
+create table if not exists fiscal_events (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  fiscal_document_id uuid not null references fiscal_documents(id) on delete cascade,
+  event_type text not null,
+  status text not null default 'registered',
+  reason text,
+  protocol text,
+  xml text,
+  created_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists fiscal_communication_logs (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  fiscal_document_id uuid references fiscal_documents(id) on delete set null,
+  provider text not null,
+  operation text not null,
+  request_payload jsonb not null default '{}'::jsonb,
+  response_payload jsonb not null default '{}'::jsonb,
+  http_status integer,
+  error_message text,
+  duration_ms integer,
+  created_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_fiscal_documents_display_id on fiscal_documents;
+create trigger trg_fiscal_documents_display_id
+before insert on fiscal_documents
+for each row
+execute function assign_tenant_display_id();
+
+drop trigger if exists trg_fiscal_document_parties_display_id on fiscal_document_parties;
+create trigger trg_fiscal_document_parties_display_id
+before insert on fiscal_document_parties
+for each row
+execute function assign_tenant_display_id();
+
+drop trigger if exists trg_fiscal_events_display_id on fiscal_events;
+create trigger trg_fiscal_events_display_id
+before insert on fiscal_events
+for each row
+execute function assign_tenant_display_id();
+
+create unique index if not exists idx_fiscal_documents_tenant_display_id on fiscal_documents(tenant_id, display_id)
+  where display_id is not null;
+create unique index if not exists idx_fiscal_documents_tenant_type_series_number on fiscal_documents(tenant_id, document_type, series, number)
+  where status <> 'canceled';
+create unique index if not exists idx_fiscal_documents_tenant_access_key on fiscal_documents(tenant_id, access_key)
+  where access_key is not null and access_key <> '';
+create unique index if not exists idx_fiscal_documents_tenant_idempotency on fiscal_documents(tenant_id, idempotency_key)
+  where idempotency_key is not null and idempotency_key <> '';
+create index if not exists idx_fiscal_documents_tenant_status on fiscal_documents(tenant_id, status);
+create index if not exists idx_fiscal_documents_tenant_issue_date on fiscal_documents(tenant_id, issue_date);
+create index if not exists idx_fiscal_document_parties_document on fiscal_document_parties(tenant_id, fiscal_document_id);
+create index if not exists idx_fiscal_document_freights_document on fiscal_document_freights(tenant_id, fiscal_document_id);
+create index if not exists idx_fiscal_events_document on fiscal_events(tenant_id, fiscal_document_id);
+create index if not exists idx_fiscal_communication_logs_document on fiscal_communication_logs(tenant_id, fiscal_document_id);

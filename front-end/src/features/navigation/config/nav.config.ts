@@ -5,6 +5,7 @@ import {
   BriefcaseBusiness,
   CreditCard,
   FileText,
+  FileCheck2,
   FolderKanban,
   Layers3,
   LayoutDashboard,
@@ -86,8 +87,9 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       items: [
         navItem('revenues', 'Contas a receber', WalletCards),
         navItem('payables', 'Contas a pagar', CreditCard),
+        canAccess(userProfile, 'fiscal', 'read') ? navItem('fiscal', 'Fiscal', FileCheck2) : null,
         userProfile?.tenantSlug === 'novalog' ? null : navItem('reports', 'Relatorios', BarChart3),
-      ],
+      ].filter((item): item is NavigationItem => item !== null),
     },
     {
       id: 'registry',

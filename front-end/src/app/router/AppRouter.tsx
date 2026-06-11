@@ -5,6 +5,7 @@ import PlatformTenants from '../../pages/PlatformTenants';
 import TenantProfile from '../../pages/TenantProfile';
 import Revenues from '../../pages/Revenues';
 import Payables from '../../pages/Payables';
+import Fiscal from '../../pages/Fiscal';
 import Expenses from '../../pages/Expenses';
 import Vehicles from '../../pages/Vehicles';
 import Reports from '../../pages/Reports';
@@ -59,6 +60,7 @@ export default function AppRouter() {
             <Route path="/transportadora" element={<TenantProfile />} />
             <Route path="/contas-a-receber" element={<Revenues />} />
             <Route path="/contas-a-pagar" element={<PayablesRoute />} />
+            <Route path="/fiscal" element={<Fiscal />} />
             <Route path="/custos-operacionais" element={<ExpensesRoute />} />
             <Route path="/veiculos" element={<Vehicles />} />
             <Route path="/fornecedores" element={<Suppliers />} />
