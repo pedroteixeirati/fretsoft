@@ -10,6 +10,7 @@ export type NavItem =
   | 'suppliers'
   | 'companies'
   | 'contracts'
+  | 'transportPartners'
   | 'freights'
   | 'novalogOperations'
   | 'novalogBillings'

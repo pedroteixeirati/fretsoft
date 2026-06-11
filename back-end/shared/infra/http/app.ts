@@ -14,6 +14,7 @@ import revenuesRouter from '../../../modules/revenues/controllers/revenues.contr
 import resourcesRouter from '../../../modules/resources/controllers/resources.controller';
 import { errorHandler } from '../../http/error-handler';
 import tenantsRouter from '../../../modules/tenants/controllers/tenants.controller';
+import transportPartnersRouter from '../../../modules/transport-partners/controllers/transport-partners.controller';
 import usersRouter from '../../../modules/users/controllers/users.controller';
 import vehiclesRouter from '../../../modules/vehicles/controllers/vehicles.controller';
 
@@ -36,6 +37,7 @@ app.use('/api', freightsRouter);
 app.use('/api', novalogRouter);
 app.use('/api', expensesRouter);
 app.use('/api', fiscalRouter);
+app.use('/api', transportPartnersRouter);
 app.use('/api', payablesRouter);
 app.use('/api', providersRouter);
 app.use('/api/revenues', revenuesRouter);

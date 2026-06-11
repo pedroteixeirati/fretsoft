@@ -7,6 +7,7 @@ import {
   FileText,
   FileCheck2,
   FolderKanban,
+  IdCard,
   Layers3,
   LayoutDashboard,
   Route,
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react';
 import { NavItem, UserProfile } from '../../../shared/types/common.types';
 import { canAccess } from '../../../lib/permissions';
-import { canAccessFiscal } from '../../../lib/features';
+import { canAccessFiscal, canUseFiscalThirdParty } from '../../../lib/features';
 import { useAuth } from '../../auth/hooks/useAuth';
 
 export interface NavigationItem {
@@ -98,6 +99,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       icon: FolderKanban,
       items: compactItems([
         canAccess(userProfile, 'vehicles', 'read') ? navItem('vehicles', 'Veiculos', Truck) : null,
+        canAccess(userProfile, 'transportPartners', 'read') && canUseFiscalThirdParty(userProfile) ? navItem('transportPartners', 'Transportadores (TAC)', IdCard) : null,
         canAccess(userProfile, 'providers', 'read') ? navItem('suppliers', 'Fornecedores', Users) : null,
         canAccess(userProfile, 'companies', 'read') ? navItem('companies', 'Empresas', Building2) : null,
       ]),

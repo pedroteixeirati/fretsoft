@@ -12,6 +12,7 @@ import Reports from '../../pages/Reports';
 import Suppliers from '../../pages/Suppliers';
 import Companies from '../../pages/Companies';
 import Contracts from '../../pages/Contracts';
+import TransportPartners from '../../pages/TransportPartners';
 import Cargas from '../../pages/Cargas';
 import Freights from '../../pages/Freights';
 import NovalogOperations from '../../pages/NovalogOperations';
@@ -66,6 +67,7 @@ export default function AppRouter() {
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/empresas" element={<Companies />} />
             <Route path="/contratos" element={<Contracts />} />
+            <Route path="/transportadores-autonomos" element={<TransportPartners />} />
             <Route path="/fretes" element={<Freights />} />
             <Route path="/novalog/lancamentos" element={<NovalogOperations />} />
             <Route path="/novalog/faturamentos" element={<NovalogBillings />} />

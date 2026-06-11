@@ -15,6 +15,10 @@ export const queryKeys = {
     all: ['providers'] as const,
     list: () => ['providers', 'list'] as const,
   },
+  transportPartners: {
+    all: ['transportPartners'] as const,
+    list: () => ['transportPartners', 'list'] as const,
+  },
   companies: {
     all: ['companies'] as const,
     list: () => ['companies', 'list'] as const,

@@ -1,6 +1,6 @@
 import { NavItem, UserProfile } from '../../shared/types/common.types';
 import { canAccess, type Section } from '../../lib/permissions';
-import { canAccessFiscal } from '../../lib/features';
+import { canAccessFiscal, canUseFiscalThirdParty } from '../../lib/features';
 import { canAccessNovalogOperations } from '../../features/novalog/utils/novalog.visibility';
 
 export const navItemToPath: Record<NavItem, string> = {
@@ -15,6 +15,7 @@ export const navItemToPath: Record<NavItem, string> = {
   suppliers: '/fornecedores',
   companies: '/empresas',
   contracts: '/contratos',
+  transportPartners: '/transportadores-autonomos',
   freights: '/fretes',
   novalogOperations: '/novalog/lancamentos',
   novalogBillings: '/novalog/faturamentos',
@@ -51,6 +52,7 @@ export function getFirstAllowedTab(profile: UserProfile): NavItem {
   if (canAccessNovalogOperations(profile)) return 'novalogReports';
   if (canAccess(profile, 'cargas', 'read')) return 'cargas';
   if (canAccess(profile, 'contracts', 'read')) return 'contracts';
+  if (canAccess(profile, 'transportPartners', 'read') && canUseFiscalThirdParty(profile)) return 'transportPartners';
   if (canAccess(profile, 'expenses', 'read')) return 'expenses';
   if (canAccess(profile, 'tenantProfile', 'read')) return 'tenantProfile';
   if (canAccess(profile, 'settings', 'read')) return 'settings';
@@ -69,6 +71,8 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
       return activeTab;
     case 'fiscal':
       return canAccess(profile, 'fiscal', 'read') && canAccessFiscal(profile) ? activeTab : getFirstAllowedTab(profile);
+    case 'transportPartners':
+      return canAccess(profile, 'transportPartners', 'read') && canUseFiscalThirdParty(profile) ? activeTab : getFirstAllowedTab(profile);
     case 'expenses':
       return canAccess(profile, 'expenses', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'vehicles':
@@ -111,6 +115,7 @@ export const navItemSectionMap: Partial<Record<NavItem, Section>> = {
   suppliers: 'providers',
   companies: 'companies',
   contracts: 'contracts',
+  transportPartners: 'transportPartners',
   freights: 'freights',
   novalogOperations: 'freights',
   novalogBillings: 'revenues',
