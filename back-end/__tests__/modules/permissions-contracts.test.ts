@@ -34,7 +34,8 @@ test('front-end permite leitura financeira ampla e protege acoes por perfil', ()
 
 test('App resolve navegacao respeitando as novas secoes operacionais e financeiras', () => {
   assert.match(navigationSource, /case 'expenses':[\s\S]*canAccess\(profile, 'expenses', 'read'\)/);
-  assert.match(navigationSource, /case 'revenues':\s*case 'payables':\s*case 'fiscal':\s*case 'reports':\s*return activeTab;/);
+  assert.match(navigationSource, /case 'revenues':\s*case 'payables':\s*case 'reports':\s*return activeTab;/);
+  assert.match(navigationSource, /case 'fiscal':\s*return canAccess\(profile, 'fiscal', 'read'\) && canAccessFiscal\(profile\) \? activeTab : getFirstAllowedTab\(profile\);/);
 });
 
 test('back-end mantem custos operacionais e leitura financeira alinhados ao menu', () => {

@@ -28,4 +28,5 @@ export interface UserProfile {
   tenantName: string;
   tenantSlug: string;
   tenantLogoUrl?: string;
+  features?: Record<string, boolean>;
 }

@@ -15,4 +15,5 @@ export const config = {
   firebaseAdminProjectId: required('FIREBASE_ADMIN_PROJECT_ID'),
   firebaseAdminClientEmail: required('FIREBASE_ADMIN_CLIENT_EMAIL'),
   firebaseAdminPrivateKey: required('FIREBASE_ADMIN_PRIVATE_KEY').replace(/\\n/g, '\n'),
+  fiscalModuleEnabled: (process.env.FISCAL_MODULE_ENABLED || 'true').trim().toLowerCase() !== 'false',
 };

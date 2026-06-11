@@ -1,5 +1,6 @@
 import { NavItem, UserProfile } from '../../shared/types/common.types';
 import { canAccess, type Section } from '../../lib/permissions';
+import { canAccessFiscal } from '../../lib/features';
 import { canAccessNovalogOperations } from '../../features/novalog/utils/novalog.visibility';
 
 export const navItemToPath: Record<NavItem, string> = {
@@ -44,7 +45,7 @@ export function getFirstAllowedTab(profile: UserProfile): NavItem {
   if (canAccess(profile, 'providers', 'read')) return 'suppliers';
   if (canAccess(profile, 'companies', 'read')) return 'companies';
   if (canAccess(profile, 'freights', 'read')) return 'freights';
-  if (canAccess(profile, 'fiscal', 'read')) return 'fiscal';
+  if (canAccess(profile, 'fiscal', 'read') && canAccessFiscal(profile)) return 'fiscal';
   if (canAccessNovalogOperations(profile)) return 'novalogOperations';
   if (canAccessNovalogOperations(profile)) return 'novalogBillings';
   if (canAccessNovalogOperations(profile)) return 'novalogReports';
@@ -64,9 +65,10 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
       return canAccess(profile, 'tenantProfile', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'revenues':
     case 'payables':
-    case 'fiscal':
     case 'reports':
       return activeTab;
+    case 'fiscal':
+      return canAccess(profile, 'fiscal', 'read') && canAccessFiscal(profile) ? activeTab : getFirstAllowedTab(profile);
     case 'expenses':
       return canAccess(profile, 'expenses', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'vehicles':

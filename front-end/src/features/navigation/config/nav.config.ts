@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { NavItem, UserProfile } from '../../../shared/types/common.types';
 import { canAccess } from '../../../lib/permissions';
+import { canAccessFiscal } from '../../../lib/features';
 import { useAuth } from '../../auth/hooks/useAuth';
 
 export interface NavigationItem {
@@ -87,7 +88,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       items: [
         navItem('revenues', 'Contas a receber', WalletCards),
         navItem('payables', 'Contas a pagar', CreditCard),
-        canAccess(userProfile, 'fiscal', 'read') ? navItem('fiscal', 'Fiscal', FileCheck2) : null,
+        canAccess(userProfile, 'fiscal', 'read') && canAccessFiscal(userProfile) ? navItem('fiscal', 'Fiscal', FileCheck2) : null,
         userProfile?.tenantSlug === 'novalog' ? null : navItem('reports', 'Relatorios', BarChart3),
       ].filter((item): item is NavigationItem => item !== null),
     },

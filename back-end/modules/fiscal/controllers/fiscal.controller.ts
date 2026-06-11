@@ -1,7 +1,9 @@
 import express from 'express';
+import type { NextFunction, Response } from 'express';
 import { canPerform } from '../../../shared/authorization/permissions';
 import { notFoundError } from '../../../shared/errors/app-error';
 import { ensureAllowed } from '../../../shared/http/ensure-allowed';
+import { ensureFeature } from '../../../shared/http/ensure-feature';
 import { sendErrorResponse } from '../../../shared/http/error-response';
 import { loadAuthContext } from '../../auth/middlewares/load-auth-context.middleware';
 import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
@@ -12,7 +14,14 @@ import { createFiscalDocument, emitFiscalDocument, getFiscalDocument, listTenant
 
 const router = express.Router();
 
-router.get('/fiscal/documents', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+function requireFiscalFeature(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!ensureFeature(res, req.auth?.features, 'fiscal', 'Modulo fiscal nao habilitado para este tenant.')) {
+    return;
+  }
+  next();
+}
+
+router.get('/fiscal/documents', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('read', fiscalPermissions, req.auth?.role), 'Sem permissao para visualizar documentos fiscais.')) {
       return;
@@ -24,7 +33,7 @@ router.get('/fiscal/documents', loadAuthContext, async (req: AuthenticatedReques
   }
 });
 
-router.get('/fiscal/documents/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+router.get('/fiscal/documents/:id', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('read', fiscalPermissions, req.auth?.role), 'Sem permissao para visualizar documentos fiscais.')) {
       return;
@@ -42,7 +51,7 @@ router.get('/fiscal/documents/:id', loadAuthContext, async (req: AuthenticatedRe
   }
 });
 
-router.post('/fiscal/documents', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+router.post('/fiscal/documents', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('create', fiscalPermissions, req.auth?.role), 'Sem permissao para criar documentos fiscais.')) {
       return;
@@ -54,7 +63,7 @@ router.post('/fiscal/documents', loadAuthContext, async (req: AuthenticatedReque
   }
 });
 
-router.post('/fiscal/documents/:id/emit', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+router.post('/fiscal/documents/:id/emit', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para emitir documentos fiscais.')) {
       return;
@@ -72,7 +81,7 @@ router.post('/fiscal/documents/:id/emit', loadAuthContext, async (req: Authentic
   }
 });
 
-router.post('/fiscal/documents/:id/sync', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+router.post('/fiscal/documents/:id/sync', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para sincronizar documentos fiscais.')) {
       return;
@@ -90,7 +99,7 @@ router.post('/fiscal/documents/:id/sync', loadAuthContext, async (req: Authentic
   }
 });
 
-router.put('/fiscal/documents/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+router.put('/fiscal/documents/:id', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para editar documentos fiscais.')) {
       return;
@@ -108,7 +117,7 @@ router.put('/fiscal/documents/:id', loadAuthContext, async (req: AuthenticatedRe
   }
 });
 
-router.delete('/fiscal/documents/:id', loadAuthContext, async (req: AuthenticatedRequest, res, next) => {
+router.delete('/fiscal/documents/:id', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('delete', fiscalPermissions, req.auth?.role), 'Sem permissao para excluir documentos fiscais.')) {
       return;

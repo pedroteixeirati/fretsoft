@@ -1,10 +1,26 @@
 import type { DecodedIdToken } from 'firebase-admin/auth';
+import { config } from '../../../shared/config/env';
 import {
   createUserFromIdentity,
+  findTenantFeatures,
   findTenantMembership,
   findUserByFirebaseUid,
   updateUserProfile,
 } from '../repositories/auth.repository';
+
+async function resolveTenantFeatures(tenantId: string) {
+  const rows = await findTenantFeatures(tenantId);
+  const features: Record<string, boolean> = {};
+
+  for (const row of rows) {
+    if (!row.enabled) continue;
+    // Kill-switch global: desliga todo o modulo fiscal independente do flag por tenant.
+    if (!config.fiscalModuleEnabled && row.feature_key.startsWith('fiscal')) continue;
+    features[row.feature_key] = true;
+  }
+
+  return features;
+}
 
 export async function ensureUser(decoded: DecodedIdToken) {
   const existing = await findUserByFirebaseUid(decoded.uid);
@@ -30,6 +46,8 @@ export async function resolveAuthContext(decoded: DecodedIdToken) {
     return null;
   }
 
+  const features = await resolveTenantFeatures(membership.tenant_id);
+
   return {
     uid: decoded.uid,
     userId: user.id,
@@ -40,5 +58,6 @@ export async function resolveAuthContext(decoded: DecodedIdToken) {
     tenantName: membership.tenant_name,
     tenantSlug: membership.tenant_slug,
     tenantLogoUrl: membership.tenant_logo_url,
+    features,
   };
 }
