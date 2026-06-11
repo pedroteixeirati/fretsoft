@@ -9,7 +9,7 @@ import { Alert, Button, ConfirmDialog, DataTable, Input, KpiCard, Modal, PageHea
 import { fiscalApi } from '../services/fiscal.api';
 import { useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
-import type { FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalExecutionMode, FiscalPayment } from '../types/fiscal.types';
+import type { FiscalCteData, FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalExecutionMode, FiscalParty, FiscalPayment } from '../types/fiscal.types';
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -51,9 +51,16 @@ const emptyDraft: FiscalDocumentDraft = {
   executionMode: 'own_fleet',
   ciot: '',
   rntrc: '',
+  cteData: {},
   parties: [],
   payments: [],
 };
+
+const PARTY_ROLES = ['sender', 'recipient'] as const;
+
+function blankParty(role: FiscalParty['role']): FiscalParty {
+  return { role, name: '', documentNumber: '', stateRegistration: '', city: '', state: '', phone: '', street: '', number: '', district: '', zipCode: '', cityIbgeCode: '' };
+}
 
 function formatDate(value: string) {
   if (!value) return '-';
@@ -147,6 +154,7 @@ export default function FiscalDocumentsPage() {
       executionMode: document.executionMode || 'own_fleet',
       ciot: document.ciot || '',
       rntrc: document.rntrc || '',
+      cteData: document.cteData || {},
       parties: document.parties || [],
       payments: document.payments || [],
     });
@@ -167,6 +175,53 @@ export default function FiscalDocumentsPage() {
       const base = current.payments[0] || { payeeName: '', payeeDocument: '', componentType: '04' as const, amount: 0, bankName: '', bankBranch: '', bankAccount: '', pixKey: '' };
       return { ...current, payments: [{ ...base, [key]: value }] };
     });
+  };
+
+  const getParty = (role: FiscalParty['role']) => draft.parties.find((current) => current.role === role) || blankParty(role);
+
+  const updateParty = (role: FiscalParty['role'], key: keyof FiscalParty, value: string) => {
+    setDraft((current) => {
+      const others = current.parties.filter((party) => party.role !== role);
+      const existing = current.parties.find((party) => party.role === role) || blankParty(role);
+      return { ...current, parties: [...others, { ...existing, [key]: value }] };
+    });
+  };
+
+  const updateCteData = <K extends keyof FiscalCteData>(key: K, value: FiscalCteData[K]) => {
+    setDraft((current) => ({ ...current, cteData: { ...current.cteData, [key]: value } }));
+  };
+
+  const nfeKeysText = (draft.cteData.nfeKeys || []).join('\n');
+  const setNfeKeysText = (text: string) => {
+    const keys = text.split(/[\s,;]+/).map((key) => key.replace(/\D/g, '')).filter((key) => key.length > 0);
+    updateCteData('nfeKeys', keys);
+  };
+
+  const isCte = draft.documentType !== 'mdfe';
+
+  const renderParty = (role: FiscalParty['role'], label: string) => {
+    const party = getParty(role);
+    return (
+      <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container/40 p-4">
+        <p className="text-sm font-bold text-on-surface">{label}</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Input label="Nome" value={party.name} onChange={(event) => updateParty(role, 'name', event.target.value)} />
+          <Input label="CNPJ / CPF" value={party.documentNumber} onChange={(event) => updateParty(role, 'documentNumber', event.target.value)} />
+          <Input label="Inscricao estadual" value={party.stateRegistration} onChange={(event) => updateParty(role, 'stateRegistration', event.target.value)} />
+        </div>
+        <div className="grid gap-4 md:grid-cols-4">
+          <Input label="Municipio" value={party.city} onChange={(event) => updateParty(role, 'city', event.target.value)} />
+          <Input label="Codigo IBGE" value={party.cityIbgeCode} onChange={(event) => updateParty(role, 'cityIbgeCode', event.target.value)} placeholder="7 digitos" />
+          <Input label="UF" value={party.state} onChange={(event) => updateParty(role, 'state', event.target.value)} maxLength={2} />
+          <Input label="CEP" value={party.zipCode} onChange={(event) => updateParty(role, 'zipCode', event.target.value)} />
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Input label="Logradouro" value={party.street} onChange={(event) => updateParty(role, 'street', event.target.value)} />
+          <Input label="Numero" value={party.number} onChange={(event) => updateParty(role, 'number', event.target.value)} />
+          <Input label="Bairro" value={party.district} onChange={(event) => updateParty(role, 'district', event.target.value)} />
+        </div>
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -413,6 +468,53 @@ export default function FiscalDocumentsPage() {
             <Input label="Origem" value={draft.originName} onChange={(event) => updateDraft('originName', event.target.value)} placeholder="Origem" />
             <Input label="Destino" value={draft.destinationName} onChange={(event) => updateDraft('destinationName', event.target.value)} placeholder="Destino" />
           </div>
+
+          {isCte ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-2xl bg-info/5 px-4 py-3">
+                <FileCheck2 className="h-5 w-5 text-info" />
+                <div className="flex-1 text-sm">
+                  <span className="font-bold text-on-surface">Emitente: {userProfile?.tenantName || 'Transportadora'}</span>
+                  <p className="text-xs text-on-surface-variant">CNPJ, IE, CRT e endereco preenchidos automaticamente do cadastro da Transportadora.</p>
+                </div>
+              </div>
+
+              {renderParty('sender', 'Remetente')}
+              {renderParty('recipient', 'Destinatario')}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input label="IBGE municipio inicio" value={draft.cteData.municipioInicioIbge || ''} onChange={(event) => updateCteData('municipioInicioIbge', event.target.value)} placeholder="7 digitos" />
+                <Input label="IBGE municipio fim" value={draft.cteData.municipioFimIbge || ''} onChange={(event) => updateCteData('municipioFimIbge', event.target.value)} placeholder="7 digitos" />
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container/40 p-4">
+                <p className="text-sm font-bold text-on-surface">Tributacao</p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Input label="CFOP" value={draft.cteData.cfop || ''} onChange={(event) => updateCteData('cfop', event.target.value)} placeholder="6352" />
+                  <Input label="Natureza da operacao" value={draft.cteData.naturezaOperacao || ''} onChange={(event) => updateCteData('naturezaOperacao', event.target.value)} />
+                  <Input label="Tipo de servico" value={draft.cteData.tipoServico || ''} onChange={(event) => updateCteData('tipoServico', event.target.value)} placeholder="0 - Normal" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Input label="CST ICMS" value={draft.cteData.icmsCst || ''} onChange={(event) => updateCteData('icmsCst', event.target.value)} placeholder="00" />
+                  <Input label="Base calculo" type="number" step="0.01" value={draft.cteData.icmsBaseCalculo ?? ''} onChange={(event) => updateCteData('icmsBaseCalculo', event.target.value === '' ? undefined : Number(event.target.value))} />
+                  <Input label="Aliquota %" type="number" step="0.01" value={draft.cteData.icmsAliquota ?? ''} onChange={(event) => updateCteData('icmsAliquota', event.target.value === '' ? undefined : Number(event.target.value))} />
+                  <Input label="Valor ICMS" type="number" step="0.01" value={draft.cteData.icmsValor ?? ''} onChange={(event) => updateCteData('icmsValor', event.target.value === '' ? undefined : Number(event.target.value))} />
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container/40 p-4">
+                <p className="text-sm font-bold text-on-surface">Carga e NF-e vinculada</p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input label="Produto predominante" value={draft.cteData.produtoPredominante || ''} onChange={(event) => updateCteData('produtoPredominante', event.target.value)} />
+                  <Input label="Valor da carga" type="number" step="0.01" value={draft.cteData.valorCarga ?? ''} onChange={(event) => updateCteData('valorCarga', event.target.value === '' ? undefined : Number(event.target.value))} />
+                </div>
+                <div>
+                  <span className="mb-1 block text-sm font-medium text-on-surface-variant">Chaves de NF-e (uma por linha)</span>
+                  <textarea value={nfeKeysText} onChange={(event) => setNfeKeysText(event.target.value)} rows={2} className="w-full rounded-xl border border-outline-variant bg-surface p-3 text-sm text-on-surface" placeholder="44 digitos por NF-e" />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {canUseTac ? (
             <div className="space-y-4">

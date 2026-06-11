@@ -11,6 +11,27 @@ export interface FiscalParty {
   stateRegistration: string;
   city: string;
   state: string;
+  phone: string;
+  street: string;
+  number: string;
+  district: string;
+  zipCode: string;
+  cityIbgeCode: string;
+}
+
+export interface FiscalCteData {
+  cfop?: string;
+  naturezaOperacao?: string;
+  tipoServico?: string;
+  icmsCst?: string;
+  icmsBaseCalculo?: number;
+  icmsAliquota?: number;
+  icmsValor?: number;
+  produtoPredominante?: string;
+  valorCarga?: number;
+  municipioInicioIbge?: string;
+  municipioFimIbge?: string;
+  nfeKeys?: string[];
 }
 
 export interface FiscalPayment {
@@ -54,6 +75,7 @@ export interface FiscalDocument {
   executionMode: FiscalExecutionMode;
   ciot: string;
   rntrc: string;
+  cteData: FiscalCteData;
   createdAt: string;
   updatedAt: string;
   parties: FiscalParty[];
