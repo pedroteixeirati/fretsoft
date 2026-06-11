@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { Bell, ChevronRight, Globe, Info, Loader2, Moon, Shield, UserPlus, Wallet } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Bell, ChevronRight, Globe, Info, Loader2, Moon, Shield, ToggleRight, UserPlus, Wallet } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import { useFirebase } from '../context/FirebaseContext';
 import { canAccess } from '../lib/permissions';
+import { getErrorMessage } from '../lib/errors';
+import { tenantFeaturesApi, TenantFeature } from '../features/tenant-features/services/tenant-features.api';
 import { logout } from '../firebase';
 
 export default function Settings() {
-  const { user, userProfile, signUp } = useFirebase();
+  const { user, userProfile, signUp, refreshProfile } = useFirebase();
   const canManageUsers = canAccess(userProfile, 'users', 'create');
+  const isDev = userProfile?.role === 'dev';
   const canCreateAdmin = userProfile?.role === 'dev';
   const isNovalogTenant = userProfile?.tenantSlug === 'novalog';
   const roleOptions = [
@@ -132,6 +135,8 @@ export default function Settings() {
           </section>
         )}
 
+        {isDev && <FeatureFlagsSection onChanged={refreshProfile} />}
+
         <section className="bg-surface-container-lowest rounded-3xl border border-outline-variant overflow-hidden shadow-sm">
           <div className="p-6 border-b border-outline-variant flex items-center justify-between">
             <div>
@@ -179,6 +184,78 @@ export default function Settings() {
         </div>
       </div>
     </div>
+  );
+}
+
+function FeatureFlagsSection({ onChanged }: { onChanged: () => void }) {
+  const [features, setFeatures] = useState<TenantFeature[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [savingKey, setSavingKey] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    tenantFeaturesApi
+      .list()
+      .then((data) => { if (active) setFeatures(data ?? []); })
+      .catch((err) => { if (active) setError(getErrorMessage(err, 'Nao foi possivel carregar as feature flags.')); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const toggle = async (feature: TenantFeature) => {
+    setSavingKey(feature.key);
+    setError('');
+    try {
+      const updated = await tenantFeaturesApi.setFeature(feature.key, !feature.enabled);
+      setFeatures(updated ?? []);
+      onChanged();
+    } catch (err) {
+      setError(getErrorMessage(err, 'Nao foi possivel atualizar a feature flag.'));
+    } finally {
+      setSavingKey('');
+    }
+  };
+
+  return (
+    <section className="bg-surface-container-lowest rounded-3xl border border-outline-variant overflow-hidden shadow-sm">
+      <div className="p-6 border-b border-outline-variant">
+        <h3 className="text-xl font-bold text-on-surface flex items-center gap-2">
+          <ToggleRight className="w-6 h-6 text-primary" />
+          Funcionalidades (feature flags)
+        </h3>
+        <p className="text-sm text-on-surface-variant mt-1">Ative ou desative modulos para esta transportadora. Visivel apenas para o perfil dev.</p>
+      </div>
+      <div className="p-6 space-y-3">
+        {error && <p className="text-error text-xs font-bold">{error}</p>}
+        {loading ? (
+          <p className="text-sm text-on-surface-variant">Carregando...</p>
+        ) : (
+          features.map((feature) => (
+            <div key={feature.key} className="flex items-center justify-between gap-4 rounded-2xl border border-outline-variant bg-surface-container px-4 py-3">
+              <div>
+                <p className="font-bold text-on-surface text-sm">{feature.label}</p>
+                <p className="text-xs text-on-surface-variant font-mono">{feature.key}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={feature.enabled}
+                aria-label={`Alternar ${feature.label}`}
+                disabled={savingKey === feature.key}
+                onClick={() => toggle(feature)}
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${feature.enabled ? 'bg-primary' : 'bg-outline-variant'}`}
+              >
+                <span className={`absolute top-1 h-5 w-5 rounded-full bg-surface-container-lowest transition-all ${feature.enabled ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+          ))
+        )}
+        <p className="text-xs text-on-surface-variant">
+          A flag mestre <span className="font-mono">fiscal</span> precisa estar ligada para o modulo aparecer; <span className="font-mono">fiscal.third_party</span> libera TAC/CIOT.
+        </p>
+      </div>
+    </section>
   );
 }
 
