@@ -20,6 +20,7 @@ export interface FiscalParty {
 }
 
 export interface FiscalCteData {
+  tomadorTipo?: 'remetente' | 'destinatario' | 'outros' | string;
   cfop?: string;
   naturezaOperacao?: string;
   tipoServico?: string;

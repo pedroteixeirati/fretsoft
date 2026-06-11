@@ -157,6 +157,32 @@ export async function findTenantEmitter(tenantId?: string) {
   return result.rows[0] || null;
 }
 
+export type ContractCompanyRow = {
+  corporate_name: string | null;
+  trade_name: string | null;
+  cnpj: string | null;
+  state_registration: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+};
+
+export async function findContractCompanyForFreight(contractId: string, tenantId?: string) {
+  const result = await pool.query<ContractCompanyRow>(
+    `select co.corporate_name, co.trade_name, co.cnpj, co.state_registration,
+            co.address, co.city, co.state, co.zip_code
+     from contracts c
+     join companies co on co.id = c.company_id
+     where c.id = $1
+       and c.tenant_id = $2
+     limit 1`,
+    [contractId, tenantId]
+  );
+
+  return result.rows[0] || null;
+}
+
 export async function findFiscalDocumentBySourceFreight(freightId: string, tenantId?: string) {
   const result = await pool.query<{ id: string }>(
     `select id

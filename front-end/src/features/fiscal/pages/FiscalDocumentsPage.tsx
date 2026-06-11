@@ -7,6 +7,7 @@ import { canAccess } from '../../../lib/permissions';
 import { canUseFiscalThirdParty } from '../../../lib/features';
 import { Alert, Button, ConfirmDialog, DataTable, Input, KpiCard, Modal, PageHeader, Select, type DataTableColumn } from '../../../shared/ui';
 import { fiscalApi } from '../services/fiscal.api';
+import { DEFAULT_ICMS_CST, suggestCfop } from '../utils/cfop';
 import { useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
 import type { FiscalCteData, FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalExecutionMode, FiscalParty, FiscalPayment } from '../types/fiscal.types';
@@ -183,7 +184,21 @@ export default function FiscalDocumentsPage() {
     setDraft((current) => {
       const others = current.parties.filter((party) => party.role !== role);
       const existing = current.parties.find((party) => party.role === role) || blankParty(role);
-      return { ...current, parties: [...others, { ...existing, [key]: value }] };
+      const nextParties = [...others, { ...existing, [key]: value }];
+
+      // Ao definir a UF de remetente/destinatario, sugere CFOP/CST se ainda vazios.
+      let cteData = current.cteData;
+      if (key === 'state') {
+        const ufOrigem = nextParties.find((party) => party.role === 'sender')?.state || '';
+        const ufDestino = nextParties.find((party) => party.role === 'recipient')?.state || '';
+        const cfop = suggestCfop(ufOrigem, ufDestino);
+        const patch: Partial<FiscalCteData> = {};
+        if (cfop && !current.cteData.cfop) patch.cfop = cfop;
+        if (!current.cteData.icmsCst) patch.icmsCst = DEFAULT_ICMS_CST;
+        if (Object.keys(patch).length) cteData = { ...current.cteData, ...patch };
+      }
+
+      return { ...current, parties: nextParties, cteData };
     });
   };
 
@@ -481,6 +496,23 @@ export default function FiscalDocumentsPage() {
 
               {renderParty('sender', 'Remetente')}
               {renderParty('recipient', 'Destinatario')}
+
+              <div>
+                <span className="mb-1 block text-sm font-medium text-on-surface-variant">Tomador do servico (quem paga o frete)</span>
+                <div className="md:w-1/2">
+                  <Select
+                    value={draft.cteData.tomadorTipo || 'destinatario'}
+                    onChange={(value) => updateCteData('tomadorTipo', value)}
+                    options={[
+                      { value: 'destinatario', label: 'Destinatario' },
+                      { value: 'remetente', label: 'Remetente' },
+                      { value: 'outros', label: 'Outro' },
+                    ]}
+                    placeholder="Tomador"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-on-surface-variant">Ex.: a carga sai da mineradora (remetente) e a siderurgica (destinatario) paga o frete.</p>
+              </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Input label="IBGE municipio inicio" value={draft.cteData.municipioInicioIbge || ''} onChange={(event) => updateCteData('municipioInicioIbge', event.target.value)} placeholder="7 digitos" />

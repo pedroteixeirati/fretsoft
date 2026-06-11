@@ -146,6 +146,10 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
   const recipient = partyByRole(request.parties, 'recipient');
   const dispatcher = partyByRole(request.parties, 'dispatcher');
   const receiver = partyByRole(request.parties, 'receiver');
+  const taker = partyByRole(request.parties, 'taker');
+
+  const tomadorCodes: Record<string, string> = { remetente: '0', expedidor: '1', recebedor: '2', destinatario: '3', outros: '4' };
+  const tomadorCode = tomadorCodes[String(cteData.tomadorTipo || '')];
 
   return onlyDefinedEntries({
     ...emitter,
@@ -165,7 +169,7 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
     codigo_municipio_fim: cteData.municipioFimIbge || document.tax_data?.codigo_municipio_fim,
     municipio_fim: document.tax_data?.municipio_fim || document.destination_name || undefined,
     uf_fim: document.tax_data?.uf_fim,
-    tomador: document.tax_data?.tomador,
+    tomador: tomadorCode ?? document.tax_data?.tomador,
     retirar_mercadoria: taxData.retirar_mercadoria || '1',
     indicador_inscricao_estadual_tomador: taxData.indicador_inscricao_estadual_tomador || '1',
     valor_total: Number(document.amount || 0),
@@ -187,6 +191,7 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
     ...focusPartyFields('destinatario', recipient),
     ...focusPartyFields('expedidor', dispatcher),
     ...focusPartyFields('recebedor', receiver),
+    ...(tomadorCode === '4' ? focusPartyFields('tomador', taker) : {}),
   });
 }
 

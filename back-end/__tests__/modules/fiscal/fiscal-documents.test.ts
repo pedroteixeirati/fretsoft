@@ -39,6 +39,16 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
+test('tomador derivado de tomadorTipo e cliente do contrato pre-preenche destinatario', () => {
+  assert.match(providerServiceSource, /const tomadorCodes: Record<string, string> = \{ remetente: '0'/);
+  assert.match(providerServiceSource, /tomador: tomadorCode \?\? document\.tax_data\?\.tomador/);
+  assert.match(providerServiceSource, /tomadorCode === '4' \? focusPartyFields\('tomador', taker\)/);
+  assert.match(serviceSource, /findContractCompanyForFreight/);
+  assert.match(serviceSource, /role: 'recipient' as const/);
+  assert.match(serviceSource, /tomadorTipo: company \? 'destinatario' : undefined/);
+  assert.match(repositorySource, /join companies co on co\.id = c\.company_id/i);
+});
+
 test('CT-e completo: emitente automatico, partes com endereco/IBGE, tributacao e NF-e', () => {
   const cteMigration = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713438000000_cte_fiscal_data.sql'), 'utf8');
   assert.match(cteMigration, /alter table if exists tenants add column if not exists crt text/i);

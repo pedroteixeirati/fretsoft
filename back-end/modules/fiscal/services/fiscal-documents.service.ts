@@ -32,6 +32,7 @@ import {
   createTenantFiscalDocument,
   createFiscalCommunicationLog,
   deleteTenantFiscalDocument,
+  findContractCompanyForFreight,
   findFiscalDocumentByAccessKey,
   findFiscalDocumentBySourceFreight,
   findFiscalDocumentDuplicate,
@@ -233,6 +234,7 @@ function normalizeCteData(value: unknown): FiscalCteData {
     : undefined;
 
   return {
+    tomadorTipo: normalizeOptionalText(data.tomadorTipo as string) || undefined,
     cfop: normalizeOptionalText(data.cfop as string) || undefined,
     naturezaOperacao: normalizeOptionalText(data.naturezaOperacao as string) || undefined,
     tipoServico: normalizeOptionalText(data.tipoServico as string) || undefined,
@@ -371,7 +373,26 @@ export async function buildFiscalDraftFromFreight(freightId: string, tenantId: s
 
   const existing = await findFiscalDocumentBySourceFreight(freight.id, tenantId);
   const partner = freight.transport_partner_id ? await findTenantTransportPartner(freight.transport_partner_id, tenantId || '') : null;
+  const company = freight.contract_id ? await findContractCompanyForFreight(freight.contract_id, tenantId) : null;
   const amount = Number(freight.amount || 0);
+
+  // Cliente do contrato (ex.: siderurgica) entra como destinatario e tomador do servico.
+  const recipientParty = company
+    ? [{
+        role: 'recipient' as const,
+        name: company.trade_name || company.corporate_name || '',
+        documentNumber: company.cnpj || '',
+        stateRegistration: company.state_registration || '',
+        city: company.city || '',
+        state: company.state || '',
+        zipCode: company.zip_code || '',
+        street: company.address || '',
+        number: '',
+        district: '',
+        phone: '',
+        cityIbgeCode: '',
+      }]
+    : [];
 
   return {
     existingDocumentId: existing?.id || null,
@@ -383,15 +404,17 @@ export async function buildFiscalDraftFromFreight(freightId: string, tenantId: s
       amount,
       originName: freight.origin || '',
       destinationName: freight.destination || '',
-      takerName: freight.contract_name || '',
+      takerName: company?.trade_name || company?.corporate_name || freight.contract_name || '',
       executionMode: freight.execution_mode || 'own_fleet',
       transportPartnerId: freight.transport_partner_id || '',
       ciot: '',
       rntrc: partner?.rntrc || '',
       sourceFreightId: freight.id,
+      parties: recipientParty,
       cteData: {
         naturezaOperacao: 'PRESTACAO DE SERVICO DE TRANSPORTE',
         valorCarga: amount,
+        tomadorTipo: company ? 'destinatario' : undefined,
       } as FiscalCteData,
       payments: partner
         ? [{
