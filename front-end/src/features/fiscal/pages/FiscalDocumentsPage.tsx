@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FileCheck2, FilePlus2, Lock, Pencil, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
+import { FileCheck2, FilePlus2, Lock, Pencil, RefreshCw, Search, Send, Trash2, Upload } from 'lucide-react';
 import { useFirebase } from '../../../context/FirebaseContext';
 import { getErrorMessage } from '../../../lib/errors';
 import { canAccess } from '../../../lib/permissions';
@@ -8,6 +8,7 @@ import { canUseFiscalThirdParty } from '../../../lib/features';
 import { Alert, Button, ConfirmDialog, DataTable, Input, KpiCard, Modal, PageHeader, Select, type DataTableColumn } from '../../../shared/ui';
 import { fiscalApi } from '../services/fiscal.api';
 import { DEFAULT_ICMS_CST, suggestCfop } from '../utils/cfop';
+import { parseNfeXml } from '../utils/nfe-import';
 import { useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
 import type { FiscalCteData, FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalExecutionMode, FiscalParty, FiscalPayment } from '../types/fiscal.types';
@@ -91,6 +92,9 @@ export default function FiscalDocumentsPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [warningMessages, setWarningMessages] = useState<string[]>([]);
   const [documentToDelete, setDocumentToDelete] = useState<FiscalDocument | null>(null);
+  const [nfeImportMsg, setNfeImportMsg] = useState('');
+  const [nfeImportError, setNfeImportError] = useState('');
+  const nfeInputRef = useRef<HTMLInputElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const filteredDocuments = useMemo(() => {
@@ -213,6 +217,45 @@ export default function FiscalDocumentsPage() {
   };
 
   const isCte = draft.documentType !== 'mdfe';
+
+  const handleNfeImport = (file?: File | null) => {
+    if (!file) return;
+    setNfeImportError('');
+    setNfeImportMsg('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseNfeXml(String(reader.result || ''));
+      if (!parsed) {
+        setNfeImportError('Arquivo nao parece ser uma NF-e valida (XML).');
+        return;
+      }
+      setDraft((current) => {
+        const sender = parsed.sender || current.parties.find((party) => party.role === 'sender');
+        const recipient = parsed.recipient || current.parties.find((party) => party.role === 'recipient');
+        const parties = current.parties.filter((party) => party.role !== 'sender' && party.role !== 'recipient');
+        if (sender) parties.push(sender);
+        if (recipient) parties.push(recipient);
+        const nfeKeys = Array.from(new Set([...(current.cteData.nfeKeys || []), parsed.nfeKey]));
+        const cfop = suggestCfop(sender?.state, recipient?.state);
+        return {
+          ...current,
+          parties,
+          cteData: {
+            ...current.cteData,
+            nfeKeys,
+            valorCarga: current.cteData.valorCarga ?? parsed.valorCarga,
+            produtoPredominante: current.cteData.produtoPredominante || parsed.produtoPredominante,
+            tomadorTipo: current.cteData.tomadorTipo || 'destinatario',
+            cfop: current.cteData.cfop || cfop,
+            icmsCst: current.cteData.icmsCst || DEFAULT_ICMS_CST,
+          },
+        };
+      });
+      setNfeImportMsg(`NF-e importada: ${parsed.sender?.name || 'remetente'} -> ${parsed.recipient?.name || 'destinatario'} (chave final ...${parsed.nfeKey.slice(-6)}).`);
+    };
+    reader.onerror = () => setNfeImportError('Nao foi possivel ler o arquivo.');
+    reader.readAsText(file);
+  };
 
   const renderParty = (role: FiscalParty['role'], label: string) => {
     const party = getParty(role);
@@ -486,6 +529,25 @@ export default function FiscalDocumentsPage() {
 
           {isCte ? (
             <div className="space-y-4">
+              <input
+                ref={nfeInputRef}
+                type="file"
+                accept=".xml,text/xml,application/xml"
+                className="hidden"
+                onChange={(event) => { handleNfeImport(event.target.files?.[0]); event.target.value = ''; }}
+              />
+              <button
+                type="button"
+                onClick={() => nfeInputRef.current?.click()}
+                className="w-full rounded-2xl border border-dashed border-outline-variant bg-surface-container/40 p-4 text-center transition-colors hover:border-primary/40"
+              >
+                <Upload className="mx-auto h-6 w-6 text-on-surface-variant" />
+                <span className="mt-1 block text-sm font-medium text-on-surface">Importar XML da NF-e</span>
+                <span className="block text-xs text-on-surface-variant">Preenche remetente, destinatario (com IBGE), chave e valor automaticamente.</span>
+              </button>
+              {nfeImportError ? <Alert tone="danger">{nfeImportError}</Alert> : null}
+              {nfeImportMsg ? <Alert tone="success">{nfeImportMsg}</Alert> : null}
+
               <div className="flex items-center gap-3 rounded-2xl bg-info/5 px-4 py-3">
                 <FileCheck2 className="h-5 w-5 text-info" />
                 <div className="flex-1 text-sm">
