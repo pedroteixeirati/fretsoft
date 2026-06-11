@@ -29,6 +29,7 @@ export interface FiscalProviderAdapter {
 }
 
 const focusProviderAliases = new Set(['focus', 'focus_nfe', 'focusnfe']);
+const mockProviderAliases = new Set(['mock', 'mock_fiscal', 'focus_nfe_mock']);
 
 function providerNameFromEnv() {
   return (process.env.FISCAL_PROVIDER || '').trim().toLowerCase();
@@ -66,6 +67,23 @@ function focusReference(document: FiscalDocumentRow) {
 
 function focusAuthHeader(token: string) {
   return `Basic ${Buffer.from(`${token}:`).toString('base64')}`;
+}
+
+function numericHash(value: string) {
+  let hash = 0;
+  for (const char of value) {
+    hash = (hash * 31 + char.charCodeAt(0)) % 1000000000;
+  }
+  return String(Math.abs(hash)).padStart(9, '0');
+}
+
+function mockAccessKey(document: FiscalDocumentRow) {
+  const seed = `${document.tenant_id || '31'}${document.document_type}${document.series}${document.number}${document.id}`;
+  return `${numericHash(seed)}${numericHash(seed.split('').reverse().join(''))}${numericHash(`${seed}:cte`)}${numericHash(`${seed}:mdfe`)}${numericHash(`${seed}:focus`).slice(0, 8)}`.slice(0, 44);
+}
+
+function mockProtocol(document: FiscalDocumentRow) {
+  return `MOCK${numericHash(`${document.id}:${document.series}:${document.number}`)}`;
 }
 
 function onlyDefinedEntries(payload: Record<string, unknown>) {
@@ -286,6 +304,55 @@ export function createFocusNfeProviderAdapter(): FiscalProviderAdapter {
   };
 }
 
+export function createMockFiscalProviderAdapter(): FiscalProviderAdapter {
+  return {
+    name: 'mock_fiscal',
+    async emitDocument(request) {
+      const reference = focusReference(request.document);
+      return {
+        status: 'processing',
+        provider: 'mock_fiscal',
+        providerDocumentId: reference,
+        responsePayload: {
+          ref: reference,
+          status: 'processando_autorizacao',
+          mensagem: 'Emissao fiscal simulada em ambiente local.',
+        },
+        httpStatus: 202,
+      };
+    },
+    async consultDocument(request) {
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      const accessKey = mockAccessKey(request.document);
+      const protocol = mockProtocol(request.document);
+      const suffix = request.document.document_type === 'mdfe' ? 'mdfe' : 'cte';
+
+      return {
+        status: 'authorized',
+        provider: 'mock_fiscal',
+        providerDocumentId: reference,
+        accessKey,
+        protocol,
+        authorizedAt: new Date().toISOString(),
+        xml: `mock://fiscal/${reference}/${suffix}.xml`,
+        dacteUrl: `mock://fiscal/${reference}/${request.document.document_type === 'mdfe' ? 'damdfe' : 'dacte'}.pdf`,
+        responsePayload: {
+          ref: reference,
+          status: 'autorizado',
+          status_sefaz: '100',
+          mensagem_sefaz: `Autorizado o uso do ${focusDocumentKind(request.document.document_type)} em mock local`,
+          chave: accessKey,
+          protocolo,
+          caminho_xml: `mock://fiscal/${reference}/${suffix}.xml`,
+          caminho_dacte: request.document.document_type === 'mdfe' ? undefined : `mock://fiscal/${reference}/dacte.pdf`,
+          caminho_damdfe: request.document.document_type === 'mdfe' ? `mock://fiscal/${reference}/damdfe.pdf` : undefined,
+        },
+        httpStatus: 200,
+      };
+    },
+  };
+}
+
 export function buildFiscalProviderRequest(document: FiscalDocumentRow, parties: FiscalPartyRow[]): FiscalProviderRequest {
   return {
     operation: 'emit_document',
@@ -331,6 +398,10 @@ export function getFiscalProviderAdapter(): FiscalProviderAdapter {
 
   if (focusProviderAliases.has(providerName)) {
     return createFocusNfeProviderAdapter();
+  }
+
+  if (mockProviderAliases.has(providerName)) {
+    return createMockFiscalProviderAdapter();
   }
 
   throw fiscalErrors.providerNotConfigured();

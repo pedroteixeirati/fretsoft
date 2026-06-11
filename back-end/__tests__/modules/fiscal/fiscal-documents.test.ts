@@ -89,6 +89,13 @@ test('integracao fiscal prepara provider e registra tentativas de emissao sem si
   assert.match(providerServiceSource, /processando_autorizacao/);
   assert.match(providerServiceSource, /createFocusNfeProviderAdapter/);
   assert.match(providerServiceSource, /focusProviderAliases\.has\(providerName\)/);
+  assert.match(providerServiceSource, /createMockFiscalProviderAdapter/);
+  assert.match(providerServiceSource, /mockProviderAliases\.has\(providerName\)/);
+  assert.match(providerServiceSource, /name: 'mock_fiscal'/);
+  assert.match(providerServiceSource, /status: 'processando_autorizacao'/);
+  assert.match(providerServiceSource, /mock:\/\/fiscal\/\$\{reference\}/);
+  assert.match(providerServiceSource, /mockAccessKey/);
+  assert.match(providerServiceSource, /mockProtocol/);
   assert.match(providerServiceSource, /throw fiscalErrors\.providerNotConfigured\(\)/);
   assert.match(repositorySource, /insert into fiscal_communication_logs/i);
   assert.match(repositorySource, /update fiscal_documents[\s\S]*provider_document_id = coalesce/i);
