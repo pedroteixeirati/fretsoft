@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import authRouter from '../../../modules/auth/controllers/auth.controller';
+import cargoInsurancePoliciesRouter from '../../../modules/cargo-insurance-policies/controllers/cargo-insurance-policies.controller';
 import companiesRouter from '../../../modules/companies/controllers/companies.controller';
 import contractsRouter from '../../../modules/contracts/controllers/contracts.controller';
 import cargasRouter from '../../../modules/cargas/controllers/cargas.controller';
@@ -28,6 +29,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 app.use('/api', authRouter);
+app.use('/api', cargoInsurancePoliciesRouter);
 app.use('/api', tenantsRouter);
 app.use('/api', usersRouter);
 app.use('/api', vehiclesRouter);

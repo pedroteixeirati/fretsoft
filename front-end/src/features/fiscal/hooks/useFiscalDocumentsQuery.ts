@@ -3,6 +3,7 @@ import { fiscalApi } from '../services/fiscal.api';
 
 export const fiscalQueryKeys = {
   documents: ['fiscal', 'documents'] as const,
+  cargoInsurancePolicies: ['fiscal', 'cargo-insurance-policies'] as const,
 };
 
 export function useFiscalDocumentsQuery(enabled = true) {
@@ -16,5 +17,19 @@ export function useFiscalDocumentsQuery(enabled = true) {
     documents: documentsQuery.data || [],
     isLoading: documentsQuery.isLoading,
     error: documentsQuery.error,
+  };
+}
+
+export function useCargoInsurancePoliciesQuery(enabled = true) {
+  const policiesQuery = useQuery({
+    queryKey: fiscalQueryKeys.cargoInsurancePolicies,
+    queryFn: fiscalApi.listCargoInsurancePolicies,
+    enabled,
+  });
+
+  return {
+    policies: policiesQuery.data || [],
+    isLoading: policiesQuery.isLoading,
+    error: policiesQuery.error,
   };
 }

@@ -942,6 +942,43 @@ create unique index if not exists idx_tenants_cnpj_digits
   on tenants ((regexp_replace(cnpj, '\D', '', 'g')))
   where cnpj is not null and regexp_replace(cnpj, '\D', '', 'g') <> '';
 create unique index if not exists idx_users_display_id on users(display_id) where display_id is not null;
+
+create table if not exists cargo_insurance_policies (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  insurance_company_name text not null,
+  insurance_company_document text not null,
+  policy_number text not null,
+  endorsement_numbers jsonb not null default '[]'::jsonb check (jsonb_typeof(endorsement_numbers) = 'array'),
+  responsible_type text not null default 'carrier' check (responsible_type in ('carrier', 'shipper', 'taker', 'other')),
+  coverage_type text not null default 'rctr_c' check (coverage_type in ('rctr_c', 'rcf_dc', 'other')),
+  starts_at date,
+  ends_at date,
+  status text not null default 'active' check (status in ('active', 'inactive', 'expired')),
+  is_default boolean not null default false,
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_cargo_insurance_policies_display_id on cargo_insurance_policies;
+create trigger trg_cargo_insurance_policies_display_id
+before insert on cargo_insurance_policies
+for each row
+execute function assign_tenant_display_id();
+
+create unique index if not exists idx_cargo_insurance_policies_tenant_display_id
+  on cargo_insurance_policies(tenant_id, display_id)
+  where display_id is not null;
+create index if not exists idx_cargo_insurance_policies_tenant_id on cargo_insurance_policies(tenant_id);
+create index if not exists idx_cargo_insurance_policies_status on cargo_insurance_policies(tenant_id, status);
+create unique index if not exists idx_cargo_insurance_policies_tenant_default
+  on cargo_insurance_policies(tenant_id)
+  where is_default = true and status = 'active';
+
 create unique index if not exists idx_tenant_users_tenant_display_id on tenant_users(tenant_id, display_id) where display_id is not null;
 create unique index if not exists idx_vehicles_tenant_display_id on vehicles(tenant_id, display_id) where display_id is not null;
 create unique index if not exists idx_vehicles_tenant_plate

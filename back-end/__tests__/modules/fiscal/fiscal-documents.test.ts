@@ -39,9 +39,10 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
 });
 
-test('reenvio do documento autorizado por e-mail (saida)', () => {
+test('reenvio por e-mail fica controlado quando provider nao suporta a operacao', () => {
   assert.match(providerServiceSource, /sendEmail\(request: FiscalProviderRequest, emails: string\[\]\)/);
-  assert.match(providerServiceSource, /\/\$\{endpoint\}\/\$\{encodeURIComponent\(reference\)\}\/email/);
+  assert.doesNotMatch(providerServiceSource, /\/\$\{endpoint\}\/\$\{encodeURIComponent\(reference\)\}\/email/);
+  assert.match(providerServiceSource, /providerOperationUnsupported/);
   assert.match(serviceSource, /export async function resendFiscalDocument/);
   assert.match(serviceSource, /document\.status !== 'authorized'\) throw fiscalErrors\.documentNotResendable\(\)/);
   assert.match(serviceSource, /provider\.sendEmail\(\{ \.\.\.request, operation: 'send_email' \}, cleanEmails\)/);
@@ -58,12 +59,43 @@ test('MDF-e: dados estruturados, agregacao de CT-es e encerramento', () => {
   assert.match(serviceSource, /setFiscalDocumentMdfeData/);
 
   assert.match(providerServiceSource, /closeDocument\(request: FiscalProviderRequest\)/);
-  assert.match(providerServiceSource, /\/mdfe\/\$\{encodeURIComponent\(reference\)\}\/encerramento/);
-  assert.match(providerServiceSource, /veiculo_tracao: veiculoTracao/);
+  assert.match(providerServiceSource, /cancelDocument\(request: FiscalProviderRequest, justification: string\)/);
+  assert.match(providerServiceSource, /sendCorrectionLetter\(request: FiscalProviderRequest, correction: FiscalCorrectionLetterInput\)/);
+  assert.match(providerServiceSource, /addMdfeDriver\(request: FiscalProviderRequest, driver: FiscalMdfeDriverInput\)/);
+  assert.match(providerServiceSource, /\/mdfe\/\$\{encodeURIComponent\(reference\)\}\/encerrar/);
+  assert.match(providerServiceSource, /method: 'DELETE'/);
+  assert.match(providerServiceSource, /body: JSON\.stringify\(\{ justificativa: justification \}\)/);
+  assert.match(providerServiceSource, /\/carta_correcao/);
+  assert.match(providerServiceSource, /\/inclusao_condutor/);
+  assert.match(providerServiceSource, /registro_nacional_transporte/);
+  assert.match(providerServiceSource, /placa_veiculo/);
+  assert.match(providerServiceSource, /municipios_descarregamento: mapMdfeMunicipiosDescarregamento/);
   assert.match(providerServiceSource, /chave_cte: String\(chave\)/);
 
   assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/close'/);
   assert.match(controllerSource, /closeMdfeDocument\(req\.params\.id/);
+  assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/cancel'/);
+  assert.match(controllerSource, /cancelFiscalDocument\(req\.params\.id/);
+  assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/correction-letter'/);
+  assert.match(controllerSource, /sendFiscalCorrectionLetter\(req\.params\.id/);
+  assert.match(controllerSource, /router\.post\('\/fiscal\/documents\/:id\/mdfe-driver'/);
+  assert.match(controllerSource, /addMdfeDriverToDocument\(req\.params\.id/);
+  assert.match(controllerSource, /router\.post\('\/fiscal\/webhooks\/focus\/:event\?'/);
+  assert.match(controllerSource, /FOCUS_NFE_WEBHOOK_AUTHORIZATION/);
+  assert.match(serviceSource, /export async function handleFocusWebhook/);
+  assert.match(serviceSource, /findFiscalDocumentForProviderWebhook/);
+  assert.match(serviceSource, /operation: 'provider_webhook'/);
+  assert.match(repositorySource, /provider_document_id = \$1/);
+  assert.match(controllerSource, /router\.get\('\/fiscal\/documents\/:id\/logs'/);
+  assert.match(controllerSource, /router\.get\('\/fiscal\/documents\/:id\/events'/);
+  assert.match(serviceSource, /export async function listFiscalDocumentCommunicationLogs/);
+  assert.match(serviceSource, /export async function listFiscalDocumentEvents/);
+  assert.match(repositorySource, /from fiscal_communication_logs l/);
+  assert.match(repositorySource, /from fiscal_events e/);
+  assert.match(serviceSource, /eventType: 'mdfe_close'/);
+  assert.match(serviceSource, /eventType: 'cancel'/);
+  assert.match(serviceSource, /eventType: 'correction_letter'/);
+  assert.match(serviceSource, /eventType: 'mdfe_driver_add'/);
 });
 
 test('tomador derivado de tomadorTipo e cliente do contrato pre-preenche destinatario', () => {
@@ -204,11 +236,20 @@ test('integracao fiscal prepara provider e registra tentativas de emissao sem si
   assert.match(providerServiceSource, /mockProtocol/);
   assert.match(providerServiceSource, /throw fiscalErrors\.providerNotConfigured\(\)/);
   assert.match(repositorySource, /insert into fiscal_communication_logs/i);
+  assert.match(repositorySource, /insert into fiscal_events/i);
   assert.match(repositorySource, /update fiscal_documents[\s\S]*provider_document_id = coalesce/i);
   assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/emit/);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/logs/);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/events/);
   assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/sync/);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/cancel/);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/correction-letter/);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/documents\/\$\{id\}\/mdfe-driver/);
   assert.match(fiscalHookSource, /emitDocument/);
   assert.match(fiscalHookSource, /syncDocument/);
+  assert.match(fiscalHookSource, /cancelDocument/);
+  assert.match(fiscalHookSource, /sendCorrectionLetter/);
+  assert.match(fiscalHookSource, /addMdfeDriver/);
   assert.match(fiscalPageSource, /aria-label=\{`Emitir \$\{documentLabel\(document\)\}`\}/);
   assert.match(fiscalPageSource, /aria-label=\{`Sincronizar \$\{documentLabel\(document\)\}`\}/);
 });

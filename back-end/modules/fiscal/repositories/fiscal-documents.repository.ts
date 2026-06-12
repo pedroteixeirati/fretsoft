@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { pool } from '../../../shared/infra/database/pool';
-import type { FiscalDocumentPayload, FiscalDocumentRow, FiscalPartyPayload, FiscalPartyRow, FiscalPaymentRow } from '../dtos/fiscal-document.types';
+import type { FiscalCommunicationLogRow, FiscalDocumentPayload, FiscalDocumentRow, FiscalEventRow, FiscalPartyPayload, FiscalPartyRow, FiscalPaymentRow } from '../dtos/fiscal-document.types';
 
 function db(client?: PoolClient) {
   return client || pool;
@@ -8,6 +8,7 @@ function db(client?: PoolClient) {
 
 function selectDocumentColumns() {
   return `id,
+          tenant_id,
           display_id,
           document_type,
           model,
@@ -123,6 +124,33 @@ export async function findFiscalDocumentByAccessKey(accessKey: string, tenantId?
        and ($3::uuid is null or id <> $3)
      limit 1`,
     [tenantId, accessKey, ignoreId || null]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function findFiscalDocumentForProviderWebhook(params: {
+  documentType?: FiscalDocumentRow['document_type'] | 'cte_or_cte_os' | null;
+  providerDocumentId?: string | null;
+  accessKey?: string | null;
+}) {
+  const providerDocumentId = params.providerDocumentId || null;
+  const accessKey = params.accessKey || null;
+  const result = await pool.query<FiscalDocumentRow>(
+    `select ${selectDocumentColumns()}
+     from fiscal_documents
+     where ($1::text is not null and provider_document_id = $1)
+        or ($2::text is not null and access_key = $2)
+     order by
+       case
+         when $3::text = 'mdfe' and document_type = 'mdfe' then 0
+         when $3::text = 'cte_or_cte_os' and document_type in ('cte', 'cte_os') then 0
+         when $3::text = document_type then 0
+         else 1
+       end,
+       updated_at desc
+     limit 1`,
+    [providerDocumentId, accessKey, params.documentType || null],
   );
 
   return result.rows[0] || null;
@@ -580,6 +608,91 @@ export async function createFiscalCommunicationLog(params: {
   );
 
   return result.rows[0] || null;
+}
+
+export async function listFiscalCommunicationLogs(fiscalDocumentId: string, tenantId?: string) {
+  const result = await pool.query<FiscalCommunicationLogRow>(
+    `select l.id,
+            l.fiscal_document_id,
+            l.provider,
+            l.operation,
+            l.request_payload,
+            l.response_payload,
+            l.http_status,
+            l.error_message,
+            l.duration_ms,
+            l.created_at
+     from fiscal_communication_logs l
+     join fiscal_documents d on d.id = l.fiscal_document_id
+     where l.fiscal_document_id = $1
+       and l.tenant_id = $2
+       and d.tenant_id = $2
+     order by l.created_at desc`,
+    [fiscalDocumentId, tenantId],
+  );
+
+  return result.rows;
+}
+
+export async function createFiscalEvent(params: {
+  tenantId?: string;
+  fiscalDocumentId: string;
+  eventType: string;
+  status?: string;
+  reason?: string | null;
+  protocol?: string | null;
+  xml?: string | null;
+  createdByUserId?: string | null;
+}) {
+  const result = await pool.query<{ id: string }>(
+    `insert into fiscal_events (
+       tenant_id,
+       fiscal_document_id,
+       event_type,
+       status,
+       reason,
+       protocol,
+       xml,
+       created_by_user_id
+     )
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
+     returning id`,
+    [
+      params.tenantId,
+      params.fiscalDocumentId,
+      params.eventType,
+      params.status || 'registered',
+      params.reason || null,
+      params.protocol || null,
+      params.xml || null,
+      params.createdByUserId || null,
+    ],
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function listFiscalEvents(fiscalDocumentId: string, tenantId?: string) {
+  const result = await pool.query<FiscalEventRow>(
+    `select e.id,
+            e.fiscal_document_id,
+            e.event_type,
+            e.status,
+            e.reason,
+            e.protocol,
+            e.xml,
+            e.created_by_user_id,
+            e.created_at
+     from fiscal_events e
+     join fiscal_documents d on d.id = e.fiscal_document_id
+     where e.fiscal_document_id = $1
+       and e.tenant_id = $2
+       and d.tenant_id = $2
+     order by e.created_at desc`,
+    [fiscalDocumentId, tenantId],
+  );
+
+  return result.rows;
 }
 
 export async function upsertFiscalDocumentFromNovalogBillingItem(params: {

@@ -10,7 +10,7 @@ import type { AuthenticatedRequest } from '../../auth/dtos/auth-context';
 import { fiscalPermissions } from '../fiscal.resource';
 import type { FiscalDocumentInput } from '../dtos/fiscal-document.types';
 import { serializeFiscalDocument, serializeFiscalDocuments } from '../serializers/fiscal-documents.serializer';
-import { buildFiscalDraftFromFreight, closeMdfeDocument, createFiscalDocument, emitFiscalDocument, getFiscalDocument, listTenantFiscalDocuments, removeFiscalDocument, resendFiscalDocument, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
+import { addMdfeDriverToDocument, buildFiscalDraftFromFreight, cancelFiscalDocument, closeMdfeDocument, createFiscalDocument, emitFiscalDocument, getFiscalDocument, handleFocusWebhook, listFiscalDocumentCommunicationLogs, listFiscalDocumentEvents, listTenantFiscalDocuments, removeFiscalDocument, resendFiscalDocument, sendFiscalCorrectionLetter, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
 
 const router = express.Router();
 
@@ -20,6 +20,37 @@ function requireFiscalFeature(req: AuthenticatedRequest, res: Response, next: Ne
   }
   next();
 }
+
+function validateFocusWebhookAuthorization(req: express.Request, res: Response) {
+  const expected = (process.env.FOCUS_NFE_WEBHOOK_AUTHORIZATION || '').trim();
+  const headerName = (process.env.FOCUS_NFE_WEBHOOK_AUTHORIZATION_HEADER || 'authorization').trim();
+  if (!expected) {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(503).json({ error: 'Webhook Focus NFe sem segredo configurado.', code: 'focus_webhook_secret_missing' });
+      return false;
+    }
+    return true;
+  }
+
+  if (req.get(headerName) !== expected) {
+    res.status(401).json({ error: 'Webhook Focus NFe nao autorizado.', code: 'focus_webhook_unauthorized' });
+    return false;
+  }
+  return true;
+}
+
+router.post('/fiscal/webhooks/focus/:event?', async (req, res, next) => {
+  try {
+    if (!validateFocusWebhookAuthorization(req, res)) {
+      return;
+    }
+
+    const result = await handleFocusWebhook(req.params.event, req.body);
+    res.status(202).json({ ok: true, matched: result.matched });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get('/fiscal/documents', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -64,6 +95,42 @@ router.get('/fiscal/documents/:id', loadAuthContext, requireFiscalFeature, async
     }
 
     res.json(serializeFiscalDocument(document));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/fiscal/documents/:id/logs', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', fiscalPermissions, req.auth?.role), 'Sem permissao para visualizar logs fiscais.')) {
+      return;
+    }
+
+    const logs = await listFiscalDocumentCommunicationLogs(req.params.id, req.auth?.tenantId);
+    if (!logs) {
+      sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
+      return;
+    }
+
+    res.json(logs);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/fiscal/documents/:id/events', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', fiscalPermissions, req.auth?.role), 'Sem permissao para visualizar eventos fiscais.')) {
+      return;
+    }
+
+    const events = await listFiscalDocumentEvents(req.params.id, req.auth?.tenantId);
+    if (!events) {
+      sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
+      return;
+    }
+
+    res.json(events);
   } catch (error) {
     next(error);
   }
@@ -143,6 +210,78 @@ router.post('/fiscal/documents/:id/close', loadAuthContext, requireFiscalFeature
     }
 
     const document = await closeMdfeDocument(req.params.id, req.auth?.tenantId, req.auth?.userId);
+    if (!document) {
+      sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
+      return;
+    }
+
+    res.json(serializeFiscalDocument(document));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/fiscal/documents/:id/cancel', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para cancelar documentos fiscais.')) {
+      return;
+    }
+
+    const justification = typeof (req.body as { justification?: unknown }).justification === 'string'
+      ? (req.body as { justification: string }).justification
+      : '';
+    const document = await cancelFiscalDocument(req.params.id, req.auth?.tenantId, req.auth?.userId, justification);
+    if (!document) {
+      sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
+      return;
+    }
+
+    res.json(serializeFiscalDocument(document));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/fiscal/documents/:id/correction-letter', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para emitir carta de correcao.')) {
+      return;
+    }
+
+    const body = req.body as {
+      correctedField?: string;
+      correctedValue?: string;
+      correctedGroup?: string;
+      correctedGroupItemNumber?: string;
+    };
+    const document = await sendFiscalCorrectionLetter(req.params.id, req.auth?.tenantId, req.auth?.userId, {
+      correctedField: body.correctedField || '',
+      correctedValue: body.correctedValue || '',
+      correctedGroup: body.correctedGroup || '',
+      correctedGroupItemNumber: body.correctedGroupItemNumber || '',
+    });
+    if (!document) {
+      sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
+      return;
+    }
+
+    res.json(serializeFiscalDocument(document));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/fiscal/documents/:id/mdfe-driver', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para incluir condutor no MDF-e.')) {
+      return;
+    }
+
+    const body = req.body as { name?: string; cpf?: string };
+    const document = await addMdfeDriverToDocument(req.params.id, req.auth?.tenantId, req.auth?.userId, {
+      name: body.name || '',
+      cpf: body.cpf || '',
+    });
     if (!document) {
       sendErrorResponse(res, notFoundError('Documento fiscal nao encontrado.', 'fiscal_document_not_found'));
       return;

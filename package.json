@@ -20,6 +20,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "node --experimental-strip-types --experimental-specifier-resolution=node --test --test-concurrency=1 --test-isolation=none back-end/__tests__/**/*.test.ts",
+    "focus:webhooks:register": "tsx scripts/focus-register-webhooks.ts",
+    "smoke:focus": "tsx scripts/focus-integration-smoke.ts",
     "test:front": "vitest --config front-end/vite.config.ts",
     "test:front:run": "vitest run --config front-end/vite.config.ts"
   },
