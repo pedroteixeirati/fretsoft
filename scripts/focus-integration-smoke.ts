@@ -145,6 +145,7 @@ function ctePayload(): JsonObject {
       nfeKeys: [nfeKey],
     },
     taxData: {
+      modal: '01',
       uf_envio: env('FOCUS_SMOKE_ORIGIN_UF', 'MG'),
       uf_inicio: env('FOCUS_SMOKE_ORIGIN_UF', 'MG'),
       uf_fim: env('FOCUS_SMOKE_DESTINATION_UF', 'MG'),
@@ -155,6 +156,14 @@ function ctePayload(): JsonObject {
       codigo_municipio_inicio: digits(env('FOCUS_SMOKE_ORIGIN_IBGE', '3118601')),
       codigo_municipio_fim: digits(env('FOCUS_SMOKE_DESTINATION_IBGE', '3106705')),
       indicador_inscricao_estadual_tomador: env('FOCUS_SMOKE_TAKER_IE_INDICATOR', '9'),
+      modal_rodoviario: {
+        rntrc: digits(requiredEnv('FOCUS_SMOKE_RNTRC')),
+      },
+      quantidades: [{
+        codigo_unidade_medida: '01',
+        tipo_medida: 'PESO BRUTO',
+        quantidade: Number(env('FOCUS_SMOKE_WEIGHT', '1000')),
+      }],
     },
     parties: [party('sender', 'SENDER'), party('recipient', 'RECIPIENT')],
     payments: [commonPayment()],
