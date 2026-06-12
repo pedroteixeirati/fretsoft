@@ -69,6 +69,13 @@ async function createHook(event: typeof events[number]) {
   return payload as FocusHook;
 }
 
+function redactHook(hook: FocusHook) {
+  return {
+    ...hook,
+    authorization: hook.authorization ? '***' : hook.authorization,
+  };
+}
+
 async function main() {
   console.log(`[focus:webhooks] Ambiente: ${focusBaseUrl()}`);
   const created: FocusHook[] = [];
@@ -80,7 +87,7 @@ async function main() {
   }
 
   console.log('\n[focus:webhooks] Webhooks criados');
-  console.log(JSON.stringify(created, null, 2));
+  console.log(JSON.stringify(created.map(redactHook), null, 2));
 }
 
 main().catch((error) => {
