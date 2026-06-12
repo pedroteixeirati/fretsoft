@@ -3,6 +3,26 @@ export type FiscalDocumentStatus = 'draft' | 'processing' | 'authorized' | 'reje
 
 export type FiscalExecutionMode = 'own_fleet' | 'third_party';
 
+export interface CargoInsurancePolicy {
+  id: string;
+  displayId?: number;
+  insuranceCompanyName: string;
+  insuranceCompanyDocument: string;
+  policyNumber: string;
+  endorsementNumbers: string[];
+  responsibleType: 'carrier' | 'shipper' | 'taker' | 'other';
+  coverageType: 'rctr_c' | 'rcf_dc' | 'other';
+  startsAt: string;
+  endsAt: string;
+  status: 'active' | 'inactive' | 'expired';
+  isDefault: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CargoInsurancePolicyDraft = Omit<CargoInsurancePolicy, 'id' | 'displayId' | 'createdAt' | 'updatedAt'>;
+
 export interface FiscalParty {
   id?: string;
   role: 'taker' | 'sender' | 'recipient' | 'dispatcher' | 'receiver';
@@ -34,8 +54,14 @@ export interface FiscalMdfeData {
   pesoTotal?: number;
   valorTotal?: number;
   produtoPredominante?: string;
+  produtoNcm?: string;
+  contratanteNome?: string;
+  contratanteDocumento?: string;
+  cepCarregamento?: string;
+  cepDescarregamento?: string;
   encerrado?: boolean;
   encerradoEm?: string;
+  condutoresAdicionais?: Array<{ nome: string; cpf: string; adicionadoEm?: string }>;
 }
 
 export interface FiscalCteData {
@@ -105,6 +131,54 @@ export interface FiscalDocument {
 }
 
 export type FiscalDocumentDraft = Omit<FiscalDocument, 'id' | 'displayId' | 'createdAt' | 'updatedAt'>;
+
+export interface FiscalCommunicationLog {
+  id: string;
+  fiscal_document_id?: string | null;
+  fiscalDocumentId?: string | null;
+  provider: string;
+  operation: string;
+  request_payload?: Record<string, unknown>;
+  requestPayload?: Record<string, unknown>;
+  response_payload?: Record<string, unknown>;
+  responsePayload?: Record<string, unknown>;
+  http_status?: number | null;
+  httpStatus?: number | null;
+  error_message?: string | null;
+  errorMessage?: string | null;
+  duration_ms?: number | null;
+  durationMs?: number | null;
+  created_at?: string;
+  createdAt?: string;
+}
+
+export interface FiscalEvent {
+  id: string;
+  fiscal_document_id?: string;
+  fiscalDocumentId?: string;
+  event_type?: string;
+  eventType?: string;
+  status: string;
+  reason?: string | null;
+  protocol?: string | null;
+  xml?: string | null;
+  created_by_user_id?: string | null;
+  createdByUserId?: string | null;
+  created_at?: string;
+  createdAt?: string;
+}
+
+export interface FiscalCorrectionLetterDraft {
+  correctedField: string;
+  correctedValue: string;
+  correctedGroup?: string;
+  correctedGroupItemNumber?: string;
+}
+
+export interface FiscalMdfeDriverDraft {
+  name: string;
+  cpf: string;
+}
 
 export interface FiscalDraftFromFreight {
   existingDocumentId: string | null;

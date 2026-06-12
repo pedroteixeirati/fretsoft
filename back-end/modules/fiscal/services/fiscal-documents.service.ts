@@ -32,13 +32,17 @@ import { fiscalErrors } from '../errors/fiscal.errors';
 import {
   createTenantFiscalDocument,
   createFiscalCommunicationLog,
+  createFiscalEvent,
   deleteTenantFiscalDocument,
   findContractCompanyForFreight,
+  findFiscalDocumentForProviderWebhook,
   findFiscalDocumentByAccessKey,
   findFiscalDocumentBySourceFreight,
   findFiscalDocumentDuplicate,
   findTenantEmitter,
   findTenantFiscalDocument,
+  listFiscalCommunicationLogs,
+  listFiscalEvents,
   listFiscalDocumentParties,
   listFiscalDocumentPayments,
   listTenantFiscalDocuments as listTenantFiscalDocumentRows,
@@ -48,7 +52,10 @@ import {
 } from '../repositories/fiscal-documents.repository';
 import {
   buildFiscalProviderRequest,
+  type FiscalCorrectionLetterInput,
+  type FiscalMdfeDriverInput,
   getFiscalProviderAdapter,
+  mapFocusResponse,
   serializeFiscalProviderRequest,
 } from './fiscal-provider.service';
 
@@ -278,6 +285,11 @@ function normalizeMdfeData(value: unknown): FiscalMdfeData {
     pesoTotal: toNumber(data.pesoTotal),
     valorTotal: toNumber(data.valorTotal),
     produtoPredominante: normalizeOptionalText(data.produtoPredominante as string) || undefined,
+    produtoNcm: (normalizeOptionalText(data.produtoNcm as string) || '').replace(/\D/g, '') || undefined,
+    contratanteNome: normalizeOptionalText(data.contratanteNome as string) || undefined,
+    contratanteDocumento: normalizeDocumentNumber(data.contratanteDocumento as string) || undefined,
+    cepCarregamento: (normalizeOptionalText(data.cepCarregamento as string) || '').replace(/\D/g, '') || undefined,
+    cepDescarregamento: (normalizeOptionalText(data.cepDescarregamento as string) || '').replace(/\D/g, '') || undefined,
     encerrado: data.encerrado === true || undefined,
     encerradoEm: normalizeOptionalText(data.encerradoEm as string) || undefined,
   };
@@ -367,6 +379,18 @@ export async function getFiscalDocument(id: string, tenantId?: string) {
   const parties = await listFiscalDocumentParties(id, tenantId);
   const payments = await listFiscalDocumentPayments(id, tenantId);
   return mapDocumentRow(row, parties, payments);
+}
+
+export async function listFiscalDocumentCommunicationLogs(id: string, tenantId: string | undefined) {
+  const row = await findTenantFiscalDocument(id, tenantId);
+  if (!row) return null;
+  return listFiscalCommunicationLogs(id, tenantId);
+}
+
+export async function listFiscalDocumentEvents(id: string, tenantId: string | undefined) {
+  const row = await findTenantFiscalDocument(id, tenantId);
+  if (!row) return null;
+  return listFiscalEvents(id, tenantId);
 }
 
 const editableStatuses: FiscalDocumentStatus[] = ['draft', 'rejected', 'error'];
@@ -689,6 +713,17 @@ export async function closeMdfeDocument(id: string, tenantId: string | undefined
       durationMs,
     });
 
+    await createFiscalEvent({
+      tenantId,
+      fiscalDocumentId: id,
+      eventType: 'mdfe_close',
+      status: response.status || 'registered',
+      reason: 'Encerramento do MDF-e',
+      protocol: response.protocol,
+      xml: response.xml,
+      createdByUserId: userId,
+    });
+
     await setFiscalDocumentMdfeData(id, tenantId, { ...(document.mdfe_data || {}), encerrado: true, encerradoEm: new Date().toISOString() }, userId);
     return getFiscalDocument(id, tenantId);
   } catch (error) {
@@ -705,4 +740,288 @@ export async function closeMdfeDocument(id: string, tenantId: string | undefined
     });
     throw error;
   }
+}
+
+export async function cancelFiscalDocument(id: string, tenantId: string | undefined, userId: string | undefined, justificationInput: string) {
+  const document = await findTenantFiscalDocument(id, tenantId);
+  if (!document) return null;
+  if (!['cte', 'cte_os', 'mdfe'].includes(document.document_type) || document.status !== 'authorized') {
+    throw fiscalErrors.documentNotCancelable();
+  }
+
+  const justification = normalizeRequiredText(justificationInput);
+  if (justification.length < 15 || justification.length > 255) {
+    throw fiscalErrors.invalidCancellationJustification();
+  }
+
+  const request = buildFiscalProviderRequest(document, [], []);
+  const requestPayload = { ...serializeFiscalProviderRequest({ ...request, operation: 'cancel_document' }), justification };
+  const startedAt = Date.now();
+  let providerName = document.provider || 'focus_nfe';
+
+  try {
+    const provider = getFiscalProviderAdapter();
+    providerName = provider.name;
+    const response = await provider.cancelDocument({ ...request, operation: 'cancel_document' }, justification);
+    const durationMs = Date.now() - startedAt;
+
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'cancel_document',
+      requestPayload,
+      responsePayload: response.responsePayload || {},
+      httpStatus: response.httpStatus || null,
+      durationMs,
+    });
+
+    await updateFiscalDocumentAfterProviderAttempt({
+      id,
+      tenantId,
+      userId,
+      provider: providerName,
+      providerDocumentId: response.providerDocumentId,
+      status: response.status,
+      accessKey: response.accessKey,
+      protocol: response.protocol,
+      authorizedAt: response.authorizedAt,
+      xml: response.xml,
+      dacteUrl: response.dacteUrl,
+    });
+
+    await createFiscalEvent({
+      tenantId,
+      fiscalDocumentId: id,
+      eventType: 'cancel',
+      status: response.status || 'registered',
+      reason: justification,
+      protocol: response.protocol,
+      xml: response.xml,
+      createdByUserId: userId,
+    });
+
+    return getFiscalDocument(id, tenantId);
+  } catch (error) {
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'cancel_document',
+      requestPayload,
+      responsePayload: {},
+      errorMessage: error instanceof Error ? error.message : 'Falha desconhecida ao cancelar o documento fiscal.',
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
+}
+
+export async function sendFiscalCorrectionLetter(
+  id: string,
+  tenantId: string | undefined,
+  userId: string | undefined,
+  input: FiscalCorrectionLetterInput,
+) {
+  const document = await findTenantFiscalDocument(id, tenantId);
+  if (!document) return null;
+  if (!['cte', 'cte_os'].includes(document.document_type) || document.status !== 'authorized') {
+    throw fiscalErrors.documentNotCorrectable();
+  }
+
+  const correction: FiscalCorrectionLetterInput = {
+    correctedField: normalizeRequiredText(input.correctedField),
+    correctedValue: normalizeRequiredText(input.correctedValue),
+    correctedGroup: normalizeOptionalText(input.correctedGroup) || undefined,
+    correctedGroupItemNumber: normalizeOptionalText(input.correctedGroupItemNumber) || undefined,
+  };
+
+  if (!correction.correctedField) throw fiscalErrors.invalidCorrectionField();
+  if (!correction.correctedValue) throw fiscalErrors.invalidCorrectionValue();
+
+  const request = buildFiscalProviderRequest(document, [], []);
+  const requestPayload = { ...serializeFiscalProviderRequest({ ...request, operation: 'correction_letter' }), correction };
+  const startedAt = Date.now();
+  let providerName = document.provider || 'focus_nfe';
+
+  try {
+    const provider = getFiscalProviderAdapter();
+    providerName = provider.name;
+    const response = await provider.sendCorrectionLetter({ ...request, operation: 'correction_letter' }, correction);
+
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'correction_letter',
+      requestPayload,
+      responsePayload: response.responsePayload || {},
+      httpStatus: response.httpStatus || null,
+      durationMs: Date.now() - startedAt,
+    });
+
+    await createFiscalEvent({
+      tenantId,
+      fiscalDocumentId: id,
+      eventType: 'correction_letter',
+      status: response.status || 'registered',
+      reason: `${correction.correctedField}: ${correction.correctedValue}`,
+      protocol: response.protocol,
+      xml: response.xml,
+      createdByUserId: userId,
+    });
+
+    return getFiscalDocument(id, tenantId);
+  } catch (error) {
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'correction_letter',
+      requestPayload,
+      responsePayload: {},
+      errorMessage: error instanceof Error ? error.message : 'Falha desconhecida ao emitir carta de correcao.',
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
+}
+
+export async function addMdfeDriverToDocument(
+  id: string,
+  tenantId: string | undefined,
+  userId: string | undefined,
+  input: FiscalMdfeDriverInput,
+) {
+  const document = await findTenantFiscalDocument(id, tenantId);
+  if (!document) return null;
+  const mdfe = (document.mdfe_data || {}) as { encerrado?: boolean };
+  if (document.document_type !== 'mdfe' || document.status !== 'authorized' || mdfe.encerrado === true) {
+    throw fiscalErrors.mdfeDriverNotAddable();
+  }
+
+  const driver: FiscalMdfeDriverInput = {
+    name: normalizeRequiredText(input.name),
+    cpf: normalizeDocumentNumber(input.cpf),
+  };
+
+  if (driver.name.length < 2) throw fiscalErrors.invalidMdfeDriverName();
+  if (!/^\d{11}$/.test(driver.cpf)) throw fiscalErrors.invalidMdfeDriverCpf();
+
+  const request = buildFiscalProviderRequest(document, [], []);
+  const requestPayload = { ...serializeFiscalProviderRequest({ ...request, operation: 'add_mdfe_driver' }), driver };
+  const startedAt = Date.now();
+  let providerName = document.provider || 'focus_nfe';
+
+  try {
+    const provider = getFiscalProviderAdapter();
+    providerName = provider.name;
+    const response = await provider.addMdfeDriver({ ...request, operation: 'add_mdfe_driver' }, driver);
+
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'add_mdfe_driver',
+      requestPayload,
+      responsePayload: response.responsePayload || {},
+      httpStatus: response.httpStatus || null,
+      durationMs: Date.now() - startedAt,
+    });
+
+    await createFiscalEvent({
+      tenantId,
+      fiscalDocumentId: id,
+      eventType: 'mdfe_driver_add',
+      status: response.status || 'registered',
+      reason: driver.name,
+      protocol: response.protocol,
+      xml: response.xml,
+      createdByUserId: userId,
+    });
+
+    const currentDrivers = Array.isArray((document.mdfe_data || {}).condutoresAdicionais)
+      ? ((document.mdfe_data || {}).condutoresAdicionais as unknown[])
+      : [];
+    await setFiscalDocumentMdfeData(id, tenantId, {
+      ...(document.mdfe_data || {}),
+      condutoresAdicionais: [...currentDrivers, { nome: driver.name, cpf: driver.cpf, adicionadoEm: new Date().toISOString() }],
+    }, userId);
+
+    return getFiscalDocument(id, tenantId);
+  } catch (error) {
+    await createFiscalCommunicationLog({
+      tenantId,
+      fiscalDocumentId: id,
+      provider: providerName,
+      operation: 'add_mdfe_driver',
+      requestPayload,
+      responsePayload: {},
+      errorMessage: error instanceof Error ? error.message : 'Falha desconhecida ao incluir condutor no MDF-e.',
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
+}
+
+function pickWebhookString(payload: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+function normalizeFocusWebhookEvent(event?: string | null) {
+  const normalized = String(event || '').trim().toLowerCase();
+  if (normalized === 'mdfe') return 'mdfe' as const;
+  if (normalized === 'cte' || normalized === 'cte_os' || normalized === 'cte-cteos') return 'cte_or_cte_os' as const;
+  return null;
+}
+
+export async function handleFocusWebhook(event: string | undefined, payloadInput: unknown) {
+  const payload = normalizeJsonObject(payloadInput);
+  const reference = pickWebhookString(payload, ['ref', 'referencia', 'referência']);
+  const accessKey = pickWebhookString(payload, ['chave', 'chave_cte', 'chave_mdfe', 'chave_nfe']).replace(/\D/g, '');
+  const document = await findFiscalDocumentForProviderWebhook({
+    documentType: normalizeFocusWebhookEvent(event),
+    providerDocumentId: reference || null,
+    accessKey: accessKey || null,
+  });
+
+  if (!document) {
+    return { matched: false, document: null };
+  }
+
+  const response = mapFocusResponse(payload, 200, reference || document.provider_document_id || document.id);
+  await createFiscalCommunicationLog({
+    tenantId: document.tenant_id,
+    fiscalDocumentId: document.id,
+    provider: 'focus_nfe',
+    operation: 'provider_webhook',
+    requestPayload: { event: event || null },
+    responsePayload: payload,
+    httpStatus: 200,
+  });
+
+  await updateFiscalDocumentAfterProviderAttempt({
+    id: document.id,
+    tenantId: document.tenant_id,
+    provider: response.provider,
+    providerDocumentId: response.providerDocumentId,
+    status: response.status,
+    accessKey: response.accessKey,
+    protocol: response.protocol,
+    authorizedAt: response.authorizedAt,
+    xml: response.xml,
+    dacteUrl: response.dacteUrl,
+  });
+
+  const rawStatus = pickWebhookString(payload, ['status', 'status_sefaz']).toLowerCase();
+  if (document.document_type === 'mdfe' && ['encerrado', 'encerrada'].includes(rawStatus)) {
+    await setFiscalDocumentMdfeData(document.id, document.tenant_id, { ...(document.mdfe_data || {}), encerrado: true, encerradoEm: new Date().toISOString() }, undefined);
+  }
+
+  const updated = await getFiscalDocument(document.id, document.tenant_id);
+  return { matched: true, document: updated };
 }

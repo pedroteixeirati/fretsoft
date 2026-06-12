@@ -1,7 +1,20 @@
 import type { FiscalDocumentRow, FiscalPartyRow, FiscalPaymentRow } from '../dtos/fiscal-document.types';
 import { fiscalErrors } from '../errors/fiscal.errors';
+import { findDefaultCargoInsurancePolicy } from '../../cargo-insurance-policies/repositories/cargo-insurance-policies.repository';
 
-export type FiscalProviderOperation = 'emit_document' | 'consult_document' | 'close_document' | 'send_email';
+export type FiscalProviderOperation = 'emit_document' | 'consult_document' | 'close_document' | 'cancel_document' | 'correction_letter' | 'add_mdfe_driver' | 'provider_webhook' | 'send_email';
+
+export interface FiscalCorrectionLetterInput {
+  correctedField: string;
+  correctedValue: string;
+  correctedGroup?: string;
+  correctedGroupItemNumber?: string;
+}
+
+export interface FiscalMdfeDriverInput {
+  name: string;
+  cpf: string;
+}
 
 export interface FiscalProviderRequest {
   operation: FiscalProviderOperation;
@@ -24,6 +37,23 @@ function buildInfPag(payments: FiscalPaymentRow[]) {
   }));
 }
 
+function buildMdfePayments(payments: FiscalPaymentRow[]) {
+  if (!payments || payments.length === 0) return undefined;
+  return payments.map((payment) => {
+    const documentNumber = (payment.payee_document || '').replace(/\D/g, '');
+    const amount = Number(payment.amount || 0);
+    return onlyDefinedEntries({
+      nome: payment.payee_name || undefined,
+      cpf: documentNumber.length === 11 ? documentNumber : undefined,
+      cnpj: documentNumber.length === 14 ? documentNumber : undefined,
+      componentes: [onlyDefinedEntries({ tipo: payment.component_type, valor: amount })],
+      valor_total_contrato: amount,
+      forma_pagamento: '0',
+      pix: payment.pix_key || undefined,
+    });
+  });
+}
+
 export interface FiscalProviderResponse {
   status: FiscalDocumentRow['status'];
   provider: string;
@@ -42,6 +72,9 @@ export interface FiscalProviderAdapter {
   emitDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
   consultDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
   closeDocument(request: FiscalProviderRequest): Promise<FiscalProviderResponse>;
+  cancelDocument(request: FiscalProviderRequest, justification: string): Promise<FiscalProviderResponse>;
+  sendCorrectionLetter(request: FiscalProviderRequest, correction: FiscalCorrectionLetterInput): Promise<FiscalProviderResponse>;
+  addMdfeDriver(request: FiscalProviderRequest, driver: FiscalMdfeDriverInput): Promise<FiscalProviderResponse>;
   sendEmail(request: FiscalProviderRequest, emails: string[]): Promise<FiscalProviderResponse>;
 }
 
@@ -139,6 +172,72 @@ function cteNfes(cteData: Record<string, unknown>, taxData: Record<string, unkno
   return taxData.nfes;
 }
 
+function asObject(value: unknown) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function mapMdfeMunicipiosCarregamento(taxData: Record<string, unknown>) {
+  const municipios = Array.isArray(taxData.municipios_carregamento) ? taxData.municipios_carregamento as unknown[] : [];
+  return municipios.map((municipio) => {
+    const item = asObject(municipio);
+    return onlyDefinedEntries({
+      codigo: item.codigo || item.codigo_municipio,
+      nome: item.nome || item.nome_municipio,
+    });
+  }).filter((municipio) => Object.keys(municipio).length > 0);
+}
+
+function mapMdfeMunicipiosDescarregamento(taxData: Record<string, unknown>, ctes: Array<Record<string, unknown>>) {
+  const municipios = Array.isArray(taxData.municipios_descarregamento) ? taxData.municipios_descarregamento as unknown[] : [];
+  return municipios.map((municipio) => {
+    const item = asObject(municipio);
+    const conhecimentos = Array.isArray(item.conhecimentos_transporte)
+      ? item.conhecimentos_transporte
+      : Array.isArray(item.ctes)
+        ? item.ctes
+        : ctes;
+    return onlyDefinedEntries({
+      codigo: item.codigo || item.codigo_municipio,
+      nome: item.nome || item.nome_municipio,
+      conhecimentos_transporte: conhecimentos,
+    });
+  }).filter((municipio) => Object.keys(municipio).length > 0);
+}
+
+function mapMdfeCargoInsurance(policy: Awaited<ReturnType<typeof findDefaultCargoInsurancePolicy>> | null) {
+  if (!policy) return undefined;
+  return [onlyDefinedEntries({
+    responsavel_seguro: policy.responsible_type === 'carrier' ? '1' : '2',
+    nome_seguradora: policy.insurance_company_name,
+    cnpj_seguradora: policy.insurance_company_document,
+    numero_apolice: policy.policy_number,
+    numero_averbacao: Array.isArray(policy.endorsement_numbers) ? policy.endorsement_numbers : [],
+  })];
+}
+
+function mapMdfeContractors(mdfe: Record<string, unknown>, taxData: Record<string, unknown>, document: FiscalDocumentRow) {
+  if (Array.isArray(asObject(taxData.modal_rodoviario).contratantes)) {
+    return asObject(taxData.modal_rodoviario).contratantes;
+  }
+  if (Array.isArray(taxData.contratantes)) {
+    return taxData.contratantes;
+  }
+
+  const documentNumber = String(mdfe.contratanteDocumento || taxData.contratante_documento || '').replace(/\D/g, '');
+  const name = mdfe.contratanteNome || taxData.contratante_nome || document.taker_name;
+  if (!documentNumber && !name) return undefined;
+
+  return [onlyDefinedEntries({
+    nome: name,
+    cpf: documentNumber.length === 11 ? documentNumber : undefined,
+    cnpj: documentNumber.length === 14 ? documentNumber : undefined,
+  })];
+}
+
+function countMdfeCtes(ctes: unknown) {
+  return Array.isArray(ctes) ? ctes.length : undefined;
+}
+
 function mapFocusCtePayload(request: FiscalProviderRequest) {
   const document = request.document;
   const taxData = document.tax_data || {};
@@ -197,52 +296,64 @@ function mapFocusCtePayload(request: FiscalProviderRequest) {
   });
 }
 
-function mapFocusMdfePayload(request: FiscalProviderRequest) {
+function mapFocusMdfePayload(request: FiscalProviderRequest, cargoInsurancePolicy: Awaited<ReturnType<typeof findDefaultCargoInsurancePolicy>> | null = null) {
   const document = request.document;
   const taxData = document.tax_data || {};
   const mdfe = (document.mdfe_data || {}) as Record<string, unknown>;
   const emitter = document.emitter_snapshot || {};
-
-  const veiculoTracao = (mdfe.vehiclePlate || mdfe.vehicleRenavam)
-    ? onlyDefinedEntries({
-        placa: mdfe.vehiclePlate,
-        RENAVAM: mdfe.vehicleRenavam,
-        uf: mdfe.vehicleUf,
-        tara: mdfe.vehicleTara,
-        condutores: mdfe.condutorNome ? [onlyDefinedEntries({ nome: mdfe.condutorNome, cpf: mdfe.condutorCpf })] : undefined,
-      })
-    : taxData.veiculo_tracao;
   const ctes = Array.isArray(mdfe.cteKeys) && (mdfe.cteKeys as unknown[]).length
     ? (mdfe.cteKeys as unknown[]).map((chave) => ({ chave_cte: String(chave) }))
     : taxData.ctes;
+  const modalRodoviario = {
+    ...asObject(taxData.modal_rodoviario),
+    registro_nacional_transporte: document.rntrc || taxData.rntrc || asObject(taxData.modal_rodoviario).rntrc || asObject(taxData.modal_rodoviario).registro_nacional_transporte,
+    placa_veiculo: mdfe.vehiclePlate || taxData.placa_veiculo,
+    renavam_veiculo: mdfe.vehicleRenavam || taxData.renavam_veiculo,
+    uf_licenciamento_veiculo: mdfe.vehicleUf || taxData.uf_licenciamento_veiculo,
+    tara_veiculo: mdfe.vehicleTara ?? taxData.tara_veiculo,
+    tipo_rodado_veiculo: taxData.tipo_rodado_veiculo || '06',
+    tipo_carroceria_veiculo: taxData.tipo_carroceria_veiculo || '00',
+    contratantes: mapMdfeContractors(mdfe, taxData, document),
+    pagamentos: buildMdfePayments(request.payments) || asObject(taxData.modal_rodoviario).pagamentos || taxData.pagamentos,
+    condutores: mdfe.condutorNome
+      ? [onlyDefinedEntries({ nome: mdfe.condutorNome, cpf: mdfe.condutorCpf })]
+      : taxData.condutores,
+  };
 
   return onlyDefinedEntries({
     ...emitter,
-    ...taxData,
     data_emissao: document.issue_date,
-    modal: taxData.modal || '1',
-    tipo_emitente: taxData.tipo_emitente || '1',
+    emitente: taxData.emitente || taxData.tipo_emitente || '1',
     uf_inicio: mdfe.ufInicio || taxData.uf_inicio,
     uf_fim: mdfe.ufFim || taxData.uf_fim,
-    veiculo_tracao: veiculoTracao,
     percurso: mdfe.percurso || taxData.percurso,
-    municipios_carregamento: taxData.municipios_carregamento,
-    municipios_descarregamento: taxData.municipios_descarregamento,
-    ctes,
+    municipios_carregamento: mapMdfeMunicipiosCarregamento(taxData),
+    municipios_descarregamento: mapMdfeMunicipiosDescarregamento(taxData, Array.isArray(ctes) ? ctes as Array<Record<string, unknown>> : []),
     nfes: taxData.nfes,
-    valor_total: mdfe.valorTotal ?? taxData.valor_total,
-    peso_bruto_total: mdfe.pesoTotal ?? taxData.peso_bruto_total,
-    produto_predominante: mdfe.produtoPredominante || taxData.produto_predominante,
+    quantidade_total_cte: taxData.quantidade_total_cte || countMdfeCtes(ctes),
+    valor_total_carga: mdfe.valorTotal ?? taxData.valor_total_carga ?? taxData.valor_total,
+    codigo_unidade_medida_peso_bruto: taxData.codigo_unidade_medida_peso_bruto || '01',
+    peso_bruto: mdfe.pesoTotal ?? taxData.peso_bruto ?? taxData.peso_bruto_total,
+    tipo_carga: taxData.tipo_carga || '05',
+    descricao_produto: mdfe.produtoPredominante || taxData.descricao_produto || taxData.produto_predominante,
+    codigo_ncm_produto: mdfe.produtoNcm || taxData.codigo_ncm_produto,
+    cep_carregamento: mdfe.cepCarregamento || taxData.cep_carregamento,
+    latitude_carregamento: taxData.latitude_carregamento,
+    longitude_carregamento: taxData.longitude_carregamento,
+    cep_descarregamento: mdfe.cepDescarregamento || taxData.cep_descarregamento,
+    latitude_descarregamento: taxData.latitude_descarregamento,
+    longitude_descarregamento: taxData.longitude_descarregamento,
+    seguros_carga: taxData.seguros_carga || mapMdfeCargoInsurance(cargoInsurancePolicy),
     ciot: document.ciot || taxData.ciot || undefined,
-    rntrc: document.rntrc || taxData.rntrc || undefined,
     infPag: buildInfPag(request.payments) || taxData.infPag,
     observacoes: document.notes || taxData.observacoes,
+    modal_rodoviario: onlyDefinedEntries(modalRodoviario),
   });
 }
 
-function mapFocusPayload(request: FiscalProviderRequest) {
+async function mapFocusPayload(request: FiscalProviderRequest) {
   return request.document.document_type === 'mdfe'
-    ? mapFocusMdfePayload(request)
+    ? mapFocusMdfePayload(request, await findDefaultCargoInsurancePolicy(request.document.tenant_id))
     : mapFocusCtePayload(request);
 }
 
@@ -252,7 +363,8 @@ function mapFocusStatus(status: unknown): FiscalDocumentRow['status'] {
   if (['cancelado', 'cancelada', 'canceled'].includes(normalized)) return 'canceled';
   if (['denegado', 'denegada', 'denied'].includes(normalized)) return 'denied';
   if (['rejeitado', 'rejeitada', 'rejected'].includes(normalized)) return 'rejected';
-  if (['erro_autorizacao', 'erro', 'error'].includes(normalized)) return 'error';
+  if (['erro_autorizacao', 'erro_cancelamento', 'erro', 'error'].includes(normalized)) return 'error';
+  if (['encerrado', 'encerrada'].includes(normalized)) return 'authorized';
   if (['processando_autorizacao', 'processando', 'processing'].includes(normalized)) return 'processing';
   return 'processing';
 }
@@ -275,7 +387,7 @@ function pickNestedString(payload: Record<string, unknown>, path: string[]) {
   return typeof current === 'string' && current.trim() ? current.trim() : null;
 }
 
-function mapFocusResponse(responsePayload: Record<string, unknown>, httpStatus: number, reference: string, provider = 'focus_nfe'): FiscalProviderResponse {
+export function mapFocusResponse(responsePayload: Record<string, unknown>, httpStatus: number, reference: string, provider = 'focus_nfe'): FiscalProviderResponse {
   return {
     status: mapFocusStatus(responsePayload.status || responsePayload.status_sefaz),
     provider,
@@ -305,7 +417,7 @@ export function createFocusNfeProviderAdapter(): FiscalProviderAdapter {
       const token = focusTokenFromEnv();
       const endpoint = focusDocumentEndpoint(request.document.document_type);
       const reference = focusReference(request.document);
-      const payload = mapFocusPayload(request);
+      const payload = await mapFocusPayload(request);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
 
@@ -374,16 +486,16 @@ export function createFocusNfeProviderAdapter(): FiscalProviderAdapter {
       const timeout = setTimeout(() => controller.abort(), 30000);
 
       try {
-        const response = await fetch(`${focusBaseUrlFromEnv()}/mdfe/${encodeURIComponent(reference)}/encerramento`, {
+        const response = await fetch(`${focusBaseUrlFromEnv()}/mdfe/${encodeURIComponent(reference)}/encerrar`, {
           method: 'POST',
           headers: {
             Authorization: focusAuthHeader(token),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(onlyDefinedEntries({
-            data_encerramento: new Date().toISOString().slice(0, 10),
-            uf: mdfe.ufFim,
-            codigo_municipio: mdfe.municipioFimIbge,
+            data: new Date().toISOString().slice(0, 10),
+            sigla_uf: mdfe.ufFim,
+            nome_municipio: mdfe.nomeMunicipioEncerramento || request.document.destination_name,
           })),
           signal: controller.signal,
         });
@@ -402,7 +514,7 @@ export function createFocusNfeProviderAdapter(): FiscalProviderAdapter {
         clearTimeout(timeout);
       }
     },
-    async sendEmail(request, emails) {
+    async cancelDocument(request, justification) {
       const token = focusTokenFromEnv();
       const endpoint = focusDocumentEndpoint(request.document.document_type);
       const reference = request.document.provider_document_id || focusReference(request.document);
@@ -410,29 +522,111 @@ export function createFocusNfeProviderAdapter(): FiscalProviderAdapter {
       const timeout = setTimeout(() => controller.abort(), 30000);
 
       try {
-        const response = await fetch(`${focusBaseUrlFromEnv()}/${endpoint}/${encodeURIComponent(reference)}/email`, {
-          method: 'POST',
+        const response = await fetch(`${focusBaseUrlFromEnv()}/${endpoint}/${encodeURIComponent(reference)}`, {
+          method: 'DELETE',
           headers: {
             Authorization: focusAuthHeader(token),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ emails }),
+          body: JSON.stringify({ justificativa: justification }),
           signal: controller.signal,
         });
         const responsePayload = await readJsonResponse(response);
 
         if (!response.ok) {
-          throw fiscalErrors.providerRequestFailed('Falha ao reenviar o documento por e-mail na Focus NFe.', {
+          throw fiscalErrors.providerRequestFailed(`Falha ao cancelar o ${focusDocumentKind(request.document.document_type)} na Focus NFe.`, {
             provider: 'focus_nfe',
             httpStatus: response.status,
+            documentKind: focusDocumentKind(request.document.document_type),
             response: responsePayload,
           });
         }
 
-        return { status: 'authorized', provider: 'focus_nfe', responsePayload, httpStatus: response.status };
+        return mapFocusResponse(responsePayload, response.status, reference);
       } finally {
         clearTimeout(timeout);
       }
+    },
+    async sendCorrectionLetter(request, correction) {
+      const token = focusTokenFromEnv();
+      const endpoint = focusDocumentEndpoint(request.document.document_type);
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const payload = onlyDefinedEntries({
+        grupo_corrigido: correction.correctedGroup,
+        campo_corrigido: correction.correctedField,
+        valor_corrigido: correction.correctedValue,
+        numero_item_grupo_corrigido: correction.correctedGroupItemNumber,
+        campo_api: '1',
+      });
+
+      try {
+        const response = await fetch(`${focusBaseUrlFromEnv()}/${endpoint}/${encodeURIComponent(reference)}/carta_correcao`, {
+          method: 'POST',
+          headers: {
+            Authorization: focusAuthHeader(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        const responsePayload = await readJsonResponse(response);
+
+        if (!response.ok) {
+          throw fiscalErrors.providerRequestFailed(`Falha ao emitir carta de correcao do ${focusDocumentKind(request.document.document_type)} na Focus NFe.`, {
+            provider: 'focus_nfe',
+            httpStatus: response.status,
+            documentKind: focusDocumentKind(request.document.document_type),
+            response: responsePayload,
+          });
+        }
+
+        return mapFocusResponse(responsePayload, response.status, reference);
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+    async addMdfeDriver(request, driver) {
+      const token = focusTokenFromEnv();
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const response = await fetch(`${focusBaseUrlFromEnv()}/mdfe/${encodeURIComponent(reference)}/inclusao_condutor`, {
+          method: 'POST',
+          headers: {
+            Authorization: focusAuthHeader(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ nome: driver.name, cpf: driver.cpf }),
+          signal: controller.signal,
+        });
+        const responsePayload = await readJsonResponse(response);
+
+        if (!response.ok) {
+          throw fiscalErrors.providerRequestFailed('Falha ao incluir condutor no MDF-e na Focus NFe.', {
+            provider: 'focus_nfe',
+            httpStatus: response.status,
+            documentKind: 'MDF-e',
+            response: responsePayload,
+          });
+        }
+
+        return mapFocusResponse(responsePayload, response.status, reference);
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+    async sendEmail(request, emails) {
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      throw fiscalErrors.providerOperationUnsupported('A Focus NFe nao disponibiliza reenvio por e-mail para CT-e/MDF-e nesta API. Use os links de XML/DACTE retornados na consulta.', {
+        provider: 'focus_nfe',
+        documentKind: focusDocumentKind(request.document.document_type),
+        providerDocumentId: reference,
+        emails,
+      });
     },
   };
 }
@@ -493,6 +687,54 @@ export function createMockFiscalProviderAdapter(): FiscalProviderAdapter {
           ref: reference,
           status: 'encerrado',
           mensagem: 'MDF-e encerrado em mock local.',
+        },
+        httpStatus: 200,
+      };
+    },
+    async cancelDocument(request, justification) {
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      return {
+        status: 'canceled',
+        provider: 'mock_fiscal',
+        providerDocumentId: reference,
+        responsePayload: {
+          ref: reference,
+          status: 'cancelado',
+          justificativa: justification,
+          mensagem: 'Documento fiscal cancelado em mock local.',
+        },
+        httpStatus: 200,
+      };
+    },
+    async sendCorrectionLetter(request, correction) {
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      return {
+        status: 'authorized',
+        provider: 'mock_fiscal',
+        providerDocumentId: reference,
+        responsePayload: {
+          ref: reference,
+          status: 'autorizado',
+          status_sefaz: '135',
+          mensagem_sefaz: 'Evento registrado e vinculado a CT-e',
+          numero_carta_correcao: 1,
+          correcao: correction,
+        },
+        httpStatus: 200,
+      };
+    },
+    async addMdfeDriver(request, driver) {
+      const reference = request.document.provider_document_id || focusReference(request.document);
+      return {
+        status: 'authorized',
+        provider: 'mock_fiscal',
+        providerDocumentId: reference,
+        responsePayload: {
+          ref: reference,
+          status: 'incluido',
+          status_sefaz: '135',
+          mensagem_sefaz: 'Evento registrado e vinculado a MDF-e',
+          condutor: driver,
         },
         httpStatus: 200,
       };

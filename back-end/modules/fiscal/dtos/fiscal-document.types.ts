@@ -19,8 +19,15 @@ export interface FiscalMdfeData {
   pesoTotal?: number;
   valorTotal?: number;
   produtoPredominante?: string;
+  produtoNcm?: string;
+  contratanteNome?: string;
+  contratanteDocumento?: string;
+  cepCarregamento?: string;
+  cepDescarregamento?: string;
   encerrado?: boolean;
   encerradoEm?: string;
+  nomeMunicipioEncerramento?: string;
+  condutoresAdicionais?: unknown[];
 }
 
 export interface FiscalPaymentInput {
@@ -174,6 +181,7 @@ export interface FiscalDocumentPayload {
 
 export interface FiscalDocumentRow {
   id: string;
+  tenant_id: string;
   display_id: string | number | null;
   document_type: FiscalDocumentType;
   model: string;
@@ -223,4 +231,29 @@ export interface FiscalPartyRow {
   district: string | null;
   zip_code: string | null;
   city_ibge_code: string | null;
+}
+
+export interface FiscalCommunicationLogRow {
+  id: string;
+  fiscal_document_id: string | null;
+  provider: string;
+  operation: string;
+  request_payload: Record<string, unknown>;
+  response_payload: Record<string, unknown>;
+  http_status: number | null;
+  error_message: string | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+export interface FiscalEventRow {
+  id: string;
+  fiscal_document_id: string;
+  event_type: string;
+  status: string;
+  reason: string | null;
+  protocol: string | null;
+  xml: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
 }
