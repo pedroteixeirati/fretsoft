@@ -4,9 +4,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const migrationSource = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713412800000_fiscal_documents.sql'), 'utf8');
+const nfeReceiptsMigrationSource = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713474900000_fiscal_nfe_receipts.sql'), 'utf8');
 const novalogLinkMigrationSource = readFileSync(resolve(process.cwd(), 'back-end/migrations/1713416400000_fiscal_novalog_revenue_links.sql'), 'utf8');
 const controllerSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/controllers/fiscal.controller.ts'), 'utf8');
 const serviceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/services/fiscal-documents.service.ts'), 'utf8');
+const nfeReceiptsServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/services/fiscal-nfe-receipts.service.ts'), 'utf8');
+const nfeReceiptsRepositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/repositories/fiscal-nfe-receipts.repository.ts'), 'utf8');
+const nfeXmlParserSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/utils/nfe-xml-parser.ts'), 'utf8');
 const providerServiceSource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/services/fiscal-provider.service.ts'), 'utf8');
 const repositorySource = readFileSync(resolve(process.cwd(), 'back-end/modules/fiscal/repositories/fiscal-documents.repository.ts'), 'utf8');
 const fiscalApiSource = readFileSync(resolve(process.cwd(), 'front-end/src/features/fiscal/services/fiscal.api.ts'), 'utf8');
@@ -37,6 +41,38 @@ test('migration protege duplicidade por tenant e rastreia idempotencia', () => {
   assert.match(migrationSource, /idx_fiscal_documents_tenant_access_key/i);
   assert.match(migrationSource, /idx_fiscal_documents_tenant_idempotency/i);
   assert.match(migrationSource, /trg_fiscal_documents_display_id/i);
+});
+
+test('caixa de NF-es recebidas persiste XML por tenant e gera base para CT-e', () => {
+  assert.match(nfeReceiptsMigrationSource, /create table if not exists fiscal_nfe_receipts/i);
+  assert.match(nfeReceiptsMigrationSource, /tenant_id uuid not null references tenants\(id\) on delete cascade/i);
+  assert.match(nfeReceiptsMigrationSource, /source text not null default 'upload'/i);
+  assert.match(nfeReceiptsMigrationSource, /status text not null default 'pending'/i);
+  assert.match(nfeReceiptsMigrationSource, /idx_fiscal_nfe_receipts_tenant_nfe_key/i);
+  assert.match(nfeReceiptsMigrationSource, /execute function assign_tenant_display_id\(\)/i);
+
+  assert.match(controllerSource, /router\.get\('\/fiscal\/nfe-receipts'/);
+  assert.match(controllerSource, /router\.post\('\/fiscal\/nfe-receipts\/import'/);
+  assert.match(controllerSource, /router\.patch\('\/fiscal\/nfe-receipts\/:id\/status'/);
+  assert.match(nfeReceiptsServiceSource, /parseNfeXml\(xml\)/);
+  assert.match(nfeReceiptsServiceSource, /status: 'pending'/);
+  assert.match(nfeReceiptsServiceSource, /status === 'used'/);
+  assert.match(nfeReceiptsRepositorySource, /on conflict \(tenant_id, nfe_key\) do update/i);
+  assert.match(fiscalApiSource, /\/api\/fiscal\/nfe-receipts\/import/);
+  assert.match(fiscalHookSource, /importNfeReceipt/);
+  assert.match(fiscalPageSource, /NF-es recebidas/);
+  assert.match(fiscalPageSource, /Gerar CT-e/);
+});
+
+test('parser de NF-e extrai chave partes valor produto e peso', () => {
+  assert.match(nfeXmlParserSource, /attrOf\(normalizedXml, 'infNFe', 'Id'\) \|\| textOf\(normalizedXml, 'chNFe'\)/);
+  assert.match(nfeXmlParserSource, /nfeKey\.length !== 44/);
+  assert.match(nfeXmlParserSource, /partyFromNode\(emit, 'enderEmit'\)/);
+  assert.match(nfeXmlParserSource, /partyFromNode\(dest, 'enderDest'\)/);
+  assert.match(nfeXmlParserSource, /invoiceAmount: numberFromText\(textOf\(total, 'vNF'\)\)/);
+  assert.match(nfeXmlParserSource, /weight: numberFromText\(textOf\(vol, 'pesoB'\)\)/);
+  assert.match(nfeXmlParserSource, /predominantProduct: textOf\(firstProduct, 'xProd'\)/);
+  assert.match(nfeXmlParserSource, /ncm: digits\(textOf\(firstProduct, 'NCM'\)\)/);
 });
 
 test('reenvio por e-mail fica controlado quando provider nao suporta a operacao', () => {

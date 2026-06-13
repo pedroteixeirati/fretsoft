@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fiscalApi } from '../services/fiscal.api';
 import { fiscalQueryKeys } from './useFiscalDocumentsQuery';
-import type { CargoInsurancePolicyDraft, FiscalCorrectionLetterDraft, FiscalDocumentDraft, FiscalMdfeDriverDraft } from '../types/fiscal.types';
+import type { CargoInsurancePolicyDraft, FiscalCorrectionLetterDraft, FiscalDocumentDraft, FiscalMdfeDriverDraft, FiscalNfeReceiptStatus } from '../types/fiscal.types';
 
 export function useFiscalDocumentMutations() {
   const queryClient = useQueryClient();
   const invalidateDocuments = () => queryClient.invalidateQueries({ queryKey: fiscalQueryKeys.documents });
+  const invalidateNfeReceipts = () => queryClient.invalidateQueries({ queryKey: fiscalQueryKeys.nfeReceipts });
   const invalidateCargoInsurancePolicies = () => queryClient.invalidateQueries({ queryKey: fiscalQueryKeys.cargoInsurancePolicies });
 
   const createDocument = useMutation({
@@ -21,6 +22,19 @@ export function useFiscalDocumentMutations() {
   const deleteDocument = useMutation({
     mutationFn: (id: string) => fiscalApi.removeDocument(id),
     onSuccess: invalidateDocuments,
+  });
+
+  const importNfeReceipt = useMutation({
+    mutationFn: (payload: { xml: string; source?: 'upload'; notes?: string }) => fiscalApi.importNfeReceipt(payload),
+    onSuccess: invalidateNfeReceipts,
+  });
+
+  const updateNfeReceiptStatus = useMutation({
+    mutationFn: ({ id, status, usedFiscalDocumentId }: { id: string; status: FiscalNfeReceiptStatus; usedFiscalDocumentId?: string }) => fiscalApi.updateNfeReceiptStatus(id, { status, usedFiscalDocumentId }),
+    onSuccess: () => {
+      invalidateNfeReceipts();
+      invalidateDocuments();
+    },
   });
 
   const emitDocument = useMutation({
@@ -84,6 +98,8 @@ export function useFiscalDocumentMutations() {
     addMdfeDriver,
     resendDocument,
     deleteDocument,
+    importNfeReceipt,
+    updateNfeReceiptStatus,
     createCargoInsurancePolicy,
     updateCargoInsurancePolicy,
     deleteCargoInsurancePolicy,
@@ -98,6 +114,8 @@ export function useFiscalDocumentMutations() {
       addMdfeDriver.isPending ||
       resendDocument.isPending ||
       deleteDocument.isPending ||
+      importNfeReceipt.isPending ||
+      updateNfeReceiptStatus.isPending ||
       createCargoInsurancePolicy.isPending ||
       updateCargoInsurancePolicy.isPending ||
       deleteCargoInsurancePolicy.isPending,

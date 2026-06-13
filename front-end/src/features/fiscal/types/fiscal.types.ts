@@ -3,6 +3,9 @@ export type FiscalDocumentStatus = 'draft' | 'processing' | 'authorized' | 'reje
 
 export type FiscalExecutionMode = 'own_fleet' | 'third_party';
 
+export type FiscalNfeReceiptSource = 'upload' | 'email' | 'api' | 'focus';
+export type FiscalNfeReceiptStatus = 'pending' | 'validated' | 'used' | 'ignored' | 'error';
+
 export interface CargoInsurancePolicy {
   id: string;
   displayId?: number;
@@ -183,4 +186,43 @@ export interface FiscalMdfeDriverDraft {
 export interface FiscalDraftFromFreight {
   existingDocumentId: string | null;
   draft: Partial<FiscalDocumentDraft> & { sourceFreightId: string };
+}
+
+export interface FiscalNfePartySnapshot {
+  name: string;
+  documentNumber: string;
+  stateRegistration: string;
+  city: string;
+  state: string;
+  phone: string;
+  street: string;
+  number: string;
+  district: string;
+  zipCode: string;
+  cityIbgeCode: string;
+}
+
+export interface FiscalNfeReceipt {
+  id: string;
+  displayId?: number;
+  source: FiscalNfeReceiptSource;
+  status: FiscalNfeReceiptStatus;
+  nfeKey: string;
+  xml: string;
+  senderSnapshot: FiscalNfePartySnapshot;
+  recipientSnapshot: FiscalNfePartySnapshot;
+  totalsSnapshot: {
+    invoiceAmount: number | null;
+    productAmount: number | null;
+    weight: number | null;
+  };
+  productSnapshot: {
+    predominantProduct: string;
+    ncm: string;
+  };
+  issueDate: string;
+  usedFiscalDocumentId: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
 }

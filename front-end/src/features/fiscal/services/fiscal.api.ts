@@ -1,9 +1,12 @@
 import { OperationType } from '../../../firebase';
 import { apiRequest } from '../../../shared/lib/api-client';
-import type { CargoInsurancePolicy, CargoInsurancePolicyDraft, FiscalCommunicationLog, FiscalCorrectionLetterDraft, FiscalDocument, FiscalDocumentDraft, FiscalDraftFromFreight, FiscalEvent, FiscalMdfeDriverDraft } from '../types/fiscal.types';
+import type { CargoInsurancePolicy, CargoInsurancePolicyDraft, FiscalCommunicationLog, FiscalCorrectionLetterDraft, FiscalDocument, FiscalDocumentDraft, FiscalDraftFromFreight, FiscalEvent, FiscalMdfeDriverDraft, FiscalNfeReceipt, FiscalNfeReceiptStatus } from '../types/fiscal.types';
 
 export const fiscalApi = {
   listDocuments: () => apiRequest<FiscalDocument[]>('/api/fiscal/documents', {}, OperationType.LIST),
+  listNfeReceipts: () => apiRequest<FiscalNfeReceipt[]>('/api/fiscal/nfe-receipts', {}, OperationType.LIST),
+  importNfeReceipt: (payload: { xml: string; source?: 'upload'; notes?: string }) => apiRequest<FiscalNfeReceipt>('/api/fiscal/nfe-receipts/import', { method: 'POST', body: JSON.stringify(payload) }, OperationType.CREATE),
+  updateNfeReceiptStatus: (id: string, payload: { status: FiscalNfeReceiptStatus; usedFiscalDocumentId?: string }) => apiRequest<FiscalNfeReceipt>(`/api/fiscal/nfe-receipts/${id}/status`, { method: 'PATCH', body: JSON.stringify(payload) }, OperationType.UPDATE),
   listDocumentLogs: (id: string) => apiRequest<FiscalCommunicationLog[]>(`/api/fiscal/documents/${id}/logs`, {}, OperationType.LIST),
   listDocumentEvents: (id: string) => apiRequest<FiscalEvent[]>(`/api/fiscal/documents/${id}/events`, {}, OperationType.LIST),
   draftFromFreight: (freightId: string) => apiRequest<FiscalDraftFromFreight>(`/api/fiscal/documents/from-freight/${freightId}`, {}, OperationType.GET),
