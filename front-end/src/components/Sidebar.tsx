@@ -33,7 +33,7 @@ import { NavItem } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../context/FirebaseContext';
 import { canAccess } from '../lib/permissions';
-import { canAccessFiscal, canAccessNfeInbox, canUseFiscalThirdParty } from '../lib/features';
+import { canAccessFiscal, canAccessNfeInbox, canAccessNfse, canUseFiscalThirdParty } from '../lib/features';
 import { canAccessNovalogOperations } from '../features/novalog/utils/novalog.visibility';
 
 interface SidebarProps {
@@ -116,6 +116,7 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
       icon: Settings,
       items: [
         { id: 'tenantProfile', label: 'Transportadora', icon: Building2, allowed: canSeeAdminMenu && canAccess(userProfile, 'tenantProfile', 'read') },
+        { id: 'nfseConfig', label: 'Configuracao NFS-e', icon: ReceiptText, allowed: canAccessNfse(userProfile) },
         { id: 'settings', label: 'Configuracoes', icon: Settings, allowed: canSeeAdminMenu && canAccess(userProfile, 'settings', 'read') },
         { id: 'support', label: 'Suporte', icon: ShieldCheck, allowed: canSeeAdminMenu },
       ],

@@ -27,6 +27,7 @@ const initialFormData = {
   city: '',
   state: '',
   zipCode: '',
+  ibgeCode: '',
   contractContact: '',
   notes: '',
   status: 'active' as const,
@@ -200,6 +201,7 @@ export default function Companies() {
         address: address.addressLine || current.address,
         city: address.city || current.city,
         state: address.state || current.state,
+        ibgeCode: address.ibgeCode || current.ibgeCode,
       }));
     } catch (error) {
       setZipCodeError(error instanceof Error ? error.message : 'Nao foi possivel consultar o CEP informado.');
@@ -234,6 +236,7 @@ export default function Companies() {
       city: company.city,
       state: company.state,
       zipCode: company.zipCode,
+      ibgeCode: company.ibgeCode || '',
       contractContact: company.contractContact || '',
       notes: company.notes || '',
       status: company.status,

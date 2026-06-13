@@ -1,6 +1,6 @@
 import { UserProfile } from '../shared/types/common.types';
 
-export type FeatureKey = 'fiscal' | 'fiscal.cte' | 'fiscal.mdfe' | 'fiscal.third_party' | 'fiscal.nfe_inbox';
+export type FeatureKey = 'fiscal' | 'fiscal.cte' | 'fiscal.mdfe' | 'fiscal.third_party' | 'fiscal.nfe_inbox' | 'fiscal.nfse';
 
 export function hasFeature(profile: UserProfile | null, key: FeatureKey) {
   return !!profile?.features?.[key];
@@ -14,6 +14,11 @@ export function canAccessFiscal(profile: UserProfile | null) {
 // Disponivel para quem tem a flag dedicada ou o modulo fiscal completo.
 export function canAccessNfeInbox(profile: UserProfile | null) {
   return hasFeature(profile, 'fiscal.nfe_inbox') || canAccessFiscal(profile);
+}
+
+// Emissao de NFS-e (servico). Flag dedicada, desligada por padrao.
+export function canAccessNfse(profile: UserProfile | null) {
+  return hasFeature(profile, 'fiscal.nfse');
 }
 
 export function canUseFiscalMdfe(profile: UserProfile | null) {

@@ -1,6 +1,6 @@
 import { NavItem, UserProfile } from '../../shared/types/common.types';
 import { canAccess, type Section } from '../../lib/permissions';
-import { canAccessFiscal, canAccessNfeInbox, canUseFiscalThirdParty } from '../../lib/features';
+import { canAccessFiscal, canAccessNfeInbox, canAccessNfse, canUseFiscalThirdParty } from '../../lib/features';
 import { canAccessNovalogOperations } from '../../features/novalog/utils/novalog.visibility';
 
 export const navItemToPath: Record<NavItem, string> = {
@@ -29,6 +29,7 @@ export const navItemToPath: Record<NavItem, string> = {
   novalogReports: '/novalog/relatorios',
   cargas: '/cargas',
   reports: '/relatorios',
+  nfseConfig: '/configuracao-nfse',
   settings: '/configuracoes',
   support: '/suporte',
 };
@@ -116,6 +117,8 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
       return canAccess(profile, 'cargas', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'settings':
       return canAccess(profile, 'settings', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'nfseConfig':
+      return canAccessNfse(profile) ? activeTab : getFirstAllowedTab(profile);
     default:
       return activeTab;
   }
@@ -150,5 +153,6 @@ export const navItemSectionMap: Partial<Record<NavItem, Section>> = {
   novalogReports: 'reports',
   cargas: 'cargas',
   reports: 'reports',
+  nfseConfig: 'settings',
   settings: 'settings',
 };

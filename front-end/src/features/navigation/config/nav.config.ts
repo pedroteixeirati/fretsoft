@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { NavItem, UserProfile } from '../../../shared/types/common.types';
 import { canAccess } from '../../../lib/permissions';
-import { canAccessFiscal, canAccessNfeInbox, canUseFiscalThirdParty } from '../../../lib/features';
+import { canAccessFiscal, canAccessNfeInbox, canAccessNfse, canUseFiscalThirdParty } from '../../../lib/features';
 import { useAuth } from '../../auth/hooks/useAuth';
 
 export interface NavigationItem {
@@ -124,6 +124,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       icon: Settings,
       items: compactItems([
         canSeeAdminMenu && canAccess(userProfile, 'tenantProfile', 'read') ? navItem('tenantProfile', 'Transportadora', Building2) : null,
+        canAccessNfse(userProfile) ? navItem('nfseConfig', 'Configuracao NFS-e', ReceiptText) : null,
         canSeeAdminMenu && canAccess(userProfile, 'settings', 'read') ? navItem('settings', 'Configuracoes', Settings) : null,
         canSeeAdminMenu ? navItem('support', 'Suporte', ShieldCheck) : null,
       ]),

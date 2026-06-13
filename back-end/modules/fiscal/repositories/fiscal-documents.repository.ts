@@ -159,6 +159,7 @@ export async function findFiscalDocumentForProviderWebhook(params: {
 export type TenantEmitterRow = {
   cnpj: string | null;
   state_registration: string | null;
+  municipal_registration: string | null;
   name: string;
   trade_name: string | null;
   crt: string | null;
@@ -175,7 +176,7 @@ export type TenantEmitterRow = {
 
 export async function findTenantEmitter(tenantId?: string) {
   const result = await pool.query<TenantEmitterRow>(
-    `select cnpj, state_registration, name, trade_name, crt, phone, zip_code, ibge_code,
+    `select cnpj, state_registration, municipal_registration, name, trade_name, crt, phone, zip_code, ibge_code,
             address_line, address_number, address_complement, district, city, state
      from tenants
      where id = $1

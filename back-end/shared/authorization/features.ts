@@ -6,6 +6,7 @@ export const FISCAL_FEATURE_KEYS = [
   'fiscal.mdfe',
   'fiscal.third_party',
   'fiscal.nfe_inbox',
+  'fiscal.nfse',
 ] as const;
 
 export type FiscalFeatureKey = (typeof FISCAL_FEATURE_KEYS)[number];
