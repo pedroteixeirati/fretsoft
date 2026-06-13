@@ -1,6 +1,6 @@
 import { UserProfile } from '../shared/types/common.types';
 
-export type FeatureKey = 'fiscal' | 'fiscal.cte' | 'fiscal.mdfe' | 'fiscal.third_party' | 'fiscal.nfe_inbox' | 'fiscal.nfse';
+export type FeatureKey = 'fiscal' | 'fiscal.cte' | 'fiscal.mdfe' | 'fiscal.third_party' | 'fiscal.nfe_inbox' | 'fiscal.nfse' | 'passenger_ops';
 
 export function hasFeature(profile: UserProfile | null, key: FeatureKey) {
   return !!profile?.features?.[key];
@@ -19,6 +19,11 @@ export function canAccessNfeInbox(profile: UserProfile | null) {
 // Emissao de NFS-e (servico). Flag dedicada, desligada por padrao.
 export function canAccessNfse(profile: UserProfile | null) {
   return hasFeature(profile, 'fiscal.nfse');
+}
+
+// Operacao de passageiros (fretamento): motoristas + escala de linhas.
+export function canAccessPassengerOps(profile: UserProfile | null) {
+  return hasFeature(profile, 'passenger_ops');
 }
 
 export function canUseFiscalMdfe(profile: UserProfile | null) {

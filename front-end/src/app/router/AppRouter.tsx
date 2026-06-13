@@ -13,6 +13,8 @@ import Inventory from '../../pages/Inventory';
 import MaintenanceInspections from '../../pages/MaintenanceInspections';
 import Vehicles from '../../pages/Vehicles';
 import VehicleDocuments from '../../pages/VehicleDocuments';
+import Drivers from '../../pages/Drivers';
+import TransportLines from '../../pages/TransportLines';
 import RecurringPayables from '../../pages/RecurringPayables';
 import NfeInbox from '../../pages/NfeInbox';
 import NfseConfig from '../../pages/NfseConfig';
@@ -85,6 +87,8 @@ export default function AppRouter() {
             <Route path="/manutencao-preventiva" element={<MaintenanceInspections />} />
             <Route path="/veiculos" element={<Vehicles />} />
             <Route path="/vencimentos-frota" element={<VehicleDocuments />} />
+            <Route path="/motoristas" element={<Drivers />} />
+            <Route path="/escala" element={<TransportLines />} />
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/empresas" element={<Companies />} />
             <Route path="/contratos" element={<Contracts />} />

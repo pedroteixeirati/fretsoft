@@ -8,6 +8,8 @@ import cargasRouter from '../../../modules/cargas/controllers/cargas.controller'
 import expensesRouter from '../../../modules/expenses/controllers/expenses.controller';
 import fiscalRouter from '../../../modules/fiscal/controllers/fiscal.controller';
 import nfseRouter from '../../../modules/fiscal/controllers/nfse.controller';
+import driversRouter from '../../../modules/drivers/controllers/drivers.controller';
+import transportLinesRouter from '../../../modules/transport-lines/controllers/transport-lines.controller';
 import freightsRouter from '../../../modules/freights/controllers/freights.controller';
 import novalogRouter from '../../../modules/novalog/controllers/novalog.controller';
 import payablesRouter from '../../../modules/payables/controllers/payables.controller';
@@ -51,6 +53,8 @@ app.use('/api', novalogRouter);
 app.use('/api', expensesRouter);
 app.use('/api', fiscalRouter);
 app.use('/api', nfseRouter);
+app.use('/api', driversRouter);
+app.use('/api', transportLinesRouter);
 app.use('/api', tenantFeaturesRouter);
 app.use('/api', transportPartnersRouter);
 app.use('/api', payablesRouter);

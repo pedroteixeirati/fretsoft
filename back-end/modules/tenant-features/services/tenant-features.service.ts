@@ -1,4 +1,4 @@
-import { FISCAL_FEATURE_KEYS } from '../../../shared/authorization/features';
+import { MANAGED_FEATURE_KEYS } from '../../../shared/authorization/features';
 import { forbiddenError, validationError } from '../../../shared/errors/app-error';
 import type { AuthContext } from '../../auth/dtos/auth-context';
 import { listTenantFeatureRows, upsertTenantFeature } from '../repositories/tenant-features.repository';
@@ -8,6 +8,9 @@ const FEATURE_LABELS: Record<string, string> = {
   'fiscal.cte': 'Emissao de CT-e',
   'fiscal.mdfe': 'Emissao de MDF-e',
   'fiscal.third_party': 'Frete de terceiro (TAC / CIOT)',
+  'fiscal.nfe_inbox': 'Caixa de NF-e de entrada',
+  'fiscal.nfse': 'Emissao de NFS-e',
+  passenger_ops: 'Operacao de passageiros (fretamento)',
 };
 
 function ensureDev(auth?: AuthContext) {
@@ -20,7 +23,7 @@ export async function listTenantFeatures(auth?: AuthContext) {
   ensureDev(auth);
   const rows = await listTenantFeatureRows(auth?.tenantId || '');
   const enabled = new Map(rows.map((row) => [row.feature_key, row.enabled]));
-  return FISCAL_FEATURE_KEYS.map((key) => ({
+  return MANAGED_FEATURE_KEYS.map((key) => ({
     key,
     label: FEATURE_LABELS[key] || key,
     enabled: enabled.get(key) === true,
@@ -29,7 +32,7 @@ export async function listTenantFeatures(auth?: AuthContext) {
 
 export async function setTenantFeature(auth: AuthContext | undefined, key: string, enabled: boolean) {
   ensureDev(auth);
-  if (!FISCAL_FEATURE_KEYS.includes(key as (typeof FISCAL_FEATURE_KEYS)[number])) {
+  if (!MANAGED_FEATURE_KEYS.includes(key as (typeof MANAGED_FEATURE_KEYS)[number])) {
     throw validationError('Feature flag invalida.', 'invalid_feature_key', 'key');
   }
   await upsertTenantFeature(auth?.tenantId || '', key, enabled === true, auth?.userId);

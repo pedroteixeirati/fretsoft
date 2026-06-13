@@ -1,6 +1,6 @@
 import { NavItem, UserProfile } from '../../shared/types/common.types';
 import { canAccess, type Section } from '../../lib/permissions';
-import { canAccessFiscal, canAccessNfeInbox, canAccessNfse, canUseFiscalThirdParty } from '../../lib/features';
+import { canAccessFiscal, canAccessNfeInbox, canAccessNfse, canAccessPassengerOps, canUseFiscalThirdParty } from '../../lib/features';
 import { canAccessNovalogOperations } from '../../features/novalog/utils/novalog.visibility';
 
 export const navItemToPath: Record<NavItem, string> = {
@@ -20,6 +20,8 @@ export const navItemToPath: Record<NavItem, string> = {
   inventory: '/almoxarifado',
   vehicles: '/veiculos',
   vehicleDocuments: '/vencimentos-frota',
+  drivers: '/motoristas',
+  transportLines: '/escala',
   suppliers: '/fornecedores',
   companies: '/empresas',
   contracts: '/contratos',
@@ -96,6 +98,10 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
       return canAccess(profile, 'vehicles', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'vehicleDocuments':
       return canAccess(profile, 'vehicleDocuments', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'drivers':
+      return canAccessPassengerOps(profile) ? activeTab : getFirstAllowedTab(profile);
+    case 'transportLines':
+      return canAccessPassengerOps(profile) ? activeTab : getFirstAllowedTab(profile);
     case 'recurringPayables':
       return canAccess(profile, 'recurringPayables', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'nfeInbox':
@@ -147,6 +153,8 @@ export const navItemSectionMap: Partial<Record<NavItem, Section>> = {
   inventory: 'inventory',
   vehicles: 'vehicles',
   vehicleDocuments: 'vehicleDocuments',
+  drivers: 'drivers',
+  transportLines: 'transportLines',
   suppliers: 'providers',
   companies: 'companies',
   contracts: 'contracts',
