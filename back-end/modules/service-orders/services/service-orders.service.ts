@@ -6,6 +6,7 @@ import {
   deleteTenantServiceOrder,
   findTenantServiceOrder,
   findVehicleBelongsToTenant,
+  InsufficientInventoryError,
   insertTenantServiceOrder,
   listTenantServiceOrders,
   updateTenantServiceOrder,
@@ -36,6 +37,8 @@ function mapItemRow(row: ServiceOrderItemRow) {
     unitAmount: Number(row.unit_amount || 0),
     totalAmount: Number(row.total_amount || 0),
     supplierName: row.supplier_name || '',
+    inventoryItemId: row.inventory_item_id || '',
+    inventoryItemName: row.inventory_item_name || '',
     notes: row.notes || '',
   };
 }
@@ -72,6 +75,7 @@ function validateItems(rawItems: unknown) {
     const description = normalizeRequiredText(item.description as string);
     const quantity = Number(item.quantity);
     const unitAmount = Number(item.unitAmount);
+    const inventoryItemId = normalizeOptionalText(item.inventoryItemId as string);
 
     if (!itemTypes.includes(itemType)) {
       throw validationError(`Informe um tipo valido para o item ${index + 1}.`, 'invalid_service_order_item_type', 'items');
@@ -85,6 +89,9 @@ function validateItems(rawItems: unknown) {
     if (!Number.isFinite(unitAmount) || unitAmount < 0) {
       throw validationError(`O valor unitario do item ${index + 1} deve ser zero ou maior.`, 'invalid_service_order_item_unit_amount', 'items');
     }
+    if (inventoryItemId && !isValidUuid(inventoryItemId)) {
+      throw validationError(`Vinculo de peca invalido no item ${index + 1}.`, 'invalid_service_order_item_inventory', 'items');
+    }
 
     return {
       itemType: itemType as 'part' | 'labor',
@@ -93,6 +100,7 @@ function validateItems(rawItems: unknown) {
       unitAmount: round(unitAmount),
       totalAmount: round(quantity * unitAmount),
       supplierName: normalizeOptionalText(item.supplierName as string),
+      inventoryItemId: itemType === 'part' ? inventoryItemId : null,
       notes: normalizeOptionalText(item.notes as string),
     };
   });
@@ -167,16 +175,31 @@ export async function getServiceOrder(auth: AuthContext | undefined, id: string)
   return row ? mapServiceOrderRow(row) : null;
 }
 
+function rethrowInventoryError(error: unknown): never {
+  if (error instanceof InsufficientInventoryError) {
+    throw validationError(error.message, 'service_order_insufficient_inventory', 'items');
+  }
+  throw error;
+}
+
 export async function createServiceOrder(auth: AuthContext | undefined, body: Record<string, unknown>) {
   const payload = await validateServiceOrderPayload(body, auth?.tenantId);
-  const row = await insertTenantServiceOrder(payload, auth?.tenantId, auth?.userId);
-  return row ? mapServiceOrderRow(row) : null;
+  try {
+    const row = await insertTenantServiceOrder(payload, auth?.tenantId, auth?.userId);
+    return row ? mapServiceOrderRow(row) : null;
+  } catch (error) {
+    rethrowInventoryError(error);
+  }
 }
 
 export async function updateServiceOrder(auth: AuthContext | undefined, id: string, body: Record<string, unknown>) {
   const payload = await validateServiceOrderPayload(body, auth?.tenantId);
-  const row = await updateTenantServiceOrder(id, payload, auth?.tenantId, auth?.userId);
-  return row ? mapServiceOrderRow(row) : undefined;
+  try {
+    const row = await updateTenantServiceOrder(id, payload, auth?.tenantId, auth?.userId);
+    return row ? mapServiceOrderRow(row) : undefined;
+  } catch (error) {
+    rethrowInventoryError(error);
+  }
 }
 
 export async function deleteServiceOrder(auth: AuthContext | undefined, id: string) {

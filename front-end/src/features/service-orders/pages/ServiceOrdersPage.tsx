@@ -8,6 +8,7 @@ import { clearFieldError } from '../../../shared/forms';
 import ConfirmDialog from '../../../shared/ui/ConfirmDialog';
 import KpiCard from '../../../shared/ui/KpiCard';
 import { useVehiclesQuery } from '../../vehicles/hooks/useVehiclesQuery';
+import { useInventoryQuery } from '../../inventory/hooks/useInventoryQuery';
 import { useServiceOrdersQuery } from '../hooks/useServiceOrdersQuery';
 import { useServiceOrderMutations } from '../hooks/useServiceOrderMutations';
 import { useServiceOrderForm } from '../hooks/useServiceOrderForm';
@@ -40,6 +41,7 @@ export default function ServiceOrdersPage() {
     enabled: Boolean(userProfile),
   });
   const { vehicles } = useVehiclesQuery({ enabled: Boolean(userProfile) });
+  const { items: inventoryItems } = useInventoryQuery({ enabled: Boolean(userProfile) && canAccess(userProfile, 'inventory', 'read') });
   const { createServiceOrder, updateServiceOrder, deleteServiceOrder, isSubmitting } = useServiceOrderMutations();
   const {
     isModalOpen,
@@ -138,6 +140,7 @@ export default function ServiceOrdersPage() {
         unitAmount: parseNumber(item.unitAmount),
         totalAmount: parseNumber(item.quantity) * parseNumber(item.unitAmount),
         supplierName: item.supplierName.trim(),
+        inventoryItemId: item.itemType === 'part' ? item.inventoryItemId : '',
         notes: item.notes.trim(),
       })),
     };
@@ -241,6 +244,7 @@ export default function ServiceOrdersPage() {
         isSubmitting={isSubmitting}
         formData={formData}
         vehicles={vehicles}
+        inventoryItems={inventoryItems}
         onClose={closeModal}
         onSubmit={handleSubmit}
         onChange={setFormData}

@@ -9,6 +9,8 @@ export type ServiceOrderItemRow = {
   unit_amount: string | number;
   total_amount: string | number;
   supplier_name: string | null;
+  inventory_item_id: string | null;
+  inventory_item_name: string | null;
   notes: string | null;
 };
 
@@ -52,15 +54,17 @@ const orderColumns = `
 `;
 
 const itemColumns = `
-  id,
-  service_order_id,
-  item_type,
-  description,
-  quantity,
-  unit_amount,
-  total_amount,
-  supplier_name,
-  notes
+  service_order_items.id,
+  service_order_items.service_order_id,
+  service_order_items.item_type,
+  service_order_items.description,
+  service_order_items.quantity,
+  service_order_items.unit_amount,
+  service_order_items.total_amount,
+  service_order_items.supplier_name,
+  service_order_items.inventory_item_id,
+  inventory_items.name as inventory_item_name,
+  service_order_items.notes
 `;
 
 type ServiceOrderItemPayload = {
@@ -70,8 +74,20 @@ type ServiceOrderItemPayload = {
   unitAmount: number;
   totalAmount: number;
   supplierName: string | null;
+  inventoryItemId: string | null;
   notes: string | null;
 };
+
+export class InsufficientInventoryError extends Error {
+  itemName: string;
+  available: number;
+  constructor(itemName: string, available: number) {
+    super(`Saldo insuficiente no almoxarifado para "${itemName}". Disponivel: ${available}.`);
+    this.name = 'InsufficientInventoryError';
+    this.itemName = itemName;
+    this.available = available;
+  }
+}
 
 type ServiceOrderPayload = {
   vehicleId: string;
@@ -93,8 +109,9 @@ async function attachItems(orders: ServiceOrderRow[]) {
   const itemsResult = await pool.query<ServiceOrderItemRow>(
     `select ${itemColumns}
      from service_order_items
-     where service_order_id = any($1::uuid[])
-     order by created_at asc`,
+     left join inventory_items on inventory_items.id = service_order_items.inventory_item_id
+     where service_order_items.service_order_id = any($1::uuid[])
+     order by service_order_items.created_at asc`,
     [ids],
   );
 
@@ -163,9 +180,10 @@ async function insertItems(
         unit_amount,
         total_amount,
         supplier_name,
+        inventory_item_id,
         notes
       )
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         tenantId,
         serviceOrderId,
@@ -175,8 +193,82 @@ async function insertItems(
         item.unitAmount,
         item.totalAmount,
         item.supplierName,
+        item.itemType === 'part' ? item.inventoryItemId : null,
         item.notes,
       ],
+    );
+  }
+}
+
+// Reconcilia a baixa de estoque gerada por esta OS: reverte os movimentos
+// anteriores (devolvendo o saldo) e recria as saidas para os itens de peca
+// vinculados a uma peca do almoxarifado. Tudo dentro da transacao da OS.
+async function reconcileInventoryForOrder(
+  client: { query: typeof pool.query },
+  tenantId: string,
+  serviceOrderId: string,
+  items: ServiceOrderItemPayload[],
+  occurredOn: string,
+  userId?: string,
+) {
+  // 1. Devolve ao estoque o que esta OS havia dado baixa antes.
+  await client.query(
+    `update inventory_items i
+     set quantity = i.quantity + m.quantity,
+         updated_at = now()
+     from inventory_movements m
+     where m.service_order_id = $1
+       and m.tenant_id = $2
+       and m.movement_type = 'out'
+       and m.inventory_item_id = i.id`,
+    [serviceOrderId, tenantId],
+  );
+  await client.query(
+    `delete from inventory_movements where service_order_id = $1 and tenant_id = $2`,
+    [serviceOrderId, tenantId],
+  );
+
+  // 2. Agrupa a quantidade por peca vinculada (varios itens podem citar a mesma peca).
+  const quantityByItem = new Map<string, number>();
+  for (const item of items) {
+    if (item.itemType !== 'part' || !item.inventoryItemId || item.quantity <= 0) continue;
+    quantityByItem.set(item.inventoryItemId, (quantityByItem.get(item.inventoryItemId) || 0) + item.quantity);
+  }
+
+  // 3. Cria as saidas e abate o saldo, bloqueando saldo negativo.
+  for (const [inventoryItemId, quantity] of quantityByItem) {
+    const itemResult = await client.query<{ id: string; name: string; quantity: string | number }>(
+      `select id, name, quantity
+       from inventory_items
+       where id = $1
+         and tenant_id = $2
+       for update`,
+      [inventoryItemId, tenantId],
+    );
+
+    const inventoryItem = itemResult.rows[0];
+    if (!inventoryItem) continue; // peca removida do estoque: ignora o vinculo.
+
+    const available = Number(inventoryItem.quantity) || 0;
+    if (available < quantity) {
+      throw new InsufficientInventoryError(inventoryItem.name, available);
+    }
+
+    await client.query(
+      `insert into inventory_movements (
+        tenant_id, inventory_item_id, movement_type, quantity, occurred_on, reason, service_order_id, created_by_user_id
+      )
+      values ($1, $2, 'out', $3, $4, 'Consumo em ordem de servico', $5, $6)`,
+      [tenantId, inventoryItemId, quantity, occurredOn, serviceOrderId, userId || null],
+    );
+
+    await client.query(
+      `update inventory_items
+       set quantity = quantity - $1,
+           updated_at = now()
+       where id = $2
+         and tenant_id = $3`,
+      [quantity, inventoryItemId, tenantId],
     );
   }
 }
@@ -222,6 +314,7 @@ export async function insertTenantServiceOrder(payload: ServiceOrderPayload, ten
     const orderId = orderResult.rows[0]?.id;
     if (orderId) {
       await insertItems(client, tenantId as string, orderId, payload.items);
+      await reconcileInventoryForOrder(client, tenantId as string, orderId, payload.items, payload.openedOn, userId);
     }
 
     await client.query('commit');
@@ -284,6 +377,7 @@ export async function updateTenantServiceOrder(
 
     await client.query(`delete from service_order_items where service_order_id = $1 and tenant_id = $2`, [orderId, tenantId]);
     await insertItems(client, tenantId as string, orderId, payload.items);
+    await reconcileInventoryForOrder(client, tenantId as string, orderId, payload.items, payload.openedOn, userId);
 
     await client.query('commit');
     return findTenantServiceOrder(orderId, tenantId);
@@ -296,13 +390,38 @@ export async function updateTenantServiceOrder(
 }
 
 export async function deleteTenantServiceOrder(id: string, tenantId?: string) {
-  const result = await pool.query<{ id: string }>(
-    `delete from service_orders
-     where id = $1
-       and tenant_id = $2
-     returning id`,
-    [id, tenantId],
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
 
-  return result.rows[0] || null;
+    // Devolve ao estoque qualquer baixa gerada por esta OS antes de excluir.
+    await client.query(
+      `update inventory_items i
+       set quantity = i.quantity + m.quantity,
+           updated_at = now()
+       from inventory_movements m
+       where m.service_order_id = $1
+         and m.tenant_id = $2
+         and m.movement_type = 'out'
+         and m.inventory_item_id = i.id`,
+      [id, tenantId],
+    );
+    await client.query(`delete from inventory_movements where service_order_id = $1 and tenant_id = $2`, [id, tenantId]);
+
+    const result = await client.query<{ id: string }>(
+      `delete from service_orders
+       where id = $1
+         and tenant_id = $2
+       returning id`,
+      [id, tenantId],
+    );
+
+    await client.query('commit');
+    return result.rows[0] || null;
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

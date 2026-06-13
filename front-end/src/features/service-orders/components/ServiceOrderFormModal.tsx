@@ -5,6 +5,7 @@ import Modal from '../../../components/Modal';
 import Input from '../../../shared/ui/Input';
 import { FieldLabel, FormAlert, FormDatePicker, hasRenderableFieldErrors, hasRequiredFieldsFilled, useFormErrorFocus } from '../../../shared/forms';
 import { Vehicle } from '../../vehicles/types/vehicle.types';
+import { InventoryItem } from '../../inventory/types/inventory.types';
 import { ServiceOrderFormData, ServiceOrderFormField, ServiceOrderItemFormData, createEmptyItem } from '../hooks/useServiceOrderForm';
 import { ServiceOrderItemType } from '../types/service-order.types';
 import { FormFieldErrors } from '../../../lib/errors';
@@ -17,6 +18,7 @@ interface ServiceOrderFormModalProps {
   isSubmitting: boolean;
   formData: ServiceOrderFormData;
   vehicles: Vehicle[];
+  inventoryItems: InventoryItem[];
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
   onChange: (next: ServiceOrderFormData) => void;
@@ -40,6 +42,7 @@ export default function ServiceOrderFormModal({
   isSubmitting,
   formData,
   vehicles,
+  inventoryItems,
   onClose,
   onSubmit,
   onChange,
@@ -68,6 +71,17 @@ export default function ServiceOrderFormModal({
   const addItem = (itemType: ServiceOrderItemType) => {
     onClearFieldError('items');
     onChange({ ...formData, items: [...formData.items, createEmptyItem(itemType)] });
+  };
+
+  const linkInventory = (index: number, inventoryItemId: string) => {
+    const selected = inventoryItems.find((option) => option.id === inventoryItemId);
+    const item = formData.items[index];
+    updateItem(index, {
+      inventoryItemId,
+      // Autopreenche descricao/valor a partir da peca quando ainda vazios.
+      description: selected && !item.description.trim() ? selected.name : item.description,
+      unitAmount: selected && !item.unitAmount.trim() ? String(selected.unitCost) : item.unitAmount,
+    });
   };
 
   const removeItem = (index: number) => {
@@ -259,6 +273,22 @@ export default function ServiceOrderFormModal({
                       </button>
                     </div>
                   </div>
+                  {item.itemType === 'part' ? (
+                    <div className="mt-3 space-y-1">
+                      <FieldLabel>Vincular peca do almoxarifado (baixa automatica do estoque)</FieldLabel>
+                      <CustomSelect
+                        value={item.inventoryItemId}
+                        onChange={(value) => linkInventory(index, value)}
+                        options={[
+                          { value: '', label: 'Nao vincular ao estoque' },
+                          ...inventoryItems.map((option) => ({
+                            value: option.id,
+                            label: `${option.name}${option.code ? ` (${option.code})` : ''} — saldo ${option.quantity}`,
+                          })),
+                        ]}
+                      />
+                    </div>
+                  ) : null}
                   <p className="mt-2 text-right text-xs font-medium text-on-surface-variant">
                     Subtotal: {formatCurrency(lineTotal)}
                   </p>

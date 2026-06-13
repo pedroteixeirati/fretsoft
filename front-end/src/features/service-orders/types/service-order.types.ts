@@ -9,6 +9,8 @@ export interface ServiceOrderItem {
   unitAmount: number;
   totalAmount: number;
   supplierName: string;
+  inventoryItemId: string;
+  inventoryItemName?: string;
   notes: string;
 }
 

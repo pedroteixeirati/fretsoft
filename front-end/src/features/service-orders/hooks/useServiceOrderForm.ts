@@ -8,6 +8,7 @@ export interface ServiceOrderItemFormData {
   quantity: string;
   unitAmount: string;
   supplierName: string;
+  inventoryItemId: string;
   notes: string;
 }
 
@@ -41,6 +42,7 @@ export function createEmptyItem(itemType: ServiceOrderItemType = 'part'): Servic
     quantity: '1',
     unitAmount: '',
     supplierName: '',
+    inventoryItemId: '',
     notes: '',
   };
 }
@@ -95,6 +97,7 @@ export function useServiceOrderForm() {
             quantity: String(item.quantity),
             unitAmount: String(item.unitAmount),
             supplierName: item.supplierName || '',
+            inventoryItemId: item.inventoryItemId || '',
             notes: item.notes || '',
           }))
         : [createEmptyItem('part')],
