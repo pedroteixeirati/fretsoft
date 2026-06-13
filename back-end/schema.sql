@@ -1325,6 +1325,27 @@ create table if not exists fiscal_communication_logs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists fiscal_nfe_receipts (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  source text not null default 'upload' check (source in ('upload', 'email', 'api', 'focus')),
+  status text not null default 'pending' check (status in ('pending', 'validated', 'used', 'ignored', 'error')),
+  nfe_key text not null,
+  xml text not null,
+  sender_snapshot jsonb not null default '{}'::jsonb,
+  recipient_snapshot jsonb not null default '{}'::jsonb,
+  totals_snapshot jsonb not null default '{}'::jsonb,
+  product_snapshot jsonb not null default '{}'::jsonb,
+  issue_date text,
+  used_fiscal_document_id uuid references fiscal_documents(id) on delete set null,
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 drop trigger if exists trg_fiscal_documents_display_id on fiscal_documents;
 create trigger trg_fiscal_documents_display_id
 before insert on fiscal_documents
@@ -1343,6 +1364,12 @@ before insert on fiscal_events
 for each row
 execute function assign_tenant_display_id();
 
+drop trigger if exists trg_fiscal_nfe_receipts_display_id on fiscal_nfe_receipts;
+create trigger trg_fiscal_nfe_receipts_display_id
+before insert on fiscal_nfe_receipts
+for each row
+execute function assign_tenant_display_id();
+
 create unique index if not exists idx_fiscal_documents_tenant_display_id on fiscal_documents(tenant_id, display_id)
   where display_id is not null;
 create unique index if not exists idx_fiscal_documents_tenant_type_series_number on fiscal_documents(tenant_id, document_type, series, number)
@@ -1357,6 +1384,10 @@ create index if not exists idx_fiscal_document_parties_document on fiscal_docume
 create index if not exists idx_fiscal_document_freights_document on fiscal_document_freights(tenant_id, fiscal_document_id);
 create index if not exists idx_fiscal_events_document on fiscal_events(tenant_id, fiscal_document_id);
 create index if not exists idx_fiscal_communication_logs_document on fiscal_communication_logs(tenant_id, fiscal_document_id);
+create unique index if not exists idx_fiscal_nfe_receipts_tenant_display_id on fiscal_nfe_receipts(tenant_id, display_id)
+  where display_id is not null;
+create unique index if not exists idx_fiscal_nfe_receipts_tenant_nfe_key on fiscal_nfe_receipts(tenant_id, nfe_key);
+create index if not exists idx_fiscal_nfe_receipts_tenant_status on fiscal_nfe_receipts(tenant_id, status, created_at desc);
 
 alter table if exists novalog_billing_items
   add column if not exists fiscal_document_id uuid references fiscal_documents(id) on delete set null;

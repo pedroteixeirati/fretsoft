@@ -11,6 +11,8 @@ import { fiscalPermissions } from '../fiscal.resource';
 import type { FiscalDocumentInput } from '../dtos/fiscal-document.types';
 import { serializeFiscalDocument, serializeFiscalDocuments } from '../serializers/fiscal-documents.serializer';
 import { addMdfeDriverToDocument, buildFiscalDraftFromFreight, cancelFiscalDocument, closeMdfeDocument, createFiscalDocument, emitFiscalDocument, getFiscalDocument, handleFocusWebhook, listFiscalDocumentCommunicationLogs, listFiscalDocumentEvents, listTenantFiscalDocuments, removeFiscalDocument, resendFiscalDocument, sendFiscalCorrectionLetter, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
+import { importNfeReceipt, listNfeReceipts, updateNfeReceiptStatus } from '../services/fiscal-nfe-receipts.service';
+import { serializeNfeReceipt, serializeNfeReceipts } from '../serializers/fiscal-nfe-receipts.serializer';
 
 const router = express.Router();
 
@@ -77,6 +79,48 @@ router.get('/fiscal/documents/from-freight/:freightId', loadAuthContext, require
     }
 
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/fiscal/nfe-receipts', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', fiscalPermissions, req.auth?.role), 'Sem permissao para visualizar NF-es recebidas.')) {
+      return;
+    }
+
+    res.json(serializeNfeReceipts(await listNfeReceipts(req.auth)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/fiscal/nfe-receipts/import', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('create', fiscalPermissions, req.auth?.role), 'Sem permissao para importar NF-es.')) {
+      return;
+    }
+
+    res.status(201).json(serializeNfeReceipt(await importNfeReceipt(req.auth, req.body as Record<string, unknown>) || {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/fiscal/nfe-receipts/:id/status', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para atualizar NF-es recebidas.')) {
+      return;
+    }
+
+    const receipt = await updateNfeReceiptStatus(req.auth, req.params.id, req.body as Record<string, unknown>);
+    if (!receipt) {
+      sendErrorResponse(res, notFoundError('NF-e recebida nao encontrada.', 'nfe_receipt_not_found'));
+      return;
+    }
+
+    res.json(serializeNfeReceipt(receipt));
   } catch (error) {
     next(error);
   }

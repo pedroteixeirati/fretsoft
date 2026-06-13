@@ -8,10 +8,9 @@ import { canUseFiscalThirdParty } from '../../../lib/features';
 import { Alert, Button, ConfirmDialog, DataTable, Input, KpiCard, Modal, PageHeader, Select, type DataTableColumn } from '../../../shared/ui';
 import { fiscalApi } from '../services/fiscal.api';
 import { DEFAULT_ICMS_CST, suggestCfop } from '../utils/cfop';
-import { parseNfeXml } from '../utils/nfe-import';
-import { useCargoInsurancePoliciesQuery, useFiscalDocumentsQuery } from '../hooks/useFiscalDocumentsQuery';
+import { useCargoInsurancePoliciesQuery, useFiscalDocumentsQuery, useFiscalNfeReceiptsQuery } from '../hooks/useFiscalDocumentsQuery';
 import { useFiscalDocumentMutations } from '../hooks/useFiscalDocumentMutations';
-import type { CargoInsurancePolicy, CargoInsurancePolicyDraft, FiscalCommunicationLog, FiscalCorrectionLetterDraft, FiscalCteData, FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalEvent, FiscalExecutionMode, FiscalMdfeData, FiscalMdfeDriverDraft, FiscalParty, FiscalPayment } from '../types/fiscal.types';
+import type { CargoInsurancePolicy, CargoInsurancePolicyDraft, FiscalCommunicationLog, FiscalCorrectionLetterDraft, FiscalCteData, FiscalDocument, FiscalDocumentDraft, FiscalDocumentStatus, FiscalDocumentType, FiscalEvent, FiscalExecutionMode, FiscalMdfeData, FiscalMdfeDriverDraft, FiscalNfeReceipt, FiscalParty, FiscalPayment } from '../types/fiscal.types';
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -51,6 +50,21 @@ const fiscalOperationLabels: Record<string, string> = {
   add_mdfe_driver: 'Inclusao de condutor',
   provider_webhook: 'Webhook Focus',
   send_email: 'Envio por e-mail',
+};
+
+const nfeReceiptStatusLabels: Record<FiscalNfeReceipt['status'], string> = {
+  pending: 'Pendente',
+  validated: 'Validada',
+  used: 'Usada em CT-e',
+  ignored: 'Ignorada',
+  error: 'Erro',
+};
+
+const nfeReceiptSourceLabels: Record<FiscalNfeReceipt['source'], string> = {
+  upload: 'Upload',
+  email: 'E-mail',
+  api: 'API',
+  focus: 'Focus',
 };
 
 const emptyDraft: FiscalDocumentDraft = {
@@ -158,6 +172,7 @@ export default function FiscalDocumentsPage() {
   const canDelete = canAccess(userProfile, 'fiscal', 'delete');
   const canUseTac = canUseFiscalThirdParty(userProfile);
   const { documents, isLoading, error } = useFiscalDocumentsQuery(Boolean(user));
+  const { nfeReceipts, error: nfeReceiptsError } = useFiscalNfeReceiptsQuery(Boolean(user));
   const { policies: cargoInsurancePolicies, error: cargoInsuranceError } = useCargoInsurancePoliciesQuery(Boolean(user));
   const {
     createDocument,
@@ -170,6 +185,8 @@ export default function FiscalDocumentsPage() {
     addMdfeDriver,
     resendDocument,
     deleteDocument,
+    importNfeReceipt,
+    updateNfeReceiptStatus,
     createCargoInsurancePolicy,
     updateCargoInsurancePolicy,
     deleteCargoInsurancePolicy,
@@ -204,6 +221,8 @@ export default function FiscalDocumentsPage() {
   const [resendEmails, setResendEmails] = useState('');
   const [nfeImportMsg, setNfeImportMsg] = useState('');
   const [nfeImportError, setNfeImportError] = useState('');
+  const [draftNfeReceiptId, setDraftNfeReceiptId] = useState('');
+  const nfeReceiptInputRef = useRef<HTMLInputElement | null>(null);
   const nfeInputRef = useRef<HTMLInputElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -220,6 +239,11 @@ export default function FiscalDocumentsPage() {
       return matchesSearch && matchesStatus;
     });
   }, [documents, searchTerm, statusFilter]);
+
+  const pendingNfeReceipts = useMemo(
+    () => nfeReceipts.filter((receipt) => ['pending', 'validated', 'error'].includes(receipt.status)).slice(0, 6),
+    [nfeReceipts],
+  );
 
   const defaultCargoInsurancePolicy = useMemo(
     () => cargoInsurancePolicies.find((policy) => policy.isDefault && policy.status === 'active') || null,
@@ -241,12 +265,71 @@ export default function FiscalDocumentsPage() {
   const openCreate = () => {
     setEditingDocument(null);
     setDraft(emptyDraft);
+    setDraftNfeReceiptId('');
     setSubmitError('');
+    setIsModalOpen(true);
+  };
+
+  const partyFromNfeReceipt = (receipt: FiscalNfeReceipt, role: 'sender' | 'recipient'): FiscalParty => {
+    const source = role === 'sender' ? receipt.senderSnapshot : receipt.recipientSnapshot;
+    return {
+      role,
+      name: source?.name || '',
+      documentNumber: source?.documentNumber || '',
+      stateRegistration: source?.stateRegistration || '',
+      city: source?.city || '',
+      state: source?.state || '',
+      phone: source?.phone || '',
+      street: source?.street || '',
+      number: source?.number || '',
+      district: source?.district || '',
+      zipCode: source?.zipCode || '',
+      cityIbgeCode: source?.cityIbgeCode || '',
+    };
+  };
+
+  const draftFromNfeReceipt = (receipt: FiscalNfeReceipt): FiscalDocumentDraft => {
+    const sender = partyFromNfeReceipt(receipt, 'sender');
+    const recipient = partyFromNfeReceipt(receipt, 'recipient');
+    const cfop = suggestCfop(sender.state, recipient.state);
+    const amount = Number(receipt.totalsSnapshot?.invoiceAmount || receipt.totalsSnapshot?.productAmount || 0);
+    return {
+      ...emptyDraft,
+      documentType: 'cte',
+      model: '57',
+      issueDate: new Date().toISOString().slice(0, 10),
+      amount,
+      originName: sender.city,
+      destinationName: recipient.city,
+      takerName: recipient.name,
+      notes: `CT-e gerado a partir da NF-e ${receipt.nfeKey}`,
+      parties: [sender, recipient],
+      cteData: {
+        nfeKeys: [receipt.nfeKey],
+        valorCarga: amount || undefined,
+        produtoPredominante: receipt.productSnapshot?.predominantProduct || undefined,
+        municipioInicioIbge: sender.cityIbgeCode || undefined,
+        municipioFimIbge: recipient.cityIbgeCode || undefined,
+        tomadorTipo: 'destinatario',
+        cfop: cfop || undefined,
+        icmsCst: DEFAULT_ICMS_CST,
+      },
+    };
+  };
+
+  const openCreateFromNfeReceipt = (receipt: FiscalNfeReceipt) => {
+    setEditingDocument(null);
+    setDraft(draftFromNfeReceipt(receipt));
+    setDraftNfeReceiptId(receipt.id);
+    setSubmitError('');
+    setSuccessMessage('');
+    setNfeImportMsg(`Rascunho preparado com a NF-e final ...${receipt.nfeKey.slice(-6)}.`);
     setIsModalOpen(true);
   };
 
   const openEdit = (document: FiscalDocument) => {
     setEditingDocument(document);
+    setDraftNfeReceiptId('');
     setDraft({
       documentType: document.documentType,
       model: document.model,
@@ -383,43 +466,18 @@ export default function FiscalDocumentsPage() {
 
   const selectedCteKeys = draft.mdfeData.cteKeys || [];
 
-  const handleNfeImport = (file?: File | null) => {
+  const handleNfeImport = async (file?: File | null) => {
     if (!file) return;
     setNfeImportError('');
     setNfeImportMsg('');
-    const reader = new FileReader();
-    reader.onload = () => {
-      const parsed = parseNfeXml(String(reader.result || ''));
-      if (!parsed) {
-        setNfeImportError('Arquivo nao parece ser uma NF-e valida (XML).');
-        return;
-      }
-      setDraft((current) => {
-        const sender = parsed.sender || current.parties.find((party) => party.role === 'sender');
-        const recipient = parsed.recipient || current.parties.find((party) => party.role === 'recipient');
-        const parties = current.parties.filter((party) => party.role !== 'sender' && party.role !== 'recipient');
-        if (sender) parties.push(sender);
-        if (recipient) parties.push(recipient);
-        const nfeKeys = Array.from(new Set([...(current.cteData.nfeKeys || []), parsed.nfeKey]));
-        const cfop = suggestCfop(sender?.state, recipient?.state);
-        return {
-          ...current,
-          parties,
-          cteData: {
-            ...current.cteData,
-            nfeKeys,
-            valorCarga: current.cteData.valorCarga ?? parsed.valorCarga,
-            produtoPredominante: current.cteData.produtoPredominante || parsed.produtoPredominante,
-            tomadorTipo: current.cteData.tomadorTipo || 'destinatario',
-            cfop: current.cteData.cfop || cfop,
-            icmsCst: current.cteData.icmsCst || DEFAULT_ICMS_CST,
-          },
-        };
-      });
-      setNfeImportMsg(`NF-e importada: ${parsed.sender?.name || 'remetente'} -> ${parsed.recipient?.name || 'destinatario'} (chave final ...${parsed.nfeKey.slice(-6)}).`);
-    };
-    reader.onerror = () => setNfeImportError('Nao foi possivel ler o arquivo.');
-    reader.readAsText(file);
+    try {
+      const receipt = await importNfeReceipt.mutateAsync({ xml: await file.text(), source: 'upload' });
+      setDraft(draftFromNfeReceipt(receipt));
+      setDraftNfeReceiptId(receipt.id);
+      setNfeImportMsg(`NF-e recebida: ${receipt.senderSnapshot?.name || 'remetente'} -> ${receipt.recipientSnapshot?.name || 'destinatario'} (chave final ...${receipt.nfeKey.slice(-6)}).`);
+    } catch (importError) {
+      setNfeImportError(getErrorMessage(importError, 'Nao foi possivel importar a NF-e.'));
+    }
   };
 
   const renderParty = (role: FiscalParty['role'], label: string) => {
@@ -506,8 +564,13 @@ export default function FiscalDocumentsPage() {
         ? await updateDocument.mutateAsync({ id: editingDocument.id, payload })
         : await createDocument.mutateAsync(payload);
 
+      if (!editingDocument && draftNfeReceiptId && saved?.id) {
+        await updateNfeReceiptStatus.mutateAsync({ id: draftNfeReceiptId, status: 'used', usedFiscalDocumentId: saved.id });
+      }
+
       setWarningMessages(saved?.warnings ?? []);
       setSuccessMessage(editingDocument ? 'Documento fiscal atualizado com sucesso.' : 'Documento fiscal registrado com sucesso.');
+      setDraftNfeReceiptId('');
       setIsModalOpen(false);
     } catch (submitError) {
       setSubmitError(getErrorMessage(submitError, 'Nao foi possivel salvar o documento fiscal.'));
@@ -850,6 +913,7 @@ export default function FiscalDocumentsPage() {
       />
 
       {error ? <Alert tone="danger">{getErrorMessage(error, 'Nao foi possivel carregar os documentos fiscais.')}</Alert> : null}
+      {nfeReceiptsError ? <Alert tone="danger">{getErrorMessage(nfeReceiptsError, 'Nao foi possivel carregar as NF-es recebidas.')}</Alert> : null}
       {cargoInsuranceError ? <Alert tone="danger">{getErrorMessage(cargoInsuranceError, 'Nao foi possivel carregar as apolices de seguro.')}</Alert> : null}
       {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
       {successMessage ? <Alert tone="success">{successMessage}</Alert> : null}
@@ -860,6 +924,67 @@ export default function FiscalDocumentsPage() {
           </ul>
         </Alert>
       ) : null}
+
+      <section className="rounded-2xl border border-outline-variant bg-surface p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex gap-3">
+            <span className="mt-1 rounded-full bg-primary/10 p-2 text-primary">
+              <Upload className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-on-surface">NF-es recebidas</h2>
+              <p className="text-sm text-on-surface-variant">Receba o XML da NF-e, valide os dados e gere o rascunho do CT-e sem redigitar remetente, destinatario e carga.</p>
+            </div>
+          </div>
+          {canCreate ? (
+            <div>
+              <input
+                ref={nfeReceiptInputRef}
+                type="file"
+                accept=".xml,text/xml,application/xml"
+                className="hidden"
+                onChange={(event) => { handleNfeImport(event.target.files?.[0]); event.target.value = ''; }}
+              />
+              <Button variant="secondary" onClick={() => nfeReceiptInputRef.current?.click()} disabled={importNfeReceipt.isPending}>
+                <Upload className="h-4 w-4" /> {importNfeReceipt.isPending ? 'Importando...' : 'Importar XML'}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+
+        {nfeImportError ? <Alert tone="danger" className="mt-4">{nfeImportError}</Alert> : null}
+        {nfeImportMsg ? <Alert tone="success" className="mt-4">{nfeImportMsg}</Alert> : null}
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          {pendingNfeReceipts.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container/40 p-4 text-sm text-on-surface-variant lg:col-span-3">
+              Nenhuma NF-e pendente. Quando um XML chegar por upload, e-mail ou API, ele aparecera aqui para virar CT-e.
+            </div>
+          ) : pendingNfeReceipts.map((receipt) => (
+            <article key={receipt.id} className="rounded-xl border border-outline-variant bg-surface-container/40 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-on-surface">NF-e ...{receipt.nfeKey.slice(-8)}</p>
+                  <p className="text-xs text-on-surface-variant">{nfeReceiptSourceLabels[receipt.source]} - {receipt.issueDate ? formatDate(receipt.issueDate) : formatDate(receipt.createdAt)}</p>
+                </div>
+                <span className="rounded-full bg-surface px-3 py-1 text-xs font-bold text-on-surface">{nfeReceiptStatusLabels[receipt.status]}</span>
+              </div>
+              <div className="mt-3 space-y-1 text-sm text-on-surface-variant">
+                <p><span className="font-semibold text-on-surface">Remetente:</span> {receipt.senderSnapshot?.name || '-'}</p>
+                <p><span className="font-semibold text-on-surface">Destinatario:</span> {receipt.recipientSnapshot?.name || '-'}</p>
+                <p><span className="font-semibold text-on-surface">Valor:</span> {currency.format(Number(receipt.totalsSnapshot?.invoiceAmount || receipt.totalsSnapshot?.productAmount || 0))}</p>
+              </div>
+              {canCreate ? (
+                <div className="mt-4 flex justify-end">
+                  <Button variant="secondary" onClick={() => openCreateFromNfeReceipt(receipt)}>
+                    <FilePlus2 className="h-4 w-4" /> Gerar CT-e
+                  </Button>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-4 md:grid-cols-3">
         <KpiCard label="Valor filtrado" value={currency.format(totals.amount)} icon={FileCheck2} tone="success" />

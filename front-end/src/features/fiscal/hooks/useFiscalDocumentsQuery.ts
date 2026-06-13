@@ -3,6 +3,7 @@ import { fiscalApi } from '../services/fiscal.api';
 
 export const fiscalQueryKeys = {
   documents: ['fiscal', 'documents'] as const,
+  nfeReceipts: ['fiscal', 'nfe-receipts'] as const,
   cargoInsurancePolicies: ['fiscal', 'cargo-insurance-policies'] as const,
 };
 
@@ -17,6 +18,20 @@ export function useFiscalDocumentsQuery(enabled = true) {
     documents: documentsQuery.data || [],
     isLoading: documentsQuery.isLoading,
     error: documentsQuery.error,
+  };
+}
+
+export function useFiscalNfeReceiptsQuery(enabled = true) {
+  const receiptsQuery = useQuery({
+    queryKey: fiscalQueryKeys.nfeReceipts,
+    queryFn: fiscalApi.listNfeReceipts,
+    enabled,
+  });
+
+  return {
+    nfeReceipts: receiptsQuery.data || [],
+    isLoading: receiptsQuery.isLoading,
+    error: receiptsQuery.error,
   };
 }
 
