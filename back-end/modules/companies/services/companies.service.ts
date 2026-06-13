@@ -46,6 +46,7 @@ function mapCompanyRow(row: CompanyRow) {
     city: row.city,
     state: row.state,
     zipCode: row.zip_code,
+    ibgeCode: row.ibge_code || '',
     contractContact: row.contract_contact || '',
     notes: row.notes || '',
     status: row.status,
@@ -70,6 +71,7 @@ export async function validateCompanyPayload(
   const city = normalizeRequiredText(body.city as string);
   const state = normalizeRequiredText(body.state as string).toUpperCase();
   const zipCode = normalizeRequiredText(body.zipCode as string);
+  const ibgeCode = (normalizeOptionalText(body.ibgeCode as string) || '').replace(/\D/g, '');
   const contractContact = normalizeOptionalText(body.contractContact as string);
   const notes = normalizeOptionalText(body.notes as string);
   const status = body.status as string;
@@ -115,6 +117,7 @@ export async function validateCompanyPayload(
     city,
     state,
     zipCode,
+    ibgeCode,
     contractContact: contractContact || '',
     notes: notes || '',
     status,

@@ -14,6 +14,7 @@ export interface Company {
   city: string;
   state: string;
   zipCode: string;
+  ibgeCode?: string;
   contractContact?: string;
   notes?: string;
   status: 'active' | 'inactive';

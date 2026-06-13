@@ -153,6 +153,7 @@ create table if not exists companies (
   city text not null,
   state text not null,
   zip_code text not null,
+  ibge_code text,
   contract_contact text,
   notes text,
   status text not null check (status in ('active', 'inactive')),
@@ -1390,6 +1391,26 @@ create unique index if not exists idx_fiscal_nfe_receipts_tenant_display_id on f
 create unique index if not exists idx_fiscal_nfe_receipts_tenant_nfe_key on fiscal_nfe_receipts(tenant_id, nfe_key);
 create index if not exists idx_fiscal_nfe_receipts_tenant_status on fiscal_nfe_receipts(tenant_id, status, created_at desc);
 create index if not exists idx_fiscal_nfe_receipts_used_payable on fiscal_nfe_receipts(tenant_id, used_payable_id);
+
+create table if not exists tenant_nfse_config (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  service_code text,
+  service_list_item text,
+  cnae_code text,
+  iss_rate numeric(5, 2),
+  iss_retained boolean not null default false,
+  special_regime text,
+  municipal_incidence_ibge text,
+  default_service_description text,
+  enabled boolean not null default false,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists idx_tenant_nfse_config_tenant on tenant_nfse_config(tenant_id);
 
 alter table if exists novalog_billing_items
   add column if not exists fiscal_document_id uuid references fiscal_documents(id) on delete set null;

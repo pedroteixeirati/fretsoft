@@ -15,6 +15,7 @@ import { generatePayableFromNfeReceipt, importNfeReceipt, listNfeReceipts, updat
 import { serializeNfeReceipt, serializeNfeReceipts } from '../serializers/fiscal-nfe-receipts.serializer';
 import { isFeatureEnabled } from '../../../shared/authorization/features';
 import { payablesPermissions } from '../../payables/payables.resource';
+import { getTenantNfseConfig, saveTenantNfseConfig } from '../services/tenant-nfse-config.service';
 
 const router = express.Router();
 
@@ -34,6 +35,13 @@ function requireNfeInboxAccess(req: AuthenticatedRequest, res: Response, next: N
     return;
   }
   ensureFeature(res, features, 'fiscal.nfe_inbox', 'Caixa de entrada de NF-e nao habilitada para este tenant.');
+}
+
+function requireNfseFeature(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!ensureFeature(res, req.auth?.features, 'fiscal.nfse', 'Emissao de NFS-e nao habilitada para este tenant.')) {
+    return;
+  }
+  next();
 }
 
 function validateFocusWebhookAuthorization(req: express.Request, res: Response) {
@@ -152,6 +160,30 @@ router.post('/fiscal/nfe-receipts/:id/payable', loadAuthContext, requireNfeInbox
     }
 
     res.status(201).json(serializeNfeReceipt(result.receipt || {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/fiscal/nfse-config', loadAuthContext, requireNfseFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('read', fiscalPermissions, req.auth?.role), 'Sem permissao para visualizar a configuracao de NFS-e.')) {
+      return;
+    }
+
+    res.json(await getTenantNfseConfig(req.auth));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/fiscal/nfse-config', loadAuthContext, requireNfseFeature, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para editar a configuracao de NFS-e.')) {
+      return;
+    }
+
+    res.json(await saveTenantNfseConfig(req.auth, req.body as Record<string, unknown>));
   } catch (error) {
     next(error);
   }

@@ -17,6 +17,7 @@ export type CompanyRow = {
   city: string;
   state: string;
   zip_code: string;
+  ibge_code: string | null;
   contract_contact: string | null;
   notes: string | null;
   status: 'active' | 'inactive';
@@ -39,6 +40,7 @@ const companyColumns = `
   city,
   state,
   zip_code,
+  ibge_code,
   contract_contact,
   notes,
   status
@@ -79,13 +81,14 @@ export async function insertTenantCompany(
       city,
       state,
       zip_code,
+      ibge_code,
       contract_contact,
       notes,
       status
     )
     values (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-      $11, $12, $13, $14, $15, $16, $17, $18, $19
+      $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
     )
     returning ${companyColumns}`,
     [
@@ -105,6 +108,7 @@ export async function insertTenantCompany(
       payload.city,
       payload.state,
       payload.zipCode,
+      payload.ibgeCode,
       payload.contractContact,
       payload.notes,
       payload.status,
@@ -135,13 +139,14 @@ export async function updateTenantCompany(
          city = $11,
          state = $12,
          zip_code = $13,
-         contract_contact = $14,
-         notes = $15,
-         status = $16,
-         updated_by_user_id = $17,
+         ibge_code = $14,
+         contract_contact = $15,
+         notes = $16,
+         status = $17,
+         updated_by_user_id = $18,
          updated_at = now()
-     where id = $18
-       and tenant_id = $19
+     where id = $19
+       and tenant_id = $20
      returning ${companyColumns}`,
     [
       payload.corporateName,
@@ -157,6 +162,7 @@ export async function updateTenantCompany(
       payload.city,
       payload.state,
       payload.zipCode,
+      payload.ibgeCode,
       payload.contractContact,
       payload.notes,
       payload.status,
