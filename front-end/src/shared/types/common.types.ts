@@ -15,6 +15,8 @@ export type NavItem =
   | 'inventory'
   | 'vehicles'
   | 'vehicleDocuments'
+  | 'drivers'
+  | 'transportLines'
   | 'suppliers'
   | 'companies'
   | 'contracts'

@@ -1,7 +1,7 @@
 import { UserProfile } from '../shared/types/common.types';
 
 export type Role = UserProfile['role'];
-export type Section = 'platformTenants' | 'tenantProfile' | 'revenues' | 'payables' | 'recurringPayables' | 'fiscal' | 'transportPartners' | 'vehicles' | 'vehicleDocuments' | 'providers' | 'companies' | 'contracts' | 'freights' | 'cargas' | 'expenses' | 'serviceOrders' | 'maintenanceInspections' | 'inventory' | 'reports' | 'settings' | 'users';
+export type Section = 'platformTenants' | 'tenantProfile' | 'revenues' | 'payables' | 'recurringPayables' | 'fiscal' | 'transportPartners' | 'vehicles' | 'vehicleDocuments' | 'providers' | 'companies' | 'contracts' | 'freights' | 'cargas' | 'expenses' | 'serviceOrders' | 'maintenanceInspections' | 'inventory' | 'drivers' | 'transportLines' | 'reports' | 'settings' | 'users';
 export type Action = 'read' | 'create' | 'update' | 'delete';
 
 const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
@@ -108,6 +108,18 @@ const sectionPermissions: Record<Section, Record<Action, Role[]>> = {
     delete: ['dev', 'owner', 'admin', 'operational'],
   },
   maintenanceInspections: {
+    read: ['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'],
+    create: ['dev', 'owner', 'admin', 'operational'],
+    update: ['dev', 'owner', 'admin', 'operational'],
+    delete: ['dev', 'owner', 'admin', 'operational'],
+  },
+  drivers: {
+    read: ['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'],
+    create: ['dev', 'owner', 'admin', 'operational'],
+    update: ['dev', 'owner', 'admin', 'operational'],
+    delete: ['dev', 'owner', 'admin', 'operational'],
+  },
+  transportLines: {
     read: ['dev', 'owner', 'admin', 'financial', 'operational', 'viewer'],
     create: ['dev', 'owner', 'admin', 'operational'],
     update: ['dev', 'owner', 'admin', 'operational'],

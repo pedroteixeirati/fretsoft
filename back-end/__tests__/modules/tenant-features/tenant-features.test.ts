@@ -22,7 +22,7 @@ test('feature flags expostas via rotas dedicadas e registradas', () => {
 test('apenas dev gerencia flags e somente chaves fiscais conhecidas', () => {
   assert.match(service, /function ensureDev/);
   assert.match(service, /auth\?\.role !== 'dev'/);
-  assert.match(service, /FISCAL_FEATURE_KEYS/);
+  assert.match(service, /MANAGED_FEATURE_KEYS/);
   assert.match(service, /invalid_feature_key/);
 });
 

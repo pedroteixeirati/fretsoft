@@ -9,6 +9,8 @@ export type { RecurringPayable } from './features/recurring-payables/types/recur
 export type { NfeReceipt } from './features/nfe-inbox/types/nfe-inbox.types';
 export type { NfseConfig } from './features/nfse-config/types/nfse-config.types';
 export type { NfseDocument } from './features/nfse/types/nfse.types';
+export type { Driver } from './features/drivers/types/driver.types';
+export type { TransportLine } from './features/transport-lines/types/transport-line.types';
 export type { ServiceOrder } from './features/service-orders/types/service-order.types';
 export type { InventoryItem, InventoryMovement } from './features/inventory/types/inventory.types';
 export type { MaintenanceInspection } from './features/maintenance-inspections/types/maintenance-inspection.types';

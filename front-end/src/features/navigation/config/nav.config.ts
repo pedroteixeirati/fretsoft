@@ -2,6 +2,7 @@ import { useMemo, type ElementType } from 'react';
 import {
   BarChart3,
   Boxes,
+  Bus,
   ClipboardCheck,
   Building2,
   BriefcaseBusiness,
@@ -27,7 +28,7 @@ import {
 } from 'lucide-react';
 import { NavItem, UserProfile } from '../../../shared/types/common.types';
 import { canAccess } from '../../../lib/permissions';
-import { canAccessFiscal, canAccessNfeInbox, canAccessNfse, canUseFiscalThirdParty } from '../../../lib/features';
+import { canAccessFiscal, canAccessNfeInbox, canAccessNfse, canAccessPassengerOps, canUseFiscalThirdParty } from '../../../lib/features';
 import { useAuth } from '../../auth/hooks/useAuth';
 
 export interface NavigationItem {
@@ -114,6 +115,8 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       items: compactItems([
         canAccess(userProfile, 'vehicles', 'read') ? navItem('vehicles', 'Veiculos', Truck) : null,
         canAccess(userProfile, 'vehicleDocuments', 'read') ? navItem('vehicleDocuments', 'Vencimentos da frota', CalendarClock) : null,
+        canAccessPassengerOps(userProfile) ? navItem('drivers', 'Motoristas', IdCard) : null,
+        canAccessPassengerOps(userProfile) ? navItem('transportLines', 'Escala de linhas', Bus) : null,
         canAccess(userProfile, 'transportPartners', 'read') && canUseFiscalThirdParty(userProfile) ? navItem('transportPartners', 'Transportadores (TAC)', IdCard) : null,
         canAccess(userProfile, 'providers', 'read') ? navItem('suppliers', 'Fornecedores', Users) : null,
         canAccess(userProfile, 'companies', 'read') ? navItem('companies', 'Empresas', Building2) : null,
