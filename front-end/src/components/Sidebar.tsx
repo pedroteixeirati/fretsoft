@@ -24,6 +24,7 @@ import {
   Wrench,
   Boxes,
   ClipboardCheck,
+  Inbox,
   Pickaxe,
   Layers3,
   ReceiptText,
@@ -32,7 +33,7 @@ import { NavItem } from '../types';
 import { cn } from '../lib/utils';
 import { useFirebase } from '../context/FirebaseContext';
 import { canAccess } from '../lib/permissions';
-import { canAccessFiscal, canUseFiscalThirdParty } from '../lib/features';
+import { canAccessFiscal, canAccessNfeInbox, canUseFiscalThirdParty } from '../lib/features';
 import { canAccessNovalogOperations } from '../features/novalog/utils/novalog.visibility';
 
 interface SidebarProps {
@@ -91,6 +92,7 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
         { id: 'revenues', label: 'Contas a receber', icon: WalletCards, allowed: true },
         { id: 'payables', label: 'Contas a pagar', icon: CreditCard, allowed: true },
         { id: 'recurringPayables', label: 'Despesas recorrentes', icon: Repeat, allowed: canAccess(userProfile, 'recurringPayables', 'read') },
+        { id: 'nfeInbox', label: 'NF-e de entrada', icon: Inbox, allowed: canAccessNfeInbox(userProfile) },
         { id: 'fuelAnalysis', label: 'Consumo de combustivel', icon: Fuel, allowed: canAccess(userProfile, 'expenses', 'read') },
         { id: 'fiscal', label: 'Fiscal', icon: FileCheck2, allowed: canAccess(userProfile, 'fiscal', 'read') && canAccessFiscal(userProfile) },
         { id: 'reports', label: 'Relatorios', icon: BarChart3, allowed: userProfile?.tenantSlug !== 'novalog' },

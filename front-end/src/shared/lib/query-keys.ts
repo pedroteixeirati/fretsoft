@@ -32,6 +32,10 @@ export const queryKeys = {
     all: ['maintenanceInspections'] as const,
     list: () => ['maintenanceInspections', 'list'] as const,
   },
+  nfeInbox: {
+    all: ['nfeInbox'] as const,
+    list: () => ['nfeInbox', 'list'] as const,
+  },
   providers: {
     all: ['providers'] as const,
     list: () => ['providers', 'list'] as const,

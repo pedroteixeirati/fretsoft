@@ -13,7 +13,7 @@ test('isFeatureEnabled so retorna true para flag explicitamente habilitada', () 
 });
 
 test('chaves fiscais cobrem mestre e sub-flags do rollout', () => {
-  assert.deepEqual([...FISCAL_FEATURE_KEYS], ['fiscal', 'fiscal.cte', 'fiscal.mdfe', 'fiscal.third_party']);
+  assert.deepEqual([...FISCAL_FEATURE_KEYS], ['fiscal', 'fiscal.cte', 'fiscal.mdfe', 'fiscal.third_party', 'fiscal.nfe_inbox']);
 });
 
 test('migration cria tenant_features multi-tenant com unicidade por chave', () => {

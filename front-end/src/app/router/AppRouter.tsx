@@ -14,6 +14,7 @@ import MaintenanceInspections from '../../pages/MaintenanceInspections';
 import Vehicles from '../../pages/Vehicles';
 import VehicleDocuments from '../../pages/VehicleDocuments';
 import RecurringPayables from '../../pages/RecurringPayables';
+import NfeInbox from '../../pages/NfeInbox';
 import Reports from '../../pages/Reports';
 import Suppliers from '../../pages/Suppliers';
 import Companies from '../../pages/Companies';
@@ -71,6 +72,7 @@ export default function AppRouter() {
             <Route path="/contas-a-receber" element={<Revenues />} />
             <Route path="/contas-a-pagar" element={<PayablesRoute />} />
             <Route path="/despesas-recorrentes" element={<RecurringPayables />} />
+            <Route path="/nfe-entrada" element={<NfeInbox />} />
             <Route path="/fiscal" element={<Fiscal />} />
             <Route path="/custos-operacionais" element={<ExpensesRoute />} />
             <Route path="/consumo-combustivel" element={<FuelAnalysis />} />

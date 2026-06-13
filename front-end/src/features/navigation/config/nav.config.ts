@@ -12,6 +12,7 @@ import {
   Fuel,
   FolderKanban,
   IdCard,
+  Inbox,
   Layers3,
   LayoutDashboard,
   Repeat,
@@ -26,7 +27,7 @@ import {
 } from 'lucide-react';
 import { NavItem, UserProfile } from '../../../shared/types/common.types';
 import { canAccess } from '../../../lib/permissions';
-import { canAccessFiscal, canUseFiscalThirdParty } from '../../../lib/features';
+import { canAccessFiscal, canAccessNfeInbox, canUseFiscalThirdParty } from '../../../lib/features';
 import { useAuth } from '../../auth/hooks/useAuth';
 
 export interface NavigationItem {
@@ -100,6 +101,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
         navItem('revenues', 'Contas a receber', WalletCards),
         navItem('payables', 'Contas a pagar', CreditCard),
         canAccess(userProfile, 'recurringPayables', 'read') ? navItem('recurringPayables', 'Despesas recorrentes', Repeat) : null,
+        canAccessNfeInbox(userProfile) ? navItem('nfeInbox', 'NF-e de entrada', Inbox) : null,
         canAccess(userProfile, 'fiscal', 'read') && canAccessFiscal(userProfile) ? navItem('fiscal', 'Fiscal', FileCheck2) : null,
         userProfile?.tenantSlug === 'novalog' ? null : navItem('reports', 'Relatorios', BarChart3),
       ].filter((item): item is NavigationItem => item !== null),

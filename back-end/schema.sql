@@ -1339,6 +1339,7 @@ create table if not exists fiscal_nfe_receipts (
   product_snapshot jsonb not null default '{}'::jsonb,
   issue_date text,
   used_fiscal_document_id uuid references fiscal_documents(id) on delete set null,
+  used_payable_id uuid references payables(id) on delete set null,
   notes text,
   created_by_user_id uuid references users(id) on delete set null,
   updated_by_user_id uuid references users(id) on delete set null,
@@ -1388,6 +1389,7 @@ create unique index if not exists idx_fiscal_nfe_receipts_tenant_display_id on f
   where display_id is not null;
 create unique index if not exists idx_fiscal_nfe_receipts_tenant_nfe_key on fiscal_nfe_receipts(tenant_id, nfe_key);
 create index if not exists idx_fiscal_nfe_receipts_tenant_status on fiscal_nfe_receipts(tenant_id, status, created_at desc);
+create index if not exists idx_fiscal_nfe_receipts_used_payable on fiscal_nfe_receipts(tenant_id, used_payable_id);
 
 alter table if exists novalog_billing_items
   add column if not exists fiscal_document_id uuid references fiscal_documents(id) on delete set null;
