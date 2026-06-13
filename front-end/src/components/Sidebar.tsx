@@ -93,6 +93,7 @@ export default function Sidebar({ activeItem, onNavigate, isMobileOpen, onReques
         { id: 'payables', label: 'Contas a pagar', icon: CreditCard, allowed: true },
         { id: 'recurringPayables', label: 'Despesas recorrentes', icon: Repeat, allowed: canAccess(userProfile, 'recurringPayables', 'read') },
         { id: 'nfeInbox', label: 'NF-e de entrada', icon: Inbox, allowed: canAccessNfeInbox(userProfile) },
+        { id: 'nfse', label: 'NFS-e', icon: ReceiptText, allowed: canAccessNfse(userProfile) },
         { id: 'fuelAnalysis', label: 'Consumo de combustivel', icon: Fuel, allowed: canAccess(userProfile, 'expenses', 'read') },
         { id: 'fiscal', label: 'Fiscal', icon: FileCheck2, allowed: canAccess(userProfile, 'fiscal', 'read') && canAccessFiscal(userProfile) },
         { id: 'reports', label: 'Relatorios', icon: BarChart3, allowed: userProfile?.tenantSlug !== 'novalog' },

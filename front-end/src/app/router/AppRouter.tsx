@@ -16,6 +16,7 @@ import VehicleDocuments from '../../pages/VehicleDocuments';
 import RecurringPayables from '../../pages/RecurringPayables';
 import NfeInbox from '../../pages/NfeInbox';
 import NfseConfig from '../../pages/NfseConfig';
+import Nfse from '../../pages/Nfse';
 import Reports from '../../pages/Reports';
 import Suppliers from '../../pages/Suppliers';
 import Companies from '../../pages/Companies';
@@ -75,6 +76,7 @@ export default function AppRouter() {
             <Route path="/despesas-recorrentes" element={<RecurringPayables />} />
             <Route path="/nfe-entrada" element={<NfeInbox />} />
             <Route path="/configuracao-nfse" element={<NfseConfig />} />
+            <Route path="/nfse" element={<Nfse />} />
             <Route path="/fiscal" element={<Fiscal />} />
             <Route path="/custos-operacionais" element={<ExpensesRoute />} />
             <Route path="/consumo-combustivel" element={<FuelAnalysis />} />
