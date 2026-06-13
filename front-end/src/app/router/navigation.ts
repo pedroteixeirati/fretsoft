@@ -11,6 +11,7 @@ export const navItemToPath: Record<NavItem, string> = {
   payables: '/contas-a-pagar',
   recurringPayables: '/despesas-recorrentes',
   nfeInbox: '/nfe-entrada',
+  nfse: '/nfse',
   fiscal: '/fiscal',
   expenses: '/custos-operacionais',
   fuelAnalysis: '/consumo-combustivel',
@@ -99,6 +100,8 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
       return canAccess(profile, 'recurringPayables', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'nfeInbox':
       return canAccessNfeInbox(profile) ? activeTab : getFirstAllowedTab(profile);
+    case 'nfse':
+      return canAccessNfse(profile) ? activeTab : getFirstAllowedTab(profile);
     case 'suppliers':
       return canAccess(profile, 'providers', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'companies':
@@ -135,6 +138,7 @@ export const navItemSectionMap: Partial<Record<NavItem, Section>> = {
   payables: 'payables',
   recurringPayables: 'recurringPayables',
   nfeInbox: 'payables',
+  nfse: 'revenues',
   fiscal: 'fiscal',
   expenses: 'expenses',
   fuelAnalysis: 'expenses',

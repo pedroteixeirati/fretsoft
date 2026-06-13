@@ -102,6 +102,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
         navItem('payables', 'Contas a pagar', CreditCard),
         canAccess(userProfile, 'recurringPayables', 'read') ? navItem('recurringPayables', 'Despesas recorrentes', Repeat) : null,
         canAccessNfeInbox(userProfile) ? navItem('nfeInbox', 'NF-e de entrada', Inbox) : null,
+        canAccessNfse(userProfile) ? navItem('nfse', 'NFS-e', ReceiptText) : null,
         canAccess(userProfile, 'fiscal', 'read') && canAccessFiscal(userProfile) ? navItem('fiscal', 'Fiscal', FileCheck2) : null,
         userProfile?.tenantSlug === 'novalog' ? null : navItem('reports', 'Relatorios', BarChart3),
       ].filter((item): item is NavigationItem => item !== null),

@@ -1412,6 +1412,48 @@ create table if not exists tenant_nfse_config (
 
 create unique index if not exists idx_tenant_nfse_config_tenant on tenant_nfse_config(tenant_id);
 
+create table if not exists nfse_documents (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  company_id uuid references companies(id) on delete set null,
+  reference text not null,
+  status text not null default 'draft' check (status in ('draft', 'processing', 'authorized', 'rejected', 'canceled', 'error')),
+  competence_month text,
+  service_amount numeric(14, 2) not null default 0,
+  service_description text,
+  iss_rate numeric(5, 2),
+  iss_retained boolean not null default false,
+  number text,
+  series text,
+  access_key text,
+  protocol text,
+  authorized_at text,
+  xml_url text,
+  pdf_url text,
+  provider text,
+  provider_document_id text,
+  request_payload jsonb not null default '{}'::jsonb,
+  response_payload jsonb not null default '{}'::jsonb,
+  error_message text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_nfse_documents_display_id on nfse_documents;
+create trigger trg_nfse_documents_display_id
+before insert on nfse_documents
+for each row execute function assign_tenant_display_id();
+
+create unique index if not exists idx_nfse_documents_tenant_display_id
+  on nfse_documents(tenant_id, display_id)
+  where display_id is not null;
+create unique index if not exists idx_nfse_documents_tenant_reference on nfse_documents(tenant_id, reference);
+create index if not exists idx_nfse_documents_tenant_status on nfse_documents(tenant_id, status, created_at desc);
+create index if not exists idx_nfse_documents_company on nfse_documents(tenant_id, company_id);
+
 alter table if exists novalog_billing_items
   add column if not exists fiscal_document_id uuid references fiscal_documents(id) on delete set null;
 
