@@ -9,9 +9,15 @@ export const navItemToPath: Record<NavItem, string> = {
   tenantProfile: '/transportadora',
   revenues: '/contas-a-receber',
   payables: '/contas-a-pagar',
+  recurringPayables: '/despesas-recorrentes',
   fiscal: '/fiscal',
   expenses: '/custos-operacionais',
+  fuelAnalysis: '/consumo-combustivel',
+  serviceOrders: '/ordens-de-servico',
+  maintenanceInspections: '/manutencao-preventiva',
+  inventory: '/almoxarifado',
   vehicles: '/veiculos',
+  vehicleDocuments: '/vencimentos-frota',
   suppliers: '/fornecedores',
   companies: '/empresas',
   contracts: '/contratos',
@@ -75,8 +81,20 @@ export function resolveAllowedTab(profile: UserProfile, activeTab: NavItem): Nav
       return canAccess(profile, 'transportPartners', 'read') && canUseFiscalThirdParty(profile) ? activeTab : getFirstAllowedTab(profile);
     case 'expenses':
       return canAccess(profile, 'expenses', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'fuelAnalysis':
+      return canAccess(profile, 'expenses', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'serviceOrders':
+      return canAccess(profile, 'serviceOrders', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'maintenanceInspections':
+      return canAccess(profile, 'maintenanceInspections', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'inventory':
+      return canAccess(profile, 'inventory', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'vehicles':
       return canAccess(profile, 'vehicles', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'vehicleDocuments':
+      return canAccess(profile, 'vehicleDocuments', 'read') ? activeTab : getFirstAllowedTab(profile);
+    case 'recurringPayables':
+      return canAccess(profile, 'recurringPayables', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'suppliers':
       return canAccess(profile, 'providers', 'read') ? activeTab : getFirstAllowedTab(profile);
     case 'companies':
@@ -109,9 +127,15 @@ export const navItemSectionMap: Partial<Record<NavItem, Section>> = {
   tenantProfile: 'tenantProfile',
   revenues: 'revenues',
   payables: 'payables',
+  recurringPayables: 'recurringPayables',
   fiscal: 'fiscal',
   expenses: 'expenses',
+  fuelAnalysis: 'expenses',
+  serviceOrders: 'serviceOrders',
+  maintenanceInspections: 'maintenanceInspections',
+  inventory: 'inventory',
   vehicles: 'vehicles',
+  vehicleDocuments: 'vehicleDocuments',
   suppliers: 'providers',
   companies: 'companies',
   contracts: 'contracts',

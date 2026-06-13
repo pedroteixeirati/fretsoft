@@ -7,9 +7,30 @@ export const queryKeys = {
     all: ['payables'] as const,
     list: () => ['payables', 'list'] as const,
   },
+  recurringPayables: {
+    all: ['recurringPayables'] as const,
+    list: () => ['recurringPayables', 'list'] as const,
+  },
   vehicles: {
     all: ['vehicles'] as const,
     list: () => ['vehicles', 'list'] as const,
+  },
+  vehicleDocuments: {
+    all: ['vehicleDocuments'] as const,
+    list: () => ['vehicleDocuments', 'list'] as const,
+  },
+  serviceOrders: {
+    all: ['serviceOrders'] as const,
+    list: () => ['serviceOrders', 'list'] as const,
+  },
+  inventory: {
+    all: ['inventory'] as const,
+    list: () => ['inventory', 'list'] as const,
+    movements: (itemId: string) => ['inventory', 'movements', itemId] as const,
+  },
+  maintenanceInspections: {
+    all: ['maintenanceInspections'] as const,
+    list: () => ['maintenanceInspections', 'list'] as const,
   },
   providers: {
     all: ['providers'] as const,

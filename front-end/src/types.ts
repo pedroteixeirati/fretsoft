@@ -1,9 +1,14 @@
 export type { NavItem, UserProfile } from './shared/types/common.types';
 export type { Vehicle } from './features/vehicles/types/vehicle.types';
+export type { VehicleDocument } from './features/vehicle-documents/types/vehicle-document.types';
 export type { Expense } from './features/expenses/types/expense.types';
 export type { Provider } from './features/providers/types/provider.types';
 export type { Company } from './features/companies/types/company.types';
 export type { Payable } from './features/payables/types/payable.types';
+export type { RecurringPayable } from './features/recurring-payables/types/recurring-payable.types';
+export type { ServiceOrder } from './features/service-orders/types/service-order.types';
+export type { InventoryItem, InventoryMovement } from './features/inventory/types/inventory.types';
+export type { MaintenanceInspection } from './features/maintenance-inspections/types/maintenance-inspection.types';
 export type { Contract } from './features/contracts/types/contract.types';
 export type { Freight } from './features/freights/types/freight.types';
 export type { Cargo } from './features/cargas/types/cargo.types';

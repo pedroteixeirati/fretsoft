@@ -7,7 +7,13 @@ import Revenues from '../../pages/Revenues';
 import Payables from '../../pages/Payables';
 import Fiscal from '../../pages/Fiscal';
 import Expenses from '../../pages/Expenses';
+import FuelAnalysis from '../../pages/FuelAnalysis';
+import ServiceOrders from '../../pages/ServiceOrders';
+import Inventory from '../../pages/Inventory';
+import MaintenanceInspections from '../../pages/MaintenanceInspections';
 import Vehicles from '../../pages/Vehicles';
+import VehicleDocuments from '../../pages/VehicleDocuments';
+import RecurringPayables from '../../pages/RecurringPayables';
 import Reports from '../../pages/Reports';
 import Suppliers from '../../pages/Suppliers';
 import Companies from '../../pages/Companies';
@@ -64,9 +70,15 @@ export default function AppRouter() {
             <Route path="/transportadora" element={<TenantProfile />} />
             <Route path="/contas-a-receber" element={<Revenues />} />
             <Route path="/contas-a-pagar" element={<PayablesRoute />} />
+            <Route path="/despesas-recorrentes" element={<RecurringPayables />} />
             <Route path="/fiscal" element={<Fiscal />} />
             <Route path="/custos-operacionais" element={<ExpensesRoute />} />
+            <Route path="/consumo-combustivel" element={<FuelAnalysis />} />
+            <Route path="/ordens-de-servico" element={<ServiceOrders />} />
+            <Route path="/almoxarifado" element={<Inventory />} />
+            <Route path="/manutencao-preventiva" element={<MaintenanceInspections />} />
             <Route path="/veiculos" element={<Vehicles />} />
+            <Route path="/vencimentos-frota" element={<VehicleDocuments />} />
             <Route path="/fornecedores" element={<Suppliers />} />
             <Route path="/empresas" element={<Companies />} />
             <Route path="/contratos" element={<Contracts />} />
