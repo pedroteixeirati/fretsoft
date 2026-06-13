@@ -979,6 +979,212 @@ create unique index if not exists idx_cargo_insurance_policies_tenant_default
   on cargo_insurance_policies(tenant_id)
   where is_default = true and status = 'active';
 
+create table if not exists vehicle_documents (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  vehicle_id uuid not null references vehicles(id) on delete cascade,
+  document_type text not null default 'outro' check (document_type in ('ipva', 'licenciamento', 'tacografo', 'extintor', 'seguro', 'inspecao', 'outro')),
+  identifier text,
+  amount numeric(12, 2),
+  due_date date not null,
+  status text not null default 'active' check (status in ('active', 'archived')),
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_vehicle_documents_display_id on vehicle_documents;
+create trigger trg_vehicle_documents_display_id
+before insert on vehicle_documents
+for each row
+execute function assign_tenant_display_id();
+
+create unique index if not exists idx_vehicle_documents_tenant_display_id
+  on vehicle_documents(tenant_id, display_id)
+  where display_id is not null;
+create index if not exists idx_vehicle_documents_tenant_id on vehicle_documents(tenant_id);
+create index if not exists idx_vehicle_documents_tenant_vehicle on vehicle_documents(tenant_id, vehicle_id);
+create index if not exists idx_vehicle_documents_tenant_due_date on vehicle_documents(tenant_id, status, due_date);
+
+create table if not exists recurring_payables (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  description text not null,
+  provider_name text,
+  amount numeric(12, 2) not null default 0,
+  due_day integer not null default 1 check (due_day between 1 and 31),
+  starts_on date,
+  ends_on date,
+  status text not null default 'active' check (status in ('active', 'paused')),
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_recurring_payables_display_id on recurring_payables;
+create trigger trg_recurring_payables_display_id
+before insert on recurring_payables
+for each row
+execute function assign_tenant_display_id();
+
+create unique index if not exists idx_recurring_payables_tenant_display_id
+  on recurring_payables(tenant_id, display_id)
+  where display_id is not null;
+create index if not exists idx_recurring_payables_tenant_id on recurring_payables(tenant_id);
+create index if not exists idx_recurring_payables_tenant_status on recurring_payables(tenant_id, status);
+
+alter table if exists payables add column if not exists recurring_payable_id uuid references recurring_payables(id) on delete set null;
+create index if not exists idx_payables_recurring_payable on payables(tenant_id, recurring_payable_id);
+create unique index if not exists idx_payables_recurring_reference_month
+  on payables(tenant_id, recurring_payable_id, reference_month)
+  where recurring_payable_id is not null and reference_month is not null;
+
+create table if not exists service_orders (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  vehicle_id uuid not null references vehicles(id) on delete cascade,
+  status text not null default 'open' check (status in ('open', 'in_progress', 'completed', 'canceled')),
+  opened_on date not null,
+  closed_on date,
+  odometer numeric(12, 2),
+  provider_name text,
+  description text not null,
+  total_amount numeric(12, 2) not null default 0,
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists service_order_items (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  service_order_id uuid not null references service_orders(id) on delete cascade,
+  item_type text not null default 'part' check (item_type in ('part', 'labor')),
+  description text not null,
+  quantity numeric(12, 2) not null default 1,
+  unit_amount numeric(12, 2) not null default 0,
+  total_amount numeric(12, 2) not null default 0,
+  supplier_name text,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_service_orders_display_id on service_orders;
+create trigger trg_service_orders_display_id
+before insert on service_orders
+for each row
+execute function assign_tenant_display_id();
+
+create unique index if not exists idx_service_orders_tenant_display_id
+  on service_orders(tenant_id, display_id)
+  where display_id is not null;
+create index if not exists idx_service_orders_tenant_id on service_orders(tenant_id);
+create index if not exists idx_service_orders_tenant_vehicle on service_orders(tenant_id, vehicle_id);
+create index if not exists idx_service_orders_tenant_status on service_orders(tenant_id, status);
+create index if not exists idx_service_orders_tenant_opened_on on service_orders(tenant_id, opened_on);
+create index if not exists idx_service_order_items_order on service_order_items(tenant_id, service_order_id);
+
+create table if not exists inventory_items (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  code text,
+  name text not null,
+  category text,
+  unit_cost numeric(12, 2) not null default 0,
+  quantity numeric(12, 2) not null default 0,
+  min_quantity numeric(12, 2),
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists inventory_movements (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  inventory_item_id uuid not null references inventory_items(id) on delete cascade,
+  movement_type text not null default 'in' check (movement_type in ('in', 'out')),
+  quantity numeric(12, 2) not null,
+  unit_cost numeric(12, 2),
+  occurred_on date not null,
+  reason text,
+  service_order_id uuid references service_orders(id) on delete set null,
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_inventory_items_display_id on inventory_items;
+create trigger trg_inventory_items_display_id
+before insert on inventory_items
+for each row
+execute function assign_tenant_display_id();
+
+create unique index if not exists idx_inventory_items_tenant_display_id
+  on inventory_items(tenant_id, display_id)
+  where display_id is not null;
+create index if not exists idx_inventory_items_tenant_id on inventory_items(tenant_id);
+create index if not exists idx_inventory_items_tenant_category on inventory_items(tenant_id, category);
+create unique index if not exists idx_inventory_items_tenant_code
+  on inventory_items(tenant_id, code)
+  where code is not null and code <> '';
+create index if not exists idx_inventory_movements_item on inventory_movements(tenant_id, inventory_item_id);
+create index if not exists idx_inventory_movements_occurred_on on inventory_movements(tenant_id, occurred_on);
+
+create table if not exists maintenance_inspections (
+  id uuid primary key default gen_random_uuid(),
+  display_id bigint,
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  vehicle_id uuid not null references vehicles(id) on delete cascade,
+  status text not null default 'completed' check (status in ('scheduled', 'completed')),
+  inspected_on date not null,
+  odometer numeric(12, 2),
+  mechanic_name text,
+  next_due_on date,
+  next_due_km numeric(12, 2),
+  notes text,
+  created_by_user_id uuid references users(id) on delete set null,
+  updated_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists maintenance_inspection_items (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id) on delete cascade,
+  inspection_id uuid not null references maintenance_inspections(id) on delete cascade,
+  label text not null,
+  result text not null default 'ok' check (result in ('ok', 'attention', 'na')),
+  observation text,
+  created_at timestamptz not null default now()
+);
+
+drop trigger if exists trg_maintenance_inspections_display_id on maintenance_inspections;
+create trigger trg_maintenance_inspections_display_id
+before insert on maintenance_inspections
+for each row
+execute function assign_tenant_display_id();
+
+create unique index if not exists idx_maintenance_inspections_tenant_display_id
+  on maintenance_inspections(tenant_id, display_id)
+  where display_id is not null;
+create index if not exists idx_maintenance_inspections_tenant_id on maintenance_inspections(tenant_id);
+create index if not exists idx_maintenance_inspections_tenant_vehicle on maintenance_inspections(tenant_id, vehicle_id);
+create index if not exists idx_maintenance_inspections_next_due_on on maintenance_inspections(tenant_id, next_due_on);
+create index if not exists idx_maintenance_inspection_items_inspection on maintenance_inspection_items(tenant_id, inspection_id);
+
 create unique index if not exists idx_tenant_users_tenant_display_id on tenant_users(tenant_id, display_id) where display_id is not null;
 create unique index if not exists idx_vehicles_tenant_display_id on vehicles(tenant_id, display_id) where display_id is not null;
 create unique index if not exists idx_vehicles_tenant_plate

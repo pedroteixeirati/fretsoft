@@ -1,20 +1,26 @@
 import { useMemo, type ElementType } from 'react';
 import {
   BarChart3,
+  Boxes,
+  ClipboardCheck,
   Building2,
   BriefcaseBusiness,
+  CalendarClock,
   CreditCard,
   FileText,
   FileCheck2,
+  Fuel,
   FolderKanban,
   IdCard,
   Layers3,
   LayoutDashboard,
+  Repeat,
   Route,
   Settings,
   ShieldCheck,
   Truck,
   Users,
+  Wrench,
   WalletCards,
   ReceiptText,
 } from 'lucide-react';
@@ -70,6 +76,10 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
         canAccess(userProfile, 'freights', 'read') ? navItem('freights', 'Fretes', Route) : null,
         canAccess(userProfile, 'contracts', 'read') ? navItem('contracts', 'Contratos', FileText) : null,
         canAccess(userProfile, 'expenses', 'read') ? navItem('expenses', 'Custos operacionais', CreditCard) : null,
+        canAccess(userProfile, 'serviceOrders', 'read') ? navItem('serviceOrders', 'Ordens de servico', Wrench) : null,
+        canAccess(userProfile, 'maintenanceInspections', 'read') ? navItem('maintenanceInspections', 'Manutencao preventiva', ClipboardCheck) : null,
+        canAccess(userProfile, 'inventory', 'read') ? navItem('inventory', 'Almoxarifado', Boxes) : null,
+        canAccess(userProfile, 'expenses', 'read') ? navItem('fuelAnalysis', 'Consumo de combustivel', Fuel) : null,
       ]),
     },
     {
@@ -89,6 +99,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       items: [
         navItem('revenues', 'Contas a receber', WalletCards),
         navItem('payables', 'Contas a pagar', CreditCard),
+        canAccess(userProfile, 'recurringPayables', 'read') ? navItem('recurringPayables', 'Despesas recorrentes', Repeat) : null,
         canAccess(userProfile, 'fiscal', 'read') && canAccessFiscal(userProfile) ? navItem('fiscal', 'Fiscal', FileCheck2) : null,
         userProfile?.tenantSlug === 'novalog' ? null : navItem('reports', 'Relatorios', BarChart3),
       ].filter((item): item is NavigationItem => item !== null),
@@ -99,6 +110,7 @@ export function buildNavigationSections(userProfile: UserProfile | null): Naviga
       icon: FolderKanban,
       items: compactItems([
         canAccess(userProfile, 'vehicles', 'read') ? navItem('vehicles', 'Veiculos', Truck) : null,
+        canAccess(userProfile, 'vehicleDocuments', 'read') ? navItem('vehicleDocuments', 'Vencimentos da frota', CalendarClock) : null,
         canAccess(userProfile, 'transportPartners', 'read') && canUseFiscalThirdParty(userProfile) ? navItem('transportPartners', 'Transportadores (TAC)', IdCard) : null,
         canAccess(userProfile, 'providers', 'read') ? navItem('suppliers', 'Fornecedores', Users) : null,
         canAccess(userProfile, 'companies', 'read') ? navItem('companies', 'Empresas', Building2) : null,
