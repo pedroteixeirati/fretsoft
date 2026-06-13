@@ -40,6 +40,7 @@ export interface FiscalNfeReceiptRow {
   product_snapshot: FiscalNfeProductSnapshot;
   issue_date: string | null;
   used_fiscal_document_id: string | null;
+  used_payable_id: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

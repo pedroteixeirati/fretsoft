@@ -15,6 +15,7 @@ const receiptColumns = `
   product_snapshot,
   issue_date,
   used_fiscal_document_id,
+  used_payable_id,
   notes,
   created_at,
   updated_at
@@ -116,6 +117,28 @@ export async function updateTenantNfeReceiptStatus(
        and tenant_id = $5
      returning id`,
     [status, usedFiscalDocumentId || null, userId || null, id, tenantId],
+  );
+
+  const updatedId = result.rows[0]?.id;
+  return updatedId ? findTenantNfeReceipt(updatedId, tenantId) : null;
+}
+
+export async function markNfeReceiptUsedByPayable(
+  id: string,
+  payableId: string,
+  tenantId?: string,
+  userId?: string,
+) {
+  const result = await pool.query<{ id: string }>(
+    `update fiscal_nfe_receipts
+     set status = 'used',
+         used_payable_id = $1,
+         updated_by_user_id = $2,
+         updated_at = now()
+     where id = $3
+       and tenant_id = $4
+     returning id`,
+    [payableId, userId || null, id, tenantId],
   );
 
   const updatedId = result.rows[0]?.id;

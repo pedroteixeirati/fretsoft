@@ -11,8 +11,10 @@ import { fiscalPermissions } from '../fiscal.resource';
 import type { FiscalDocumentInput } from '../dtos/fiscal-document.types';
 import { serializeFiscalDocument, serializeFiscalDocuments } from '../serializers/fiscal-documents.serializer';
 import { addMdfeDriverToDocument, buildFiscalDraftFromFreight, cancelFiscalDocument, closeMdfeDocument, createFiscalDocument, emitFiscalDocument, getFiscalDocument, handleFocusWebhook, listFiscalDocumentCommunicationLogs, listFiscalDocumentEvents, listTenantFiscalDocuments, removeFiscalDocument, resendFiscalDocument, sendFiscalCorrectionLetter, syncFiscalDocument, updateFiscalDocument } from '../services/fiscal-documents.service';
-import { importNfeReceipt, listNfeReceipts, updateNfeReceiptStatus } from '../services/fiscal-nfe-receipts.service';
+import { generatePayableFromNfeReceipt, importNfeReceipt, listNfeReceipts, updateNfeReceiptStatus } from '../services/fiscal-nfe-receipts.service';
 import { serializeNfeReceipt, serializeNfeReceipts } from '../serializers/fiscal-nfe-receipts.serializer';
+import { isFeatureEnabled } from '../../../shared/authorization/features';
+import { payablesPermissions } from '../../payables/payables.resource';
 
 const router = express.Router();
 
@@ -21,6 +23,17 @@ function requireFiscalFeature(req: AuthenticatedRequest, res: Response, next: Ne
     return;
   }
   next();
+}
+
+// A caixa de entrada de NF-e serve tanto ao fluxo de CT-e (feature `fiscal`)
+// quanto ao destino generico NF-e -> conta a pagar (feature `fiscal.nfe_inbox`).
+function requireNfeInboxAccess(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const features = req.auth?.features;
+  if (isFeatureEnabled(features, 'fiscal') || isFeatureEnabled(features, 'fiscal.nfe_inbox')) {
+    next();
+    return;
+  }
+  ensureFeature(res, features, 'fiscal.nfe_inbox', 'Caixa de entrada de NF-e nao habilitada para este tenant.');
 }
 
 function validateFocusWebhookAuthorization(req: express.Request, res: Response) {
@@ -84,7 +97,7 @@ router.get('/fiscal/documents/from-freight/:freightId', loadAuthContext, require
   }
 });
 
-router.get('/fiscal/nfe-receipts', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+router.get('/fiscal/nfe-receipts', loadAuthContext, requireNfeInboxAccess, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('read', fiscalPermissions, req.auth?.role), 'Sem permissao para visualizar NF-es recebidas.')) {
       return;
@@ -96,7 +109,7 @@ router.get('/fiscal/nfe-receipts', loadAuthContext, requireFiscalFeature, async 
   }
 });
 
-router.post('/fiscal/nfe-receipts/import', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+router.post('/fiscal/nfe-receipts/import', loadAuthContext, requireNfeInboxAccess, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('create', fiscalPermissions, req.auth?.role), 'Sem permissao para importar NF-es.')) {
       return;
@@ -108,7 +121,7 @@ router.post('/fiscal/nfe-receipts/import', loadAuthContext, requireFiscalFeature
   }
 });
 
-router.patch('/fiscal/nfe-receipts/:id/status', loadAuthContext, requireFiscalFeature, async (req: AuthenticatedRequest, res, next) => {
+router.patch('/fiscal/nfe-receipts/:id/status', loadAuthContext, requireNfeInboxAccess, async (req: AuthenticatedRequest, res, next) => {
   try {
     if (!ensureAllowed(res, canPerform('update', fiscalPermissions, req.auth?.role), 'Sem permissao para atualizar NF-es recebidas.')) {
       return;
@@ -121,6 +134,24 @@ router.patch('/fiscal/nfe-receipts/:id/status', loadAuthContext, requireFiscalFe
     }
 
     res.json(serializeNfeReceipt(receipt));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/fiscal/nfe-receipts/:id/payable', loadAuthContext, requireNfeInboxAccess, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!ensureAllowed(res, canPerform('create', payablesPermissions, req.auth?.role), 'Sem permissao para gerar contas a pagar.')) {
+      return;
+    }
+
+    const result = await generatePayableFromNfeReceipt(req.auth, req.params.id, req.body as Record<string, unknown>);
+    if (result.status === 'not_found') {
+      sendErrorResponse(res, notFoundError('NF-e recebida nao encontrada.', 'nfe_receipt_not_found'));
+      return;
+    }
+
+    res.status(201).json(serializeNfeReceipt(result.receipt || {}));
   } catch (error) {
     next(error);
   }

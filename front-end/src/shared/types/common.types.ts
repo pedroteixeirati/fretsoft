@@ -5,6 +5,7 @@ export type NavItem =
   | 'revenues'
   | 'payables'
   | 'recurringPayables'
+  | 'nfeInbox'
   | 'fiscal'
   | 'expenses'
   | 'fuelAnalysis'
